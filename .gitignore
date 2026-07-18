@@ -1,0 +1,42 @@
+# Binaries / release artifacts
+/vmbench
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Optional local external-tool binaries.
+# Official source/release archives do not vendor third-party tools by default.
+/binaries/
+
+# Go build / coverage artifacts
+coverage.out
+coverage-*.out
+.coverprofile
+
+# Local caches
+.cache/
+.gocache/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS / local tooling
+.DS_Store
+Thumbs.db
+AGENTS.md
+.codex/
+.claude/
+.agents/
+.continue/
+.cursor/
+.roo/
+.windsurf/
