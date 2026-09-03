@@ -25,7 +25,7 @@ echo "    Output  : ${OUTPUT_DIR}/${BINARY_NAME}"
 mkdir -p "$OUTPUT_DIR"
 
 cd "$PROJECT_DIR"
-go build \
+CGO_ENABLED=0 go build \
   -trimpath \
   -ldflags "-s -w \
     -X github.com/cloudapp3/vmbench.Version=${VERSION} \

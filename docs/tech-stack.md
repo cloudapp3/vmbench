@@ -11,7 +11,6 @@
 | TUI | Bubble Tea / Lip Gloss |
 | 系统信息 | gopsutil |
 | 报告 | Console / JSON / HTML |
-| 对标差异输出 | `vmbench ecs-diff` 内置快照 |
 | MCP Server | 标准库 JSON-RPC over stdio，暴露给大模型客户端 |
 
 ## 当前架构
@@ -30,7 +29,6 @@ vmbench/
 ├── history/            # 原子本地报告存储
 ├── cmd/
 │   ├── vmbench/        # CLI/TUI 入口
-│   │   ├── ecs_diff.go # ECS/GoECS 对标差异快照
 │   │   ├── mcp.go      # vmbench mcp serve 入口
 │   └── vmbench-rendertest/ # TUI 渲染快照(build tag rendertest)
 ├── mcp/                # MCP JSON-RPC stdio server + tools/list/tools/call
@@ -133,9 +131,9 @@ Runner 行为：
 | Memory | `sysbench memory` read/write/rnd-read / optional `stream` / optional `mbw` / optional `winsat mem` | MiB/s / ops/s / ns/op / MB/s |
 | Disk | `fio` 4K random read/write Q1/Q32 + 1M sequential read/write Q1/Q8 / optional `dd` / optional `winsat disk` | MiB/s / IOPS / ns/op / MB/s |
 
-`catalog.ExternalHardwareDefinitionsForTools` 按 `hardware_tools` 注册外部工具 workload。默认值按平台选择：Linux 为 `sysbench,openssl,fio`，macOS 为 `openssl`，Windows 为 `winsat`；其余 adapter 可通过 `--hardware-tool` 显式启用。工具缺失会作为 workload `error` 写入 console/JSON/HTML/TUI，便于自动化系统区分“机器性能差”和“测量工具不可用”。
+`catalog.ExternalHardwareDefinitionsForTools` 按 `hardware_tools` 注册外部工具 workload。默认值按平台选择：Linux 为 `sysbench,openssl,fio`，macOS 为 `openssl`，Windows 为 `winsat`；其余 adapter 可通过 `--hardware-tool` 显式启用。`catalog.MissingHardwareToolsForFilter` 先用与 runner 相同的 Definition Name/Category 正则语义筛选 adapter，再解析实际命令；`run` 和启用 hardware 的 `suite` 只在 stderr 提示当前 filter 会运行但缺失的工具，并在 Linux 上给出已知的 Debian/Ubuntu 包安装命令。预检只提前暴露环境问题：受影响 workload 仍作为 `error` 写入 console/JSON/HTML/TUI，不会被静默跳过。`MissingHardwareTools` 保留为无 filter 的兼容入口。
 
-Linux 默认集中的 `sysbench` 内存 workload 拆为顺序读带宽、顺序写带宽、随机读延迟三项；`fio` 磁盘 workload 拆为 4K random read/write Q1/Q32 和 1M sequential read/write Q1/Q8 八项。runner 会在每次 iteration 后采集外部工具解析出的吞吐和延迟，再对样本取中位数，避免多次迭代时只使用最后一次外部工具解析值。
+Linux 默认集中的 `sysbench` 内存 workload 拆为顺序读带宽、顺序写带宽、随机读延迟三项；`fio` 磁盘 workload 拆为 4K random read/write Q1/Q32 和 1M sequential read/write Q1/Q8 八项。runner 会在每次 iteration 后采集外部工具解析出的吞吐和延迟，再对样本取中位数，避免多次迭代时只使用最后一次外部工具解析值。可选 `dd` read 在 Linux 使用 `iflag=direct` 避免页缓存产生虚假吞吐；其他平台无法保证 uncached direct read，因此 fail-closed 并提示改用 fio。
 
 外部工具解析顺序：
 
@@ -149,9 +147,10 @@ Linux 默认集中的 `sysbench` 内存 workload 拆为顺序读带宽、顺序�
 
 - `network_info` 通过显式网络 section 获取公网 IPv4/IPv6、ASN/provider/location，并只输出可验证的 `direct` / `translated` / `unknown` NAT 结论；hardware-only `run` 不会因此发起公网请求。
 - `reachability` 以受限并发探测内置 website HTTPS 与 Telegram DC TCP 目标，逐项保留 protocol、endpoint、latency、HTTP status 和 error。
-- Go 主线 traceroute 使用系统 `traceroute` / `tcptraceroute` / `tracepath`，Windows 使用 `tracert`；目标最多 4 路并发，并按 catalog IP family 选择地址。每个结果记录实际 `probe_protocol` 和 `probe_tool`，包括 fallback 与失败路径。命令缺失、输出没有有效 hop、全超时或所有目标失败都会写入结构化错误，不伪造 route 结果。
-- Net Ping 使用 `tcp-connect/go-net-dialer` 实际探测证据；全部目标失败时返回非 nil 聚合错误，同时保留每个目标的结构化 result。部分目标成功时保留成功/失败明细并继续按 partial 语义汇总，成功结果的 0 latency/jitter/loss 仍显式序列化。
-- IP Quality 采用 fail-closed：元数据、公网 IPv4 或 DNSBL 查询未全部得到确定结论时保留 detail/error，但不生成 0-100 `score`。只有输入完整且 DNSBL 全部得到确定结果时才计算业务风险分。
+- Go 主线 traceroute 使用系统 `traceroute` / `tcptraceroute` / `tracepath`，Windows 使用 `tracert`；目标最多 4 路并发，并按 catalog IP family 解析地址。每个结果记录实际 `resolved_target`、`destination_reached`、`probe_protocol`、`probe_tool` 与 `status=ok|partial|error`。只有 hop 到达解析后的目标才是 `ok`；有有效 hop 但没有到达目标是 `partial`；命令缺失、没有有效 hop 或探测失败是 `error`。
+- Net Ping 使用 `tcp-connect/go-net-dialer` 实际探测证据；connect 成功与 TCP RST（包括 connection refused/reset）都证明目标已响应，计入 RTT/received 而不算丢包。逐目标 `connection_state` 为 `open|refused|mixed|no_response`；真正的 timeout/无响应才计入 loss。全部目标失败时返回非 nil 聚合错误，同时保留结构化 results，成功结果的 0 latency/jitter/loss 仍显式序列化。
+- Mail 与 IP Quality 的端口证据复用同一顺序 TCP 探测器，避免同时连接 `portquiz.net` 的多个端口触发突发限制；每项状态严格分类为 `open|refused|timeout|error`。DNS 解析超时属于探测 `error`，不会伪装成端口 `timeout`。
+- IP Quality 采用 fail-closed：元数据、公网 IPv4、DNSBL 或 Port 25 探测未得到确定结论时保留 detail/error，但不生成 0-100 `score`。只有输入完整且各项得到确定结果时才计算业务风险分。
 - DNSBL zone 并发查询；Cloudflare upload 使用流式请求体，避免为 50 MiB 上传数据分配同等大小内存。
 
 ## Versioned Node Catalog
@@ -187,7 +186,10 @@ vmbench suite --preset quick|website|proxy|mail
 vmbench suite --only ping,mail
 vmbench suite --skip media
 vmbench suite --ip-version v4|v6|dual
+vmbench suite --quiet --json suite.json
 ```
+
+CLI 默认通过 `suite.Options.OnEvent` 把 `section.start`、完成/失败状态和 `suite.done` 实时写到 stderr，因此 JSON/HTML 输出路径和 stdout console 内容不受进度文本污染；`--quiet` 只关闭这条进度流。
 
 `--preset` 在 `suite.Options.Preset` 中记录，并在 `Config.preset` 输出到 JSON/HTML/Console。预设只负责 section 编排：
 
@@ -255,7 +257,7 @@ Suite section 事件(`suite.Event`):
 | `section.skip` | section 未启用 |
 | `suite.done` | 全部 section 完成 |
 
-事件只携带原始 metric,不携带总分/等级。TUI 通过 `suite.Options.OnEvent` 回调订阅。
+事件只携带原始 metric,不携带总分/等级。TUI 通过 `suite.Options.OnEvent` 回调订阅，CLI 则用同一回调在 stderr 输出 section 生命周期；`--quiet` 时不安装 CLI 进度回调。
 
 ## 报告与对比
 
@@ -264,9 +266,8 @@ Suite section 事件(`suite.Event`):
 - Console：终端表格
 - Compare：自动识别 benchmark/Suite JSON，按 raw metric 对齐两份或更多报告
 - History：本地 add/list/show/delete 与 `compare --last N`
-- ECS Diff：输出 vmbench 与 ECS/GoECS 的产品差异快照
 
-Suite JSON 使用 schema v2 envelope：`schema_version=2`、`report_kind=suite`、唯一 `report_id`、app build、system、UTC timestamps/duration、规范化 config、catalog provenance 与九个 section。旧 `version=1` 和 Unix time 字段继续保留，避免破坏旧 consumer。Suite HTML 从同一结构渲染硬件 workload、network identity、route hops、ping、provider-level speed、IP quality、reachability、mail、media、warning/error；network-only Suite 也包含 system/app/catalog 元数据。
+Suite JSON 使用 schema v2 envelope：`schema_version=2`、`report_kind=suite`、唯一 `report_id`、app build、system、UTC timestamps/duration、规范化 config、catalog provenance 与九个 section。旧 `version=1` 和 Unix time 字段继续保留，避免破坏旧 consumer。Suite HTML 从同一结构渲染硬件 workload、network identity、route hops、ping、provider-level speed、IP quality、reachability、mail、media、warning/error；network-only Suite 也包含 system/app/catalog 元数据。CLI 的 JSON/HTML 导出在目标同目录创建 mode `0600` 临时文件，写入后执行 fsync 并 rename 替换，最终再次收紧为 `0600`；非 Unix 平台还依赖系统 ACL。
 
 对比规则：
 
@@ -276,20 +277,15 @@ Suite JSON 使用 schema v2 envelope：`schema_version=2`、`report_kind=suite`�
 
 Benchmark Compare 会忽略带 `error` 的 metric；`ms avg` 按 latency 处理（越低越好）；throughput 单位不兼容时不计算 delta。迭代次数、mode、scope、hardware tool 或 iperf host 选择不同，或单份报告出现重复 workload 时会输出可比性警告。
 
-Suite Compare 同时检查 unit、实际 protocol/IP family、provider/probe tool、target/node identity，以及节点型指标所需的 catalog revision。只有全部兼容才计算 delta；不兼容时仍对齐展示原始值，并输出明确 reason/warning。HTTP status 等分类码不参与百分比 delta。硬件 time/latency 越低越好、throughput 越高越好；route hop count 等中性证据只展示，不伪造“提升”。不同 report kind 不允许混合比较。
+Suite Compare 同时检查 unit、实际 protocol/IP family、provider/probe tool、target/node identity，以及节点型指标所需的 catalog revision。只有全部兼容才计算 delta；不兼容时仍对齐展示原始值，并输出明确 reason/warning。Route 指标额外要求逐项显式为 `status=ok` 且 `destination_reached=true`，缺少新到达证据的旧报告 fail-closed 为 unavailable。HTTP status 等分类码不参与百分比 delta。硬件 time/latency 越低越好、throughput 越高越好；route hop count 等中性证据只展示，不伪造“提升”。不同 report kind 不允许混合比较，IP Quality PortProbe 的状态门禁不会影响未知扩展 section。
+
+Mail Compare 只比较 `status=open` 的成功连接延迟；`refused/timeout/error` 的耗时分别是拒绝响应、超时阈值或失败开销，不作为可比较 latency。
 
 `history/` 按平台 data directory 保存独立 JSON record，使用临时文件 + fsync + rename 原子落盘；Unix 目录 mode `0700`、文件 mode `0600`，其他平台依赖系统 ACL。`--save-history` 可从 run/suite 直接写入，`--history-tag` 只作标签；`history compare --last N` 要求最近 N 份记录属于同一 report kind。
 
-## ECS Diff 快照
+## 构建一致性
 
-`cmd/vmbench/ecs_diff.go` 维护一个静态产品差异快照：
-
-- `vmbench ecs-diff`：输出人类可读文本
-- `vmbench ecs-diff --json`：输出机器可读 JSON
-
-该命令不调用网络、不执行 workload、不修改报告 schema。网站/TG 可达性、网络身份、版本化节点目录和 Suite Compare 已落地；当前后续重点是可选 upload/share adapter、第三方 IP intelligence 深度、长期节点运营和硬件工具分发。
-
-快照内容也同步到 [`docs/ecs-comparison.md`](ecs-comparison.md)。
+`sh/build.sh` 显式设置 `CGO_ENABLED=0` 后构建 `/root/temp/vmbench`，与 GoReleaser 的无 CGO 构建策略保持一致，避免本地验证产物意外依赖宿主动态库。
 
 ## 许可证注意
 

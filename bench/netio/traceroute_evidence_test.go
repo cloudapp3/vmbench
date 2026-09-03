@@ -46,11 +46,13 @@ func TestSystemTracerouteEvidenceRecordsActualFallbackAndErrors(t *testing.T) {
 		name         string
 		available    string
 		output       string
+		wantReached  bool
 		wantProtocol string
 		wantTool     string
 		wantError    bool
 	}{
-		{name: "tracepath fallback", available: "tracepath", output: " 1  192.0.2.1  1.0 ms\n", wantProtocol: "udp", wantTool: "tracepath"},
+		{name: "tracepath fallback reached", available: "tracepath", output: " 1  192.0.2.10  1.0 ms reached\n", wantReached: true, wantProtocol: "udp", wantTool: "tracepath"},
+		{name: "tracepath fallback partial", available: "tracepath", output: " 1  192.0.2.1  1.0 ms\n", wantProtocol: "udp", wantTool: "tracepath"},
 		{name: "attempted command failure", available: "tcptraceroute", output: "no hops\n", wantProtocol: "tcp", wantTool: "tcptraceroute", wantError: true},
 		{name: "no command", wantProtocol: "none", wantTool: "none", wantError: true},
 	}
@@ -68,12 +70,18 @@ func TestSystemTracerouteEvidenceRecordsActualFallbackAndErrors(t *testing.T) {
 				}
 				return []byte(tt.output), nil
 			}
-			_, protocol, tool, err := systemTracerouteWithEvidence(context.Background(), "192.0.2.10", "v4", 80, lookPath, run)
-			if (err != nil) != tt.wantError {
-				t.Fatalf("error = %v, wantError %v", err, tt.wantError)
+			evidence := systemTracerouteWithEvidence(context.Background(), "192.0.2.10", "v4", 80, lookPath, run)
+			if (evidence.err != nil) != tt.wantError {
+				t.Fatalf("error = %v, wantError %v", evidence.err, tt.wantError)
 			}
-			if protocol != tt.wantProtocol || tool != tt.wantTool {
-				t.Fatalf("evidence = %s/%s, want %s/%s", protocol, tool, tt.wantProtocol, tt.wantTool)
+			if evidence.protocol != tt.wantProtocol || evidence.tool != tt.wantTool {
+				t.Fatalf("evidence = %s/%s, want %s/%s", evidence.protocol, evidence.tool, tt.wantProtocol, tt.wantTool)
+			}
+			if evidence.destinationReached != tt.wantReached {
+				t.Fatalf("destinationReached = %t, want %t", evidence.destinationReached, tt.wantReached)
+			}
+			if evidence.resolvedTarget != "192.0.2.10" {
+				t.Fatalf("resolvedTarget = %q, want resolved IPv4", evidence.resolvedTarget)
 			}
 		})
 	}
@@ -88,5 +96,35 @@ func TestProbeTracerouteTargetsKeepsResolverFailureEvidence(t *testing.T) {
 	}
 	if len(results) != 1 || results[0].ProbeProtocol != "none" || results[0].ProbeTool != "resolver" || !strings.Contains(results[0].Error, "does not match") {
 		t.Fatalf("result = %+v", results)
+	}
+}
+
+func TestProbeTracerouteTargetsRecordsReachedAndPartialEvidence(t *testing.T) {
+	targets := []TraceTarget{
+		{ID: "reached", Name: "reached", Endpoint: "203.0.113.8"},
+		{ID: "partial", Name: "partial", Endpoint: "203.0.113.9"},
+	}
+	results, err := probeTracerouteTargetEvidence(context.Background(), targets, func(_ context.Context, target TraceTarget) traceProbeEvidence {
+		resolved := target.Endpoint
+		hops := []Hop{{TTL: 1, IP: "192.0.2.1"}}
+		if target.ID == "reached" {
+			hops = append(hops, Hop{TTL: 2, IP: resolved})
+		}
+		return traceProbeEvidence{
+			resolvedTarget:     resolved,
+			destinationReached: traceDestinationReached(hops, resolved),
+			hops:               hops,
+			protocol:           "tcp",
+			tool:               "traceroute",
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if results[0].EffectiveStatus() != TraceStatusOK || results[0].DestinationReached == nil || !*results[0].DestinationReached {
+		t.Fatalf("reached result = %+v", results[0])
+	}
+	if results[1].EffectiveStatus() != TraceStatusPartial || results[1].DestinationReached == nil || *results[1].DestinationReached {
+		t.Fatalf("partial result = %+v", results[1])
 	}
 }

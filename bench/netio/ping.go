@@ -2,12 +2,14 @@ package netio
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net"
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/cloudapp3/vmbench/bench"
@@ -18,30 +20,38 @@ const (
 	pingProbes  = 10
 	pingPort    = 80
 	pingTimeout = 5 * time.Second
+
+	// Connection-state values distinguish an accepted TCP connection from a
+	// refused connection that still proves the target responded with a RST.
+	PingConnectionStateOpen       = "open"
+	PingConnectionStateRefused    = "refused"
+	PingConnectionStateMixed      = "mixed"
+	PingConnectionStateNoResponse = "no_response"
 )
 
 // PingProbeResult stores latency statistics for one probe target.
 type PingProbeResult struct {
-	ID            string  `json:"id,omitempty"`
-	Name          string  `json:"name,omitempty"`
-	Region        string  `json:"region,omitempty"`
-	City          string  `json:"city,omitempty"`
-	Carrier       string  `json:"carrier,omitempty"`
-	ASN           int     `json:"asn,omitempty"`
-	IPFamily      string  `json:"ip_family,omitempty"`
-	Protocol      string  `json:"protocol,omitempty"`
-	Source        string  `json:"source,omitempty"`
-	ProbeProtocol string  `json:"probe_protocol"`
-	ProbeTool     string  `json:"probe_tool"`
-	Target        string  `json:"target,omitempty"`
-	Port          int     `json:"port,omitempty"`
-	Status        string  `json:"status,omitempty"`
-	Message       string  `json:"message,omitempty"`
-	AvgLatencyMs  float64 `json:"avg_latency_ms"`
-	JitterMs      float64 `json:"jitter_ms"`
-	PacketLoss    float64 `json:"packet_loss"`
-	Sent          int     `json:"sent,omitempty"`
-	Received      int     `json:"received,omitempty"`
+	ID              string  `json:"id,omitempty"`
+	Name            string  `json:"name,omitempty"`
+	Region          string  `json:"region,omitempty"`
+	City            string  `json:"city,omitempty"`
+	Carrier         string  `json:"carrier,omitempty"`
+	ASN             int     `json:"asn,omitempty"`
+	IPFamily        string  `json:"ip_family,omitempty"`
+	Protocol        string  `json:"protocol,omitempty"`
+	Source          string  `json:"source,omitempty"`
+	ProbeProtocol   string  `json:"probe_protocol"`
+	ProbeTool       string  `json:"probe_tool"`
+	Target          string  `json:"target,omitempty"`
+	Port            int     `json:"port,omitempty"`
+	Status          string  `json:"status,omitempty"`
+	ConnectionState string  `json:"connection_state,omitempty"`
+	Message         string  `json:"message,omitempty"`
+	AvgLatencyMs    float64 `json:"avg_latency_ms"`
+	JitterMs        float64 `json:"jitter_ms"`
+	PacketLoss      float64 `json:"packet_loss"`
+	Sent            int     `json:"sent,omitempty"`
+	Received        int     `json:"received,omitempty"`
 }
 
 type PingTarget struct {
@@ -59,12 +69,23 @@ type PingTarget struct {
 }
 
 type nodePingResult struct {
-	name   string
-	region string
-	host   string
-	rtts   []time.Duration
-	loss   float64
-	err    error
+	name            string
+	region          string
+	host            string
+	rtts            []time.Duration
+	loss            float64
+	connectionState string
+	message         string
+	err             error
+}
+
+type pingDialFunc func(context.Context, string, string) (net.Conn, error)
+
+type tcpPingEvidence struct {
+	rtts         []time.Duration
+	rstResponses int
+	lastErr      error
+	lastRSTErr   error
 }
 
 // ProbePingNodes measures TCP connect latency to the provided speed nodes.
@@ -87,17 +108,18 @@ func probePingNodes(ctx context.Context, nodes []SpeedNode, probe func(context.C
 	out := make([]PingProbeResult, 0, len(results))
 	for _, r := range results {
 		item := PingProbeResult{
-			ID:            strings.ToLower(strings.ReplaceAll(r.name, " ", "-")),
-			Name:          r.name,
-			Region:        r.region,
-			Protocol:      "tcp",
-			ProbeProtocol: "tcp-connect",
-			ProbeTool:     "go-net-dialer",
-			Target:        r.host,
-			Port:          pingPort,
-			PacketLoss:    r.loss,
-			Sent:          pingProbes,
-			Received:      len(r.rtts),
+			ID:              strings.ToLower(strings.ReplaceAll(r.name, " ", "-")),
+			Name:            r.name,
+			Region:          r.region,
+			Protocol:        "tcp",
+			ProbeProtocol:   "tcp-connect",
+			ProbeTool:       "go-net-dialer",
+			Target:          r.host,
+			Port:            pingPort,
+			ConnectionState: r.connectionState,
+			PacketLoss:      r.loss,
+			Sent:            pingProbes,
+			Received:        len(r.rtts),
 		}
 		if len(r.rtts) == 0 {
 			item.Status = "error"
@@ -108,6 +130,7 @@ func probePingNodes(ctx context.Context, nodes []SpeedNode, probe func(context.C
 			}
 		} else {
 			item.Status = "ok"
+			item.Message = r.message
 			item.AvgLatencyMs = avgDuration(r.rtts).Seconds() * 1000
 			item.JitterMs = jitterDuration(r.rtts).Seconds() * 1000
 		}
@@ -262,28 +285,25 @@ func pingNode(ctx context.Context, node SpeedNode) nodePingResult {
 		return nodePingResult{name: node.Name, region: node.Region, host: host, err: fmt.Errorf("invalid ping target URL")}
 	}
 
-	var rtts []time.Duration
-	var lastErr error
-	for i := 0; i < pingProbes; i++ {
-		dialer := &net.Dialer{Timeout: pingTimeout}
-		probeCtx, cancel := context.WithTimeout(ctx, pingTimeout)
-		start := time.Now()
-		conn, err := dialer.DialContext(probeCtx, "tcp", net.JoinHostPort(host, fmt.Sprintf("%d", pingPort)))
-		elapsed := time.Since(start)
-		cancel()
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		conn.Close()
-		rtts = append(rtts, elapsed)
+	evidence := probeTCP(ctx, "tcp", net.JoinHostPort(host, fmt.Sprintf("%d", pingPort)), defaultPingDial)
+	loss := float64(pingProbes-len(evidence.rtts)) / float64(pingProbes) * 100
+	return nodePingResult{
+		name:            node.Name,
+		region:          node.Region,
+		host:            host,
+		rtts:            evidence.rtts,
+		loss:            loss,
+		connectionState: evidence.connectionState(),
+		message:         evidence.responseMessage(),
+		err:             evidence.lastErr,
 	}
-
-	loss := float64(pingProbes-len(rtts)) / float64(pingProbes) * 100
-	return nodePingResult{name: node.Name, region: node.Region, host: host, rtts: rtts, loss: loss, err: lastErr}
 }
 
 func pingTarget(ctx context.Context, target PingTarget) PingProbeResult {
+	return pingTargetWithDial(ctx, target, defaultPingDial)
+}
+
+func pingTargetWithDial(ctx context.Context, target PingTarget, dial pingDialFunc) PingProbeResult {
 	port := target.Port
 	if port <= 0 {
 		port = pingPort
@@ -317,38 +337,84 @@ func pingTarget(ctx context.Context, target PingTarget) PingProbeResult {
 		network = "tcp6"
 	}
 
-	var rtts []time.Duration
-	var lastErr error
-	for i := 0; i < pingProbes; i++ {
-		dialer := &net.Dialer{Timeout: pingTimeout}
-		probeCtx, cancel := context.WithTimeout(ctx, pingTimeout)
-		start := time.Now()
-		conn, err := dialer.DialContext(probeCtx, network, net.JoinHostPort(target.Endpoint, fmt.Sprintf("%d", port)))
-		elapsed := time.Since(start)
-		cancel()
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		_ = conn.Close()
-		rtts = append(rtts, elapsed)
-	}
-
-	result.Received = len(rtts)
-	result.PacketLoss = float64(pingProbes-len(rtts)) / float64(pingProbes) * 100
-	if len(rtts) == 0 {
+	evidence := probeTCP(ctx, network, net.JoinHostPort(target.Endpoint, fmt.Sprintf("%d", port)), dial)
+	result.ConnectionState = evidence.connectionState()
+	result.Received = len(evidence.rtts)
+	result.PacketLoss = float64(pingProbes-len(evidence.rtts)) / float64(pingProbes) * 100
+	if len(evidence.rtts) == 0 {
 		result.Status = "error"
-		if lastErr != nil {
-			result.Message = lastErr.Error()
+		if evidence.lastErr != nil {
+			result.Message = evidence.lastErr.Error()
 		} else {
 			result.Message = "no successful probes"
 		}
 		return result
 	}
 	result.Status = "ok"
-	result.AvgLatencyMs = avgDuration(rtts).Seconds() * 1000
-	result.JitterMs = jitterDuration(rtts).Seconds() * 1000
+	result.Message = evidence.responseMessage()
+	result.AvgLatencyMs = avgDuration(evidence.rtts).Seconds() * 1000
+	result.JitterMs = jitterDuration(evidence.rtts).Seconds() * 1000
 	return result
+}
+
+func defaultPingDial(ctx context.Context, network, address string) (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: pingTimeout}
+	return dialer.DialContext(ctx, network, address)
+}
+
+func probeTCP(ctx context.Context, network, address string, dial pingDialFunc) tcpPingEvidence {
+	evidence := tcpPingEvidence{rtts: make([]time.Duration, 0, pingProbes)}
+	for i := 0; i < pingProbes; i++ {
+		probeCtx, cancel := context.WithTimeout(ctx, pingTimeout)
+		start := time.Now()
+		conn, err := dial(probeCtx, network, address)
+		elapsed := time.Since(start)
+		cancel()
+		if err != nil {
+			evidence.lastErr = err
+			if isTCPRST(err) {
+				evidence.rstResponses++
+				evidence.lastRSTErr = err
+				evidence.rtts = append(evidence.rtts, elapsed)
+			}
+			continue
+		}
+		if conn != nil {
+			_ = conn.Close()
+		}
+		evidence.rtts = append(evidence.rtts, elapsed)
+	}
+	return evidence
+}
+
+func (e tcpPingEvidence) connectionState() string {
+	open := len(e.rtts) - e.rstResponses
+	switch {
+	case open > 0 && e.rstResponses > 0:
+		return PingConnectionStateMixed
+	case open > 0:
+		return PingConnectionStateOpen
+	case e.rstResponses > 0:
+		return PingConnectionStateRefused
+	default:
+		return PingConnectionStateNoResponse
+	}
+}
+
+func (e tcpPingEvidence) responseMessage() string {
+	if e.lastRSTErr == nil {
+		return ""
+	}
+	return "target responded with TCP RST: " + e.lastRSTErr.Error()
+}
+
+func isTCPRST(err error) bool {
+	// Windows reports WSAECONNRESET/WSAECONNREFUSED as errno 10054/10061
+	// rather than the platform-independent syscall values.
+	return errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, syscall.ECONNREFUSED) ||
+		errors.Is(err, syscall.Errno(10054)) ||
+		errors.Is(err, syscall.Errno(10061))
 }
 
 // --- helpers ---

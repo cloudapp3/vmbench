@@ -11,7 +11,7 @@ Dashboard -> Compare
 Dashboard -> System Info
 ```
 
-`vmbench ecs-diff` 仍以 CLI/JSON 输出为主，`vmbench mcp serve` 是给大模型客户端使用的后台 stdio server，两者不进入 TUI 页面路由。
+`vmbench mcp serve` 是给大模型客户端使用的后台 stdio server，不进入 TUI 页面路由。
 
 ## Dashboard
 
@@ -26,7 +26,7 @@ Dashboard -> System Info
   - System Info
   - Quit
 
-说明：Go TUI 已移除误导性的独立 Multi-Core 入口。硬件 workload 串行执行，CPU 线程数和磁盘队列深度由外部工具参数定义；默认工具按平台选择，Linux 为 sysbench/OpenSSL/fio，macOS 为 OpenSSL，Windows 为 WinSAT。sysbench 拆出 memory read/write/latency，fio 拆出 4K random read/write Q1/Q32 与 1M sequential read/write Q1/Q8。CLI/Suite 可通过 `--hardware-tool` 显式选择其他 adapter；工具缺失时展示结构化错误，不再提供进程内 benchmark fallback。
+说明：Go TUI 已移除误导性的独立 Multi-Core 入口。硬件 workload 串行执行，CPU 线程数和磁盘队列深度由外部工具参数定义；默认工具按平台选择，Linux 为 sysbench/OpenSSL/fio，macOS 为 OpenSSL，Windows 为 WinSAT。sysbench 拆出 memory read/write/latency，fio 拆出 4K random read/write Q1/Q32 与 1M sequential read/write Q1/Q8。CLI/Suite 可通过 `--hardware-tool` 显式选择其他 adapter；CLI 会在开始前提示当前 filter 涉及的缺失工具，TUI/报告继续展示结构化错误，不提供进程内 benchmark fallback。可选 dd read 只有 Linux 能以 direct I/O 运行，其他平台 fail-closed 并提示改用 fio。
 
 按键：
 
@@ -98,9 +98,9 @@ TUI 不维护另一套隐式默认值，而是构造与 CLI/MCP 相同的规范�
 
 Go TUI 在终端低于 40 行时使用紧凑 Suite 布局：Config 只展开当前聚焦字段，Running 与 Results 对每个 section 使用单行状态摘要；在 `80x24` 下页面宽高均受终端边界约束，字段导航、启动和取消仍可操作。更高终端继续显示完整卡片与详细结果。
 
-Go 主线覆盖 `hardware / network_info / route / ping / speed / ip_quality / reachability / mail / media` 九个 section。Network Info 展示虚拟化、公网 IP、ASN/provider 和 NAT 证据；Reachability 展示 website/Telegram 的 protocol/latency/status/error。所有这些状态都不会折算为 benchmark 总分。Suite 只有所有 enabled section 都是 `ok` 时成功；enabled 的空状态、`skipped`、`partial`、`error` 均表示失败，disabled section 才只发 skip event。网络 section timeout/cancel 也会显示为结构化 `error` message。
+Go 主线覆盖 `hardware / network_info / route / ping / speed / ip_quality / reachability / mail / media` 九个 section。Network Info 展示虚拟化、公网 IP、ASN/provider 和 NAT 证据；Reachability 展示 website/Telegram 的 protocol/latency/status/error。所有这些状态都不会折算为 benchmark 总分。Suite 只有所有 enabled section 都是 `ok` 时成功；enabled 的空状态、`skipped`、`partial`、`error` 均表示失败，disabled section 才只发 skip event。Running 页保留 `PARTIAL` 独立样式但将它计入终态非成功数量，不伪装成 `ERROR` 或成功；网络 section timeout/cancel 也会显示为结构化 `error` message。
 
-Route/Ping 的完整 JSON、Console 和 HTML 会区分 catalog protocol 与实际 `probe_protocol/probe_tool`。TUI 的完整卡片和 `80x24` 紧凑摘要保留 section 状态，不在界面层重新推断协议；CLI/history Compare 直接使用报告中的实际协议、工具和 IP family 做兼容门槛。
+Route/Ping 的结构化结果会区分 catalog protocol 与实际 `probe_protocol/probe_tool`。Route 另记录 `resolved_target`、`destination_reached` 和 `status=ok|partial|error`；TUI Route 卡片使用同一有效状态，跑满 hops 但未到目标会显示 `PARTIAL`，不会伪装为成功。Ping 将 TCP RST/refused 视为收到目标响应并以 `status=ok` 展示，报告中的 `connection_state=open|refused|mixed|no_response` 保留端口状态差异，真正无响应才是 loss。Mail 卡片消费顺序探测产生的 `open|refused|timeout|error`，只有 `open` 显示为可达。IP Quality fail-closed 且没有 score 时，结果卡仍展示 section error、RiskSummary 和 Port 25 状态/消息。CLI/history Compare 直接使用报告中的实际协议、工具和 IP family 做兼容门槛。
 
 ## Compare
 
@@ -120,7 +120,7 @@ Go TUI 当前对比两份 benchmark JSON。Suite Compare 使用 CLI `vmbench com
 - latency 越低越好
 - throughput 越高越好
 
-CLI/history 的 Suite delta 额外要求 unit、protocol、provider、target/node identity 和所需 catalog revision 一致；不兼容时保留原始值和原因，但不显示伪 delta。TUI benchmark Compare 仍按 workload 的 time/throughput/latency 规则工作。
+CLI/history 的 Suite delta 额外要求 unit、protocol、provider、target/node identity 和所需 catalog revision 一致；Route 还要求显式 `status=ok` 且 `destination_reached=true`。不兼容或缺到达证据时不显示伪 delta。TUI benchmark Compare 仍按 workload 的 time/throughput/latency 规则工作。
 
 ## 样式原则
 

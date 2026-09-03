@@ -318,6 +318,60 @@ func HardwareToolIDs() []string {
 	return append([]string(nil), hardwareToolOrder...)
 }
 
+// MissingHardwareTools returns selected adapters whose executable cannot be
+// resolved from PATH or the executable-adjacent binaries directory.
+func MissingHardwareTools(tools []string) []string {
+	return MissingHardwareToolsForFilter(tools, nil)
+}
+
+// MissingHardwareToolsForFilter returns missing adapters only when at least
+// one of their workload definitions matches the same name/category filter used
+// by the runner.
+func MissingHardwareToolsForFilter(tools []string, filter *regexp.Regexp) []string {
+	selected := StandardizeHardwareTools(tools)
+	if len(selected) == 0 && len(tools) == 0 {
+		selected = DefaultHardwareTools()
+	}
+	missing := make([]string, 0, len(selected))
+	for _, tool := range selected {
+		if !hardwareToolMatchesFilter(tool, filter) {
+			continue
+		}
+		if hardwareToolAvailable(tool) {
+			continue
+		}
+		missing = append(missing, tool)
+	}
+	return missing
+}
+
+func hardwareToolMatchesFilter(tool string, filter *regexp.Regexp) bool {
+	if filter == nil {
+		return true
+	}
+	for _, def := range ExternalHardwareDefinitionsForTools("", []string{tool}) {
+		if filter.MatchString(def.Name) || filter.MatchString(def.Category) {
+			return true
+		}
+	}
+	return false
+}
+
+func hardwareToolAvailable(tool string) bool {
+	var err error
+	switch tool {
+	case HardwareToolSysbench, HardwareToolOpenSSL, HardwareToolFio, HardwareToolDD, HardwareToolMBW, HardwareToolWinSAT:
+		_, err = resolveTool(tool)
+	case HardwareToolStream:
+		_, _, err = resolveAnyTool("stream", "stream_c")
+	case HardwareToolGeekbench:
+		_, _, err = resolveAnyTool("geekbench6", "geekbench5", "geekbench4", "geekbench")
+	default:
+		return false
+	}
+	return err == nil
+}
+
 // DefaultHardwareTools returns the default hardware tools. Geekbench/WinSAT and
 // auxiliary dd/STREAM/mbw probes are opt-in.
 func DefaultHardwareTools() []string {
@@ -1016,6 +1070,9 @@ func (w *ddWorkload) Name() string {
 }
 func (w *ddWorkload) Category() string { return "Disk" }
 func (w *ddWorkload) Description() string {
+	if w.operation == "read" {
+		return fmt.Sprintf("dd direct-I/O sequential read, %d MiB", w.sizeMiB)
+	}
 	return fmt.Sprintf("dd sequential %s, %d MiB", w.operation, w.sizeMiB)
 }
 func (w *ddWorkload) Validate() error  { return nil }
@@ -1051,11 +1108,14 @@ func (w *ddWorkload) Run(ctx context.Context) (time.Duration, int64, error) {
 	var elapsed time.Duration
 	var out string
 	if w.operation == "read" {
+		if runtime.GOOS != "linux" {
+			return 0, 0, fmt.Errorf("dd read: uncached direct I/O is unsupported on %s; use fio instead", runtime.GOOS)
+		}
 		setupArgs := []string{"if=/dev/zero", "of=" + path, "bs=" + blockSize, "count=" + count, "conv=fsync"}
 		if _, _, err := runExternalCommand(ctx, 180*time.Second, bin, setupArgs...); err != nil {
 			return 0, 0, fmt.Errorf("dd setup: %w", err)
 		}
-		args := []string{"if=" + path, "of=/dev/null", "bs=" + blockSize}
+		args := []string{"if=" + path, "of=/dev/null", "bs=" + blockSize, "iflag=direct"}
 		w.command = formatCommand(bin, args)
 		elapsed, out, err = runExternalCommand(ctx, 180*time.Second, bin, args...)
 	} else {

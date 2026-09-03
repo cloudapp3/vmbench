@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"slices"
@@ -52,8 +53,6 @@ func run(args []string) int {
 		return runCompare(args[1:])
 	case "history":
 		return runHistory(args[1:])
-	case "ecs-diff", "ecs-compare":
-		return runECSDiff(args[1:])
 	case "version", "--version", "-v":
 		fmt.Printf("vmbench %s\n", vmbench.Version)
 		return 0
@@ -81,7 +80,6 @@ func printUsage(w io.Writer) {
 		"  vmbench sysinfo   [--json]            show system information",
 		"  vmbench compare   <a.json> <b.json>   compare two reports",
 		"  vmbench history   <command>           manage local report history",
-		"  vmbench ecs-diff  [--json]            show current vmbench vs ECS gaps",
 		"  vmbench version                       show version",
 		"",
 		"Run 'vmbench run --help', 'vmbench suite --help', or 'vmbench mcp serve --help' for detailed flags.",
@@ -153,8 +151,11 @@ func runBench(args []string) int {
 		fmt.Fprintln(os.Stderr, "error: --timeout must not be negative")
 		return 2
 	}
+	var filterRE *regexp.Regexp
+	filter = strings.TrimSpace(filter)
 	if filter != "" {
-		if _, err := regexp.Compile(filter); err != nil {
+		var err error
+		if filterRE, err = regexp.Compile(filter); err != nil {
 			fmt.Fprintf(os.Stderr, "error: invalid --filter regex: %v\n", err)
 			return 2
 		}
@@ -208,6 +209,9 @@ func runBench(args []string) int {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 2
+	}
+	if runOptions.Scope == vmbench.ScopeHardware || runOptions.Scope == vmbench.ScopeAll {
+		printHardwareToolPreflight(os.Stderr, runOptions.HardwareTools, filterRE)
 	}
 	report := vmbench.RunCore(context.Background(), runOptions)
 	if saveHistory {
@@ -278,6 +282,7 @@ func runSuite(args []string) int {
 		catalogCache    string
 		noNetworkInfo   bool
 		noReachability  bool
+		quiet           bool
 	)
 
 	fs.IntVar(&iterations, "iterations", 3, "iterations for hardware workloads")
@@ -305,6 +310,7 @@ func runSuite(args []string) int {
 	fs.BoolVar(&noReachability, "no-reachability", false, "skip website and Telegram reachability section")
 	fs.BoolVar(&saveHistory, "save-history", false, "save the report to local history")
 	fs.StringVar(&historyTag, "history-tag", "", "optional tag used with --save-history")
+	fs.BoolVar(&quiet, "quiet", false, "suppress section progress output")
 	fs.StringVar(&catalogSource, "node-catalog", nodecatalog.SourceEmbedded, "node catalog source: embedded, auto, or a JSON path")
 	fs.StringVar(&catalogRevision, "node-revision", "", "require an exact node catalog revision")
 	fs.StringVar(&catalogCache, "node-cache", "", "cache path override used with --node-catalog auto")
@@ -342,8 +348,11 @@ func runSuite(args []string) int {
 		fmt.Fprintln(os.Stderr, "error: --timeout must not be negative")
 		return 2
 	}
+	var filterRE *regexp.Regexp
+	filter = strings.TrimSpace(filter)
 	if filter != "" {
-		if _, err := regexp.Compile(filter); err != nil {
+		var err error
+		if filterRE, err = regexp.Compile(filter); err != nil {
 			fmt.Fprintf(os.Stderr, "error: invalid --filter regex: %v\n", err)
 			return 2
 		}
@@ -468,10 +477,14 @@ func runSuite(args []string) int {
 		CatalogSource:    catalogSource,
 		CatalogRevision:  catalogRevision,
 		CatalogCachePath: catalogCache,
+		OnEvent:          suiteProgressPrinter(!quiet),
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 2
+	}
+	if suiteOptions.Sections.Hardware {
+		printHardwareToolPreflight(os.Stderr, suiteOptions.HardwareTools, filterRE)
 	}
 	report := suite.Run(context.Background(), suiteOptions)
 	if saveHistory {
@@ -575,6 +588,73 @@ func progressPrinter(enabled bool) vmbench.EventHandler {
 			prev = ev.Message
 		}
 	}
+}
+
+func suiteProgressPrinter(enabled bool) suite.EventHandler {
+	return suiteProgressPrinterTo(os.Stderr, enabled)
+}
+
+func suiteProgressPrinterTo(w io.Writer, enabled bool) suite.EventHandler {
+	if !enabled || w == nil {
+		return nil
+	}
+	return func(event suite.Event) {
+		section := strings.TrimSpace(string(event.Section))
+		switch event.Kind {
+		case suite.EventSectionStart:
+			fmt.Fprintf(w, "  [suite] %-16s running\n", section)
+		case suite.EventSectionDone, suite.EventSectionFail:
+			fmt.Fprintf(w, "  [suite] %-16s %-7s %s\n", section, firstNonEmpty(event.Status, "unknown"), strings.TrimSpace(event.Message))
+		case suite.EventSuiteDone:
+			fmt.Fprintf(w, "  [suite] complete         %-7s %s\n", firstNonEmpty(event.Status, "unknown"), strings.TrimSpace(event.Message))
+		}
+	}
+}
+
+func printHardwareToolPreflight(w io.Writer, tools []string, filter *regexp.Regexp) {
+	if w == nil {
+		return
+	}
+	missing := catalog.MissingHardwareToolsForFilter(tools, filter)
+	if len(missing) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "notice: missing hardware tools: %s; affected workloads will be recorded as structured errors\n", strings.Join(missing, ", "))
+	if runtime.GOOS == "linux" {
+		packages := linuxHardwarePackages(missing)
+		if len(packages) > 0 {
+			fmt.Fprintf(w, "hint: Debian/Ubuntu: sudo apt-get install -y %s\n", strings.Join(packages, " "))
+		}
+	}
+}
+
+func linuxHardwarePackages(tools []string) []string {
+	packages := make([]string, 0, len(tools))
+	seen := make(map[string]struct{}, len(tools))
+	for _, tool := range tools {
+		var pkg string
+		switch tool {
+		case catalog.HardwareToolSysbench:
+			pkg = "sysbench"
+		case catalog.HardwareToolOpenSSL:
+			pkg = "openssl"
+		case catalog.HardwareToolFio:
+			pkg = "fio"
+		case catalog.HardwareToolDD:
+			pkg = "coreutils"
+		case catalog.HardwareToolMBW:
+			pkg = "mbw"
+		}
+		if pkg == "" {
+			continue
+		}
+		if _, ok := seen[pkg]; ok {
+			continue
+		}
+		seen[pkg] = struct{}{}
+		packages = append(packages, pkg)
+	}
+	return packages
 }
 
 func runList(args []string) int {
@@ -760,16 +840,39 @@ func saveHistoryReport(value any, tag string) (history.Record, error) {
 	return store.Add(data, tag)
 }
 
-func writeFile(path string, fn func(io.Writer) error) error {
-	f, err := os.Create(path)
+func writeFile(path string, fn func(io.Writer) error) (returnErr error) {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
 	if err != nil {
 		return err
 	}
-	if err := fn(f); err != nil {
-		_ = f.Close()
+	tmpPath := tmp.Name()
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+	if err := tmp.Chmod(0o600); err != nil {
+		_ = tmp.Close()
 		return err
 	}
-	return f.Close()
+	if err := fn(tmp); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	committed = true
+	return os.Chmod(path, 0o600)
 }
 
 func firstNonEmpty(values ...string) string {

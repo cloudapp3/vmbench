@@ -65,18 +65,62 @@ type Hop struct {
 
 // TraceProbeResult stores one traceroute outcome.
 type TraceProbeResult struct {
-	Target        TraceTarget `json:"target"`
-	ProbeProtocol string      `json:"probe_protocol"`
-	ProbeTool     string      `json:"probe_tool"`
-	Hops          []Hop       `json:"hops,omitempty"`
-	Error         string      `json:"error,omitempty"`
+	Target             TraceTarget `json:"target"`
+	ResolvedTarget     string      `json:"resolved_target,omitempty"`
+	DestinationReached *bool       `json:"destination_reached,omitempty"`
+	Status             string      `json:"status,omitempty"`
+	ProbeProtocol      string      `json:"probe_protocol"`
+	ProbeTool          string      `json:"probe_tool"`
+	Hops               []Hop       `json:"hops,omitempty"`
+	Error              string      `json:"error,omitempty"`
+}
+
+const (
+	TraceStatusOK      = "ok"
+	TraceStatusPartial = "partial"
+	TraceStatusError   = "error"
+)
+
+// EffectiveStatus normalizes new reachability evidence while retaining the
+// pre-status interpretation for older JSON reports.
+func (r TraceProbeResult) EffectiveStatus() string {
+	if strings.TrimSpace(r.Error) != "" {
+		return TraceStatusError
+	}
+	status := strings.ToLower(strings.TrimSpace(r.Status))
+	switch status {
+	case TraceStatusPartial, TraceStatusError:
+		return status
+	case TraceStatusOK:
+		if r.DestinationReached != nil && !*r.DestinationReached {
+			if len(r.Hops) > 0 {
+				return TraceStatusPartial
+			}
+			return TraceStatusError
+		}
+		return TraceStatusOK
+	}
+	if r.DestinationReached != nil {
+		if *r.DestinationReached {
+			return TraceStatusOK
+		}
+		if len(r.Hops) > 0 {
+			return TraceStatusPartial
+		}
+		return TraceStatusError
+	}
+	// Reports produced before reachability evidence was added treated every
+	// error-free trace as successful.
+	return TraceStatusOK
 }
 
 type traceProbeEvidence struct {
-	hops     []Hop
-	protocol string
-	tool     string
-	err      error
+	resolvedTarget     string
+	destinationReached bool
+	hops               []Hop
+	protocol           string
+	tool               string
+	err                error
 }
 
 // ProbeTracerouteTargets runs system traceroute commands against the provided targets.
@@ -93,7 +137,15 @@ func probeTracerouteTargets(ctx context.Context, targets []TraceTarget, probe fu
 func probeTracerouteTargetSpecs(ctx context.Context, targets []TraceTarget, probe func(context.Context, TraceTarget) ([]Hop, error)) ([]TraceProbeResult, error) {
 	return probeTracerouteTargetEvidence(ctx, targets, func(ctx context.Context, target TraceTarget) traceProbeEvidence {
 		hops, err := probe(ctx, target)
-		return traceProbeEvidence{hops: hops, protocol: "injected", tool: "injected", err: err}
+		resolvedTarget := normalizedTraceIP(target.Endpoint)
+		return traceProbeEvidence{
+			resolvedTarget:     resolvedTarget,
+			destinationReached: traceDestinationReached(hops, resolvedTarget),
+			hops:               hops,
+			protocol:           "injected",
+			tool:               "injected",
+			err:                err,
+		}
 	})
 }
 
@@ -121,16 +173,28 @@ func probeTracerouteTargetEvidence(ctx context.Context, targets []TraceTarget, p
 			for idx := range jobs {
 				target := targets[idx]
 				evidence := probe(ctx, target)
+				reached := evidence.destinationReached
 				result := TraceProbeResult{
-					Target:        target,
-					ProbeProtocol: firstNonEmpty(strings.TrimSpace(evidence.protocol), "unknown"),
-					ProbeTool:     firstNonEmpty(strings.TrimSpace(evidence.tool), "unknown"),
-					Hops:          evidence.hops,
+					Target:             target,
+					ResolvedTarget:     strings.TrimSpace(evidence.resolvedTarget),
+					DestinationReached: &reached,
+					ProbeProtocol:      firstNonEmpty(strings.TrimSpace(evidence.protocol), "unknown"),
+					ProbeTool:          firstNonEmpty(strings.TrimSpace(evidence.tool), "unknown"),
+					Hops:               evidence.hops,
 				}
 				if evidence.err != nil {
+					result.Status = TraceStatusError
 					result.Error = evidence.err.Error()
 					results[idx] = result
 					continue
+				}
+				if reached {
+					result.Status = TraceStatusOK
+				} else if len(evidence.hops) > 0 {
+					result.Status = TraceStatusPartial
+				} else {
+					result.Status = TraceStatusError
+					result.Error = "traceroute produced no valid hops"
 				}
 				results[idx] = result
 			}
@@ -197,14 +261,17 @@ func (w *tracerouteWorkload) Run(ctx context.Context) (time.Duration, int64, err
 	okCount := 0
 	firstError := ""
 	for _, r := range results {
-		if r.Error != "" {
+		status := r.EffectiveStatus()
+		if status == TraceStatusError {
 			parts = append(parts, fmt.Sprintf("%s: ERR", r.Target.Name))
 			if firstError == "" {
 				firstError = r.Error
 			}
 			continue
 		}
-		okCount++
+		if status == TraceStatusOK {
+			okCount++
+		}
 		n := len(r.Hops)
 		totalHops += n
 		var lastHop string
@@ -214,12 +281,16 @@ func (w *tracerouteWorkload) Run(ctx context.Context) (time.Duration, int64, err
 				break
 			}
 		}
-		parts = append(parts, fmt.Sprintf("%s: %dhops last=%s", r.Target.Name, n, lastHop))
+		parts = append(parts, fmt.Sprintf("%s: %s %dhops last=%s", r.Target.Name, strings.ToUpper(status), n, lastHop))
 	}
 	w.hopSum = totalHops
 	w.detail = strings.Join(parts, "\n")
 	if okCount == 0 {
-		w.runErr = fmt.Errorf("all %d traceroutes failed: %s", len(results), firstError)
+		if firstError != "" {
+			w.runErr = fmt.Errorf("none of %d traceroutes reached the destination: %s", len(results), firstError)
+		} else {
+			w.runErr = fmt.Errorf("none of %d traceroutes reached the destination", len(results))
+		}
 		return w.elapsed, 0, w.runErr
 	}
 	return w.elapsed, int64(totalHops), nil
@@ -248,8 +319,7 @@ func systemTracerouteTargetEvidence(ctx context.Context, target TraceTarget) tra
 	if port <= 0 {
 		port = tracePort
 	}
-	hops, protocol, tool, err := systemTracerouteWithEvidence(ctx, target.Endpoint, target.IPFamily, port, exec.LookPath, runTraceCommand)
-	return traceProbeEvidence{hops: hops, protocol: protocol, tool: tool, err: err}
+	return systemTracerouteWithEvidence(ctx, target.Endpoint, target.IPFamily, port, exec.LookPath, runTraceCommand)
 }
 
 func systemTracerouteWith(ctx context.Context, host string, lookPath traceLookPathFunc, run traceRunCommandFunc) ([]Hop, error) {
@@ -257,14 +327,14 @@ func systemTracerouteWith(ctx context.Context, host string, lookPath traceLookPa
 }
 
 func systemTracerouteWithPort(ctx context.Context, host string, port int, lookPath traceLookPathFunc, run traceRunCommandFunc) ([]Hop, error) {
-	hops, _, _, err := systemTracerouteWithEvidence(ctx, host, "", port, lookPath, run)
-	return hops, err
+	evidence := systemTracerouteWithEvidence(ctx, host, "", port, lookPath, run)
+	return evidence.hops, evidence.err
 }
 
-func systemTracerouteWithEvidence(ctx context.Context, host, family string, port int, lookPath traceLookPathFunc, run traceRunCommandFunc) ([]Hop, string, string, error) {
+func systemTracerouteWithEvidence(ctx context.Context, host, family string, port int, lookPath traceLookPathFunc, run traceRunCommandFunc) traceProbeEvidence {
 	targetIP, err := resolveTraceTargetForFamily(ctx, host, family)
 	if err != nil {
-		return nil, "none", "resolver", err
+		return traceProbeEvidence{protocol: "none", tool: "resolver", err: err}
 	}
 	resolvedFamily := traceIPFamily(targetIP)
 	specs := traceCommandSpecsForTarget(targetIP, port, resolvedFamily)
@@ -287,7 +357,13 @@ func systemTracerouteWithEvidence(ctx context.Context, host, family string, port
 
 		hops, parseErr := parseTracerouteOutput(output)
 		if parseErr == nil {
-			return hops, spec.protocol, spec.name, nil
+			return traceProbeEvidence{
+				resolvedTarget:     targetIP,
+				destinationReached: traceDestinationReached(hops, targetIP),
+				hops:               hops,
+				protocol:           spec.protocol,
+				tool:               spec.name,
+			}
 		}
 		if commandErr != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v: %s", spec.name, commandErr, truncateTraceOutput(output)))
@@ -296,9 +372,19 @@ func systemTracerouteWithEvidence(ctx context.Context, host, family string, port
 		errors = append(errors, fmt.Sprintf("%s: %v", spec.name, parseErr))
 	}
 	if !found {
-		return nil, "none", "none", fmt.Errorf("no traceroute command available (tried %s)", strings.Join(traceCommandSpecNames(specs), ", "))
+		return traceProbeEvidence{
+			resolvedTarget: targetIP,
+			protocol:       "none",
+			tool:           "none",
+			err:            fmt.Errorf("no traceroute command available (tried %s)", strings.Join(traceCommandSpecNames(specs), ", ")),
+		}
 	}
-	return nil, lastProtocol, lastTool, fmt.Errorf("traceroute %s produced no valid hops: %s", host, strings.Join(errors, "; "))
+	return traceProbeEvidence{
+		resolvedTarget: targetIP,
+		protocol:       lastProtocol,
+		tool:           lastTool,
+		err:            fmt.Errorf("traceroute %s produced no valid hops: %s", host, strings.Join(errors, "; ")),
+	}
 }
 
 func resolveTraceTarget(ctx context.Context, host string) (string, error) {
@@ -430,6 +516,31 @@ func traceIPMatchesFamily(ip net.IP, family string) bool {
 	default:
 		return true
 	}
+}
+
+func normalizedTraceIP(value string) string {
+	ip := net.ParseIP(strings.TrimSpace(value))
+	if ip == nil {
+		return ""
+	}
+	return ip.String()
+}
+
+func traceDestinationReached(hops []Hop, target string) bool {
+	targetIP := net.ParseIP(strings.TrimSpace(target))
+	if targetIP == nil {
+		return false
+	}
+	for _, hop := range hops {
+		if hop.Timeout {
+			continue
+		}
+		hopIP := net.ParseIP(strings.TrimSpace(hop.IP))
+		if hopIP != nil && hopIP.Equal(targetIP) {
+			return true
+		}
+	}
+	return false
 }
 
 func runTraceCommand(ctx context.Context, path string, args ...string) ([]byte, error) {

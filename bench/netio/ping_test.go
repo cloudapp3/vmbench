@@ -3,10 +3,105 @@ package netio
 import (
 	"context"
 	"errors"
+	"net"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
+
+func TestPingTargetCountsTCPRSTAsResponse(t *testing.T) {
+	for _, errno := range []syscall.Errno{syscall.ECONNREFUSED, syscall.ECONNRESET} {
+		t.Run(errno.Error(), func(t *testing.T) {
+			rstErr := &net.OpError{
+				Op:  "dial",
+				Net: "tcp",
+				Err: errno,
+			}
+			result := pingTargetWithDial(context.Background(), PingTarget{
+				ID:       "closed-port",
+				Name:     "Closed port",
+				Endpoint: "192.0.2.1",
+				Port:     80,
+			}, func(context.Context, string, string) (net.Conn, error) {
+				return nil, rstErr
+			})
+
+			if result.Status != "ok" {
+				t.Fatalf("Status = %q, want ok for TCP RST response", result.Status)
+			}
+			if result.ConnectionState != PingConnectionStateRefused {
+				t.Fatalf("ConnectionState = %q, want %q", result.ConnectionState, PingConnectionStateRefused)
+			}
+			if result.Sent != pingProbes || result.Received != pingProbes || result.PacketLoss != 0 {
+				t.Fatalf("probe counts = sent %d received %d loss %.1f, want %d/%d/0", result.Sent, result.Received, result.PacketLoss, pingProbes, pingProbes)
+			}
+			if !strings.Contains(result.Message, "TCP RST") || !strings.Contains(result.Message, rstErr.Error()) {
+				t.Fatalf("Message = %q, want RST explanation and raw dial error", result.Message)
+			}
+		})
+	}
+}
+
+func TestPingTargetKeepsTimeoutAndUnreachableAsLoss(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "timeout", err: context.DeadlineExceeded},
+		{name: "host unreachable", err: syscall.EHOSTUNREACH},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := pingTargetWithDial(context.Background(), PingTarget{
+				ID:       "no-response",
+				Name:     "No response",
+				Endpoint: "192.0.2.1",
+				Port:     80,
+			}, func(context.Context, string, string) (net.Conn, error) {
+				return nil, tt.err
+			})
+
+			if result.Status != "error" {
+				t.Fatalf("Status = %q, want error", result.Status)
+			}
+			if result.ConnectionState != PingConnectionStateNoResponse {
+				t.Fatalf("ConnectionState = %q, want %q", result.ConnectionState, PingConnectionStateNoResponse)
+			}
+			if result.Received != 0 || result.PacketLoss != 100 {
+				t.Fatalf("probe counts = received %d loss %.1f, want 0/100", result.Received, result.PacketLoss)
+			}
+			if !strings.Contains(result.Message, tt.err.Error()) {
+				t.Fatalf("Message = %q, want raw error %q", result.Message, tt.err)
+			}
+		})
+	}
+}
+
+func TestPingTargetReportsMixedOpenAndRefusedResponses(t *testing.T) {
+	calls := 0
+	result := pingTargetWithDial(context.Background(), PingTarget{
+		ID:       "mixed",
+		Name:     "Mixed",
+		Endpoint: "192.0.2.1",
+		Port:     80,
+	}, func(context.Context, string, string) (net.Conn, error) {
+		calls++
+		if calls%2 == 0 {
+			return nil, syscall.ECONNREFUSED
+		}
+		client, peer := net.Pipe()
+		_ = peer.Close()
+		return client, nil
+	})
+
+	if result.Status != "ok" || result.ConnectionState != PingConnectionStateMixed {
+		t.Fatalf("result = %+v, want ok mixed response", result)
+	}
+	if result.Received != pingProbes || result.PacketLoss != 0 {
+		t.Fatalf("probe counts = received %d loss %.1f, want %d/0", result.Received, result.PacketLoss, pingProbes)
+	}
+}
 
 func TestProbePingTargetsReturnsResultsAndErrorWhenAllFail(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())

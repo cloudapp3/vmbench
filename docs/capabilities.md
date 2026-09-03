@@ -1,7 +1,7 @@
 # vmbench 项目能力全景文档
 
 > 本文档对 vmbench 项目的全部能力、架构设计、接口规范、配置参数、数据模型进行系统性梳理。
-> 最后更新：2026-07-17
+> 最后更新：2026-07-20
 
 ---
 
@@ -22,8 +22,7 @@
 13. [事件系统](#13-事件系统)
 14. [构建与分发](#14-构建与分发)
 15. [跨平台支持矩阵](#15-跨平台支持矩阵)
-16. [ECS 对标差异](#16-ecs-对标差异)
-17. [完整目录结构](#17-完整目录结构)
+16. [完整目录结构](#16-完整目录结构)
 
 ---
 
@@ -66,7 +65,7 @@ vmbench 是一款**跨平台 VPS 基准测试工具**，使用 Go 编写，面�
 | 内存带宽扩展 | STREAM bandwidth kernels、mbw memory copy（可选） |
 | 磁盘顺序读写 | fio sequential read/write |
 | 磁盘随机读写 | fio random 4K IOPS |
-| 磁盘顺序测试 | dd sequential write/read（可选） |
+| 磁盘顺序测试 | dd sequential write/read（可选；Linux read 使用 direct I/O） |
 | Windows 硬件 | WinSAT CPU/memory/disk probes（Windows 默认） |
 
 ### 网络诊断
@@ -75,15 +74,15 @@ vmbench 是一款**跨平台 VPS 基准测试工具**，使用 Go 编写，面�
 |------|------|
 | 网络身份 | 虚拟化、公网 IPv4/IPv6、ASN/provider/location、保守 NAT evidence |
 | 版本化节点 | embedded/auto/path、revision pin、Ed25519 signed update/verify/health |
-| 路由追踪 | 广州/北京/上海/成都、三网/CERNET/CSTNET、IPv4/IPv6 traceroute |
-| 延迟测试 | 同一 catalog 节点上的 TCP ping latency/jitter/loss |
+| 路由追踪 | 广州/北京/上海/成都、三网/CERNET/CSTNET、IPv4/IPv6 traceroute 与到达证据 |
+| 延迟测试 | 同一 catalog 节点上的 TCP ping latency/jitter/loss/connection state |
 | 下载测速 | Cloudflare 多线程下载 |
 | 上传测速 | Cloudflare 上传 |
 | Speedtest.net | Ookla Speedtest CLI JSON 解析 |
 | Speedtest.cn | speedtest.cn 兼容 CLI JSON 解析 |
 | iperf3 测速 | 用户提供的 iperf3 目标服务器 |
 | IP 质量 | IP reputation、DNSBL 检测、邮件端口探测 |
-| 邮件端口 | 25/465/587/2525/110/143/993/995 可达性 |
+| 邮件端口 | 顺序探测 25/465/587/2525/110/143/993/995，区分 open/refused/timeout/error |
 | 流媒体解锁 | Netflix/YouTube/Disney+/ChatGPT/TikTok/Prime 等平台 |
 | 网站/TG 可达性 | Website HTTPS 与 Telegram DC TCP latency/status/error |
 
@@ -92,8 +91,8 @@ vmbench 是一款**跨平台 VPS 基准测试工具**，使用 Go 编写，面�
 | 能力 | 说明 |
 |------|------|
 | Console 报告 | 终端彩色表格输出 |
-| JSON 报告 | 机器可解析的完整结构化数据 |
-| HTML 报告 | 带系统信息卡片的可视化报告 |
+| JSON 报告 | 机器可解析的完整结构化数据；同目录临时文件原子导出，Unix mode `0600` |
+| HTML 报告 | 带系统信息卡片的可视化报告；同目录临时文件原子导出，Unix mode `0600` |
 | 报告对比 | 自动识别 benchmark/Suite；仅对兼容证据计算 delta |
 | 本地历史 | add/list/show/delete、`compare --last N`、`--save-history` |
 | 系统信息 | CPU/GPU/内存/磁盘/网络/OS/虚拟化全量采集 |
@@ -123,7 +122,6 @@ vmbench compare <a.json> <b.json> [...]      # 自动识别并对比 benchmark/S
 vmbench history add|list|show|delete|compare # 本地报告历史
 vmbench nodes list|verify|update|health      # 版本化节点目录管理
 vmbench mcp serve [--transport stdio]        # 启动 MCP 服务器
-vmbench ecs-diff [--json]                    # 输出与 ECS 的产品差异快照
 vmbench version                              # 显示版本号
 ```
 
@@ -167,6 +165,7 @@ vmbench version                              # 显示版本号
 | `--iperf-host` | （空） | 同 run 命令 |
 | `--json` | （空） | 同 run 命令 |
 | `--html` | （空） | 同 run 命令 |
+| `--quiet` | `false` | 抑制写到 stderr 的 Suite section 进度 |
 | `--save-history` | `false` | 保存 Suite v2 JSON 到本地历史 |
 | `--history-tag` | （空） | 可选历史标签 |
 
@@ -254,7 +253,7 @@ vmbench sysinfo
 vmbench sysinfo --json
 ```
 
-`run` 默认只选择 hardware scope。启用 network/all 时 CLI 会提示基础 workload 可能传输约 1.75 GB 数据；非法 regex/mode/scope/iteration/tool 返回退出码 2，没有 workload 命中或任一 workload 失败返回退出码 1。
+`run` 默认只选择 hardware scope。启用 network/all 时 CLI 会提示基础 workload 可能传输约 1.75 GB 数据；非法 regex/mode/scope/iteration/tool 返回退出码 2，没有 workload 命中或任一 workload 失败返回退出码 1。`run` 和启用 hardware 的 `suite` 在执行前按 Definition Name/Category filter 检查本次实际涉及的外部命令，缺失时先写 stderr 提示，Linux 同时给出已知 Debian/Ubuntu 安装命令；受影响 workload 仍执行失败并写入结构化 error，不会静默跳过。
 
 ---
 
@@ -316,6 +315,8 @@ Runner 始终串行、隔离执行 workload，不修改全局 `GOMAXPROCS`、GC 
 |--------|---------|
 | 磁盘顺序写 | MB/s |
 | 磁盘顺序读 | MB/s |
+
+Linux 的 dd read 使用 `iflag=direct`，避免页缓存产生远高于真实磁盘能力的结果；其他平台无法保证 uncached direct read，因此该项 fail-closed 并提示使用 fio。dd write 继续以 `conv=fsync` 落盘。
 
 #### STREAM（可选）
 
@@ -383,8 +384,13 @@ Runner 始终串行、隔离执行 workload，不修改全局 `GOMAXPROCS`、GC 
 ### 路由追踪（Traceroute）
 
 - **系统命令**：Linux/macOS 按顺序尝试 `traceroute` / `tcptraceroute` / `tracepath`，Windows 使用 `tracert`
-- **失败关闭**：命令缺失、无有效 hop、全超时或所有目标失败时记录结构化错误；目标最多 4 路并发
+- **到达证据**：逐目标记录 `resolved_target`、`destination_reached`、实际 `probe_protocol/probe_tool` 和 `status=ok|partial|error`；只有到达解析地址才是 `ok`，有有效 hop 但未到达为 `partial`
+- **失败关闭**：命令缺失、无有效 hop 或探测失败时记录结构化错误；目标最多 4 路并发
 - **节点覆盖**：版本化 catalog 当前覆盖广州、北京、上海、成都，电信/联通/移动、CERNET、CSTNET 和 IPv4/IPv6；结果保留稳定 node ID、protocol、ASN 与 revision
+
+### TCP Ping
+
+每个目标发送 10 次 TCP connect。连接成功与 TCP RST/refused/reset 都证明对端返回了响应，都会计入 RTT 与 `received`，不会计为 packet loss；timeout 或其他无响应才算丢包。逐目标 `connection_state` 为 `open`、`refused`、`mixed` 或 `no_response`，全部目标失败时仍保留 results 并返回聚合 error。
 
 ### 版本化 Node Catalog
 
@@ -418,7 +424,7 @@ Manifest 字段为 `schema_version/revision/generated_at/expires_at/nodes[]`。�
 
 > IP Quality 的 0-100 风险评分是**业务诊断指标**，不是 benchmark 总分。
 
-IP Quality 采用 fail-closed：元数据、公网 IPv4 或 DNSBL 结果不完整时不生成 score，只保留结构化 detail/error；DNSBL zone 会并发查询。
+IP Quality 采用 fail-closed：元数据、公网 IPv4、DNSBL 或 Port 25 探测结果不完整时不生成 score，只保留结构化 detail/error；DNSBL zone 会并发查询。
 
 ### 流媒体解锁检测
 
@@ -437,7 +443,7 @@ IP Quality 采用 fail-closed：元数据、公网 IPv4 或 DNSBL 结果不完�
 
 检测端口：`25`、`465`、`587`、`2525`、`110`、`143`、`993`、`995`
 
-每个端口返回：`open` / `closed` / `filtered` 状态
+端口按输入顺序逐个连接，避免同时向共享目标建立 8 个连接造成突发限流和随机假阴性。每个端口返回 `open` / `refused` / `timeout` / `error`；DNS 解析失败或超时保持为探测 `error`。IP Quality 的 25 端口证据复用相同状态语义。
 
 ---
 
@@ -510,7 +516,7 @@ speed
 
 默认只启用 `cloudflare`。同时选择多个 provider 时，顶层 summary 会写入 `aggregation: "best_per_metric"`；下载、上传与延迟可能分别来自不同 provider。选择 `iperf3` 但没有可用 host 时直接返回 provider/section error。
 
-Suite 只有所有 enabled section 都为 `status=ok` 才成功。enabled 的空状态、`skipped`、`partial`、`error` 都使总体失败、发 `section.fail` 并让 CLI 返回退出码 1；disabled section 才发 `section.skip`。默认 timeout 为 5 分钟：hardware 按 workload 应用，其他网络 section 各自派生 section context，deadline/cancel 写入结构化 error。Ping 全目标失败会保留逐目标 results 并返回聚合 error。
+Suite 只有所有 enabled section 都为 `status=ok` 才成功。enabled 的空状态、`skipped`、`partial`、`error` 都使总体失败、发 `section.fail` 并让 CLI 返回退出码 1；disabled section 才发 `section.skip`。默认 timeout 为 5 分钟：hardware 按 workload 应用，其他网络 section 各自派生 section context，deadline/cancel 写入结构化 error。CLI 默认把 section start/完成/失败和 Suite 完成状态实时写到 stderr，`--quiet` 可关闭进度。Ping 全目标失败会保留逐目标 results 并返回聚合 error。
 
 ---
 
@@ -584,6 +590,8 @@ hardware scope 的 `extensions` 为 `false`。network/all scope 会设为 `true`
 - 响应式布局
 - Suite HTML 额外展示 app/catalog metadata、hardware workloads、network identity、完整 route hops、ping、speed group/provider、IP quality、reachability、mail/media 及 detail/error
 
+CLI 的 JSON/HTML 都先写入目标同目录的 mode `0600` 临时文件，写入完成后 fsync 并 rename 到目标路径，最终文件在 Unix 保持 `0600`；这样写入中途失败不会留下半份新报告。其他平台仍依赖系统 ACL。
+
 ### 报告对比（`compare`）
 
 ```bash
@@ -598,7 +606,7 @@ vmbench history compare --last 3
 
 命令先识别 report kind，benchmark 与 Suite 不能混合。Benchmark Compare 忽略带 error 的 metric，将 `ms avg` 按 latency 处理，不跨不兼容 throughput 单位计算 delta，并对迭代次数、mode、scope、硬件工具/iperf host 选择和重复 workload 给出可比性警告。
 
-Suite Compare 对齐两份或更多 Suite v1/v2 JSON 的 raw metrics。Route/Ping 结果记录实际 `probe_protocol/probe_tool`，并显式保留成功的零值 Ping 指标。只有 unit、实际 protocol/IP family、provider/probe tool、target/node identity，以及节点型证据所需的 catalog revision 都兼容时才输出 delta；HTTP status 等分类码不参与百分比 delta。不兼容时仍显示各报告值，但 delta 留空并给出 reason/warning。Route hop count 等中性证据只用于对照，不解释成性能提升。
+Suite Compare 对齐两份或更多 Suite v1/v2 JSON 的 raw metrics。Route/Ping 结果记录实际 `probe_protocol/probe_tool`，并显式保留成功的零值 Ping 指标。只有 unit、实际 protocol/IP family、provider/probe tool、target/node identity，以及节点型证据所需的 catalog revision 都兼容时才输出 delta；HTTP status 等分类码不参与百分比 delta。不兼容时仍显示各报告值，但 delta 留空并给出 reason/warning。Route 指标还要求逐项显式为 `status=ok` 且 `destination_reached=true`；旧报告没有到达证据时不参与 delta。Route hop count 等中性证据只用于对照，不解释成性能提升。Mail 只有 `status=open` 的连接延迟进入比较；`refused/timeout/error` 耗时不作为成功 latency。未知扩展 section 继续按通用 raw-metric 规则提取，不套用 IP Quality 的端口状态门禁。
 
 ### Suite 报告结构
 
@@ -1245,6 +1253,8 @@ type Options struct {
 | `section.skip` | section 未启用 |
 | `suite.done` | 全部 section 完成 |
 
+`vmbench suite` 默认把 section 生命周期通过 `OnEvent` 实时打印到 stderr，不污染 stdout；`--quiet` 不安装该 CLI 进度回调。TUI 继续订阅同一事件模型绘制进度页。
+
 ### Event 结构
 
 ```go
@@ -1272,6 +1282,9 @@ type Event struct {
 ### Go 构建
 
 ```bash
+# 项目构建脚本：CGO_ENABLED=0，输出 /root/temp/vmbench
+./sh/build.sh
+
 # 标准构建
 go build -ldflags "-X github.com/cloudapp3/vmbench.Version=$(git describe --tags 2>/dev/null || echo dev)" \
     -o vmbench ./cmd/vmbench/
@@ -1283,6 +1296,8 @@ GOOS=darwin  GOARCH=amd64 go build -ldflags "..." -o vmbench-darwin-amd64 ./cmd/
 GOOS=darwin  GOARCH=arm64 go build -ldflags "..." -o vmbench-darwin-arm64 ./cmd/vmbench/
 GOOS=windows GOARCH=amd64 go build -ldflags "..." -o vmbench-windows-amd64 ./cmd/vmbench/
 ```
+
+`sh/build.sh` 显式设置 `CGO_ENABLED=0`，与 GoReleaser 的无 CGO 构建保持一致，避免本地测试产物依赖宿主动态库。
 
 ### Go 依赖
 
@@ -1364,37 +1379,7 @@ curl -fsSL ... | bash -s -- --dir /opt/bin
 
 ---
 
-## 16. ECS 对标差异
-
-`vmbench ecs-diff` 命令输出当前与 ECS（spiritLHLS/ecs shell 版 + oneclickvirt/ecs Go 版）的产品差异快照。
-
-### 当前对齐与剩余差距
-
-| 能力 | 状态 | 说明 |
-|------|------|------|
-| 虚拟化/公网 IP/ASN/NAT | aligned | `sysinfo.virtualization` + Suite `network_info`，NAT 采用保守证据 |
-| 网站/TG 可达性 | aligned | 独立 `reachability` section，逐目标结构化结果 |
-| 成都/CERNET/CSTNET/IPv6 | aligned | embedded/versioned catalog + stable node ID/revision |
-| Suite/history compare | vmbench_only | 多报告 compatible-only delta 与 `--last N` |
-| 长期节点运营规模 | partial | 已有 signed update/health/pin，公开运营源和覆盖规模仍需扩展 |
-| 报告分享链接 | gap/P2 | 需要显式授权、默认脱敏的 upload/share adapter |
-| 工具分发/多磁盘 | partial/P2 | 核心 adapter 已有，安装发现和多磁盘模式仍待增强 |
-
-### 查看差异
-
-```bash
-# 终端文本输出
-vmbench ecs-diff
-
-# JSON 输出
-vmbench ecs-diff --json
-```
-
-完整快照见 [`docs/ecs-comparison.md`](ecs-comparison.md)。
-
----
-
-## 17. 完整目录结构
+## 16. 完整目录结构
 
 ```
 vmbench/
@@ -1438,7 +1423,6 @@ vmbench/
 ├── cmd/vmbench/                    # CLI 入口
 │   ├── main.go                     # 命令分发
 │   ├── mcp.go                      # MCP serve 子命令
-│   ├── ecs_diff.go                 # ECS 差异快照子命令
 │   └── tui.go                      # TUI 子命令入口
 │
 ├── mcp/                            # MCP JSON-RPC 服务器
@@ -1510,7 +1494,6 @@ vmbench/
 │   ├── current-state.md            # 当前实现状态
 │   ├── tui-design.md               # TUI 设计文档
 │   ├── tui-redesign.md             # TUI 重设计
-│   ├── ecs-comparison.md           # ECS 对标差异
 │   ├── CHANGELOG.md                # 变更记录
 │   └── README.zh-CN.md             # 中文快速参考
 │
@@ -1547,6 +1530,5 @@ vmbench/
 | [docs/tech-stack.md](tech-stack.md) | 技术架构详解 |
 | [docs/current-state.md](current-state.md) | 最新实现状态 |
 | [docs/tui-design.md](tui-design.md) | TUI 设计文档 |
-| [docs/ecs-comparison.md](ecs-comparison.md) | ECS 对标差异 |
 | [docs/CHANGELOG.md](CHANGELOG.md) | 变更记录 |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | 贡献指南 |

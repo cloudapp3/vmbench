@@ -79,7 +79,7 @@ func TestWriteHTMLHandlesMissingOptionalResults(t *testing.T) {
 
 func TestWriteHTMLIncludesDetailedSuiteEvidence(t *testing.T) {
 	report := NewSuiteReport(Options{Sections: SectionSelector{
-		Hardware: true, NetworkInfo: true, Route: true, Reachability: true,
+		Hardware: true, NetworkInfo: true, Route: true, Ping: true, Reachability: true,
 	}})
 	report.Hardware.Report = &vmbench.Report{
 		Results: vmbench.ResultsSection{Workloads: []vmbench.WorkloadEntry{{
@@ -101,9 +101,23 @@ func TestWriteHTMLIncludesDetailedSuiteEvidence(t *testing.T) {
 		}},
 		Providers: []NetworkIdentityProviderResult{{ID: "identity-provider", Kind: "metadata", Status: "ok"}},
 	}
+	notReached := false
 	report.Route.Results = []RouteRun{{
-		Target: netio.TraceTarget{Name: "Route target", City: "Chengdu", Carrier: "CERNET", AS: 4538, Endpoint: "route.example"},
-		Hops:   []netio.Hop{{TTL: 1, IP: "10.0.0.1", RTTMs: 1.25}},
+		Target:             netio.TraceTarget{Name: "Route target", City: "Chengdu", Carrier: "CERNET", AS: 4538, Endpoint: "route.example"},
+		ResolvedTarget:     "203.0.113.8",
+		DestinationReached: &notReached,
+		Status:             netio.TraceStatusPartial,
+		Hops:               []netio.Hop{{TTL: 1, IP: "10.0.0.1", RTTMs: 1.25}},
+	}}
+	report.Ping.Results = []PingResult{{
+		ID:              "closed-port",
+		Name:            "Closed port",
+		Target:          "203.0.113.9",
+		Status:          "ok",
+		ConnectionState: netio.PingConnectionStateRefused,
+		Message:         "target responded with TCP RST",
+		Sent:            10,
+		Received:        10,
 	}}
 	report.Reachability.Results = []ReachabilityResult{{
 		ID: "telegram_dc1", Category: "telegram", Protocol: "tcp", Endpoint: "149.154.175.53:443", Status: "reachable", LatencyMs: 20,
@@ -120,6 +134,12 @@ func TestWriteHTMLIncludesDetailedSuiteEvidence(t *testing.T) {
 		"addresses differ",
 		"Route target",
 		"10.0.0.1",
+		"203.0.113.8",
+		"destination reached no",
+		"partial",
+		"Closed port",
+		"refused",
+		"TCP RST",
 		"telegram_dc1",
 	} {
 		if !strings.Contains(output.String(), want) {

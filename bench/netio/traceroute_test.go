@@ -2,6 +2,7 @@ package netio
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -86,6 +87,65 @@ func TestParseTracerouteOutputRejectsOnlyTimeouts(t *testing.T) {
 	}
 }
 
+func TestTraceDestinationReachedMatchesResolvedIP(t *testing.T) {
+	tests := []struct {
+		name   string
+		target string
+		hops   []Hop
+		want   bool
+	}{
+		{name: "reached IPv4", target: "203.0.113.8", hops: []Hop{{TTL: 1, IP: "192.0.2.1"}, {TTL: 2, IP: "203.0.113.8"}}, want: true},
+		{name: "reached normalized IPv6", target: "2001:db8::8", hops: []Hop{{TTL: 1, IP: "2001:0db8:0:0:0:0:0:8"}}, want: true},
+		{name: "only intermediate hops", target: "203.0.113.8", hops: []Hop{{TTL: 1, IP: "192.0.2.1"}, {TTL: 2, Timeout: true}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := traceDestinationReached(tt.hops, tt.target); got != tt.want {
+				t.Fatalf("traceDestinationReached() = %t, want %t", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTraceProbeResultEffectiveStatusReadsLegacyJSON(t *testing.T) {
+	var result TraceProbeResult
+	if err := json.Unmarshal([]byte(`{
+  "target":{"name":"legacy","endpoint":"203.0.113.8"},
+  "probe_protocol":"tcp","probe_tool":"traceroute",
+  "hops":[{"ttl":1,"ip":"192.0.2.1","rtt_ms":1}]
+}`), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.DestinationReached != nil {
+		t.Fatalf("legacy destination evidence = %v, want absent", result.DestinationReached)
+	}
+	if got := result.EffectiveStatus(); got != TraceStatusOK {
+		t.Fatalf("legacy EffectiveStatus() = %q, want %q", got, TraceStatusOK)
+	}
+}
+
+func TestTraceProbeResultJSONIncludesReachabilityEvidence(t *testing.T) {
+	reached := false
+	result := TraceProbeResult{
+		Target:             TraceTarget{Name: "partial", Endpoint: "route.example"},
+		ResolvedTarget:     "203.0.113.8",
+		DestinationReached: &reached,
+		Status:             TraceStatusPartial,
+		ProbeProtocol:      "tcp",
+		ProbeTool:          "traceroute",
+		Hops:               []Hop{{TTL: 1, IP: "192.0.2.1"}},
+	}
+	data, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{`"resolved_target":"203.0.113.8"`, `"destination_reached":false`, `"status":"partial"`} {
+		if !strings.Contains(string(data), field) {
+			t.Fatalf("trace JSON missing %s: %s", field, data)
+		}
+	}
+}
+
 func TestSystemTracerouteReportsMissingCommands(t *testing.T) {
 	lookPath := func(name string) (string, error) {
 		return "", exec.ErrNotFound
@@ -148,6 +208,9 @@ func TestProbeTracerouteTargetsReturnsStructuredErrorsAndLimitsConcurrency(t *te
 	for i, result := range results {
 		if !strings.Contains(result.Error, "trace failed") {
 			t.Errorf("result[%d].Error = %q, want structured trace error", i, result.Error)
+		}
+		if result.EffectiveStatus() != TraceStatusError || result.DestinationReached == nil || *result.DestinationReached {
+			t.Errorf("result[%d] status evidence = %+v", i, result)
 		}
 	}
 }

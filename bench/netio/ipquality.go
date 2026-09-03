@@ -155,14 +155,50 @@ func probeIPQuality(ctx context.Context, deps ipQualityDependencies) (*IPQuality
 	mailPorts := deps.mailPorts(ctx, []int{25})
 	var port25 *PortProbe
 	found25Open := false
+	port25Status := "unknown"
+	port25Conclusive := false
 	for idx := range mailPorts {
 		if mailPorts[idx].Port == 25 {
 			cp := mailPorts[idx]
 			port25 = &cp
-			if cp.Status == "open" {
+			port25Status = firstNonEmpty(strings.ToLower(strings.TrimSpace(cp.Status)), "unknown")
+			switch port25Status {
+			case MailPortStatusOpen:
 				found25Open = true
+				port25Conclusive = true
+			case MailPortStatusRefused, MailPortStatusTimeout:
+				port25Conclusive = true
 			}
 		}
+	}
+	result.Port25 = port25
+	result.MailPorts = mailPorts
+
+	evidenceSummary := make([]string, 0, 4)
+	if flags.proxy {
+		evidenceSummary = append(evidenceSummary, "proxy detected")
+	}
+	if flags.hosting {
+		evidenceSummary = append(evidenceSummary, "hosting ASN")
+	}
+	if len(listed) > 0 {
+		evidenceSummary = append(evidenceSummary, fmt.Sprintf("dnsbl listed x%d", len(listed)))
+	}
+	if !port25Conclusive {
+		evidenceSummary = append(evidenceSummary, "port25 "+port25Status)
+		result.RiskSummary = &IPRiskSummary{
+			Summary:          strings.Join(evidenceSummary, " · "),
+			DNSBLSupported:   true,
+			DNSBLTool:        "dnsbl",
+			DNSBLMessage:     dnsblMessage,
+			DNSBLListedCount: len(listed),
+			DNSBLListed:      listed,
+		}
+		detail := port25Status
+		if port25 != nil && strings.TrimSpace(port25.Message) != "" {
+			detail += ": " + strings.TrimSpace(port25.Message)
+		}
+		return result, fmt.Errorf("ip quality: port 25 probe inconclusive: %s", detail)
 	}
 	if !found25Open {
 		score -= 5
@@ -172,18 +208,9 @@ func probeIPQuality(ctx context.Context, deps ipQualityDependencies) (*IPQuality
 	}
 
 	level := scoreLevel(score)
-	summary := []string{fmt.Sprintf("score %d/100", score)}
-	if flags.proxy {
-		summary = append(summary, "proxy detected")
-	}
-	if flags.hosting {
-		summary = append(summary, "hosting ASN")
-	}
-	if len(listed) > 0 {
-		summary = append(summary, fmt.Sprintf("dnsbl listed x%d", len(listed)))
-	}
+	summary := append([]string{fmt.Sprintf("score %d/100", score)}, evidenceSummary...)
 	if !found25Open {
-		summary = append(summary, "port25 blocked")
+		summary = append(summary, "port25 "+port25Status)
 	}
 
 	result.RiskSummary = &IPRiskSummary{
@@ -195,8 +222,6 @@ func probeIPQuality(ctx context.Context, deps ipQualityDependencies) (*IPQuality
 		DNSBLListedCount: len(listed),
 		DNSBLListed:      listed,
 	}
-	result.Port25 = port25
-	result.MailPorts = mailPorts
 	result.Score = &IPScore{Total: score, MaxTotal: 100, Level: level}
 	return result, nil
 }

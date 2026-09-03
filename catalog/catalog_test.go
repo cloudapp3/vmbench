@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -138,6 +139,52 @@ func TestExternalHardwareDefinitionsForTools(t *testing.T) {
 	}
 }
 
+func TestMissingHardwareToolsUsesSelectedAdapterCommands(t *testing.T) {
+	dir := t.TempDir()
+	suffix := ""
+	if runtime.GOOS == "windows" {
+		suffix = ".exe"
+		t.Setenv("PATHEXT", ".EXE")
+	}
+	for _, name := range []string{"sysbench", "openssl", "fio", "stream_c", "geekbench6"} {
+		path := filepath.Join(dir, name+suffix)
+		if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", dir)
+
+	selected := []string{HardwareToolSysbench, HardwareToolOpenSSL, HardwareToolFio, HardwareToolStream, HardwareToolGeekbench}
+	if got := MissingHardwareTools(selected); len(got) != 0 {
+		t.Fatalf("MissingHardwareTools(%v) = %v, want none", selected, got)
+	}
+	if got := MissingHardwareTools([]string{HardwareToolMBW}); len(got) != 1 || got[0] != HardwareToolMBW {
+		t.Fatalf("MissingHardwareTools(mbw) = %v, want [mbw]", got)
+	}
+}
+
+func TestMissingHardwareToolsForFilterOnlyChecksMatchingAdapters(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	tools := []string{HardwareToolFio, HardwareToolMBW}
+	tests := []struct {
+		name   string
+		filter string
+		want   string
+	}{
+		{name: "workload name", filter: `^Disk 4K Random`, want: HardwareToolFio},
+		{name: "category", filter: `^Memory$`, want: HardwareToolMBW},
+		{name: "no hardware match", filter: `^OpenSSL`, want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := MissingHardwareToolsForFilter(tools, regexp.MustCompile(tt.filter))
+			if strings.Join(got, ",") != tt.want {
+				t.Fatalf("MissingHardwareToolsForFilter(%v, %q) = %v, want %q", tools, tt.filter, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseExternalToolOutputs(t *testing.T) {
 	if got, ok := parseDDSpeedMiB("268435456 bytes copied, 0.123 s, 2.1 GB/s"); !ok || got < 1900 {
 		t.Fatalf("parseDDSpeedMiB = %f,%v; want about 2000 MiB/s", got, ok)
@@ -150,6 +197,31 @@ func TestParseExternalToolOutputs(t *testing.T) {
 	}
 	if got, ok := parseLastFloat(`(?i)Multi[- ]Core Score\s+([\d.]+)`, "Multi-Core Score 12345"); !ok || got != 12345 {
 		t.Fatalf("parseLastFloat geekbench = %f,%v", got, ok)
+	}
+}
+
+func TestDDReadRequiresDirectIOOnLinux(t *testing.T) {
+	w := &ddWorkload{operation: "read", sizeMiB: 256}
+	if !strings.Contains(w.Description(), "direct-I/O") {
+		t.Fatalf("Description() = %q, want direct-I/O evidence", w.Description())
+	}
+	if runtime.GOOS != "linux" {
+		return
+	}
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "dd")
+	script := "#!/bin/sh\ncase \" $* \" in\n  *\" iflag=direct \"*) printf '%s\\n' '268435456 bytes copied, 1 s, 256 MiB/s' ;;\n  *) printf '%s\\n' '268435456 bytes copied, 1 s, 256 MiB/s' ;;\nesac\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+
+	if _, _, err := w.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if !strings.Contains(w.Detail(), "iflag=direct") {
+		t.Fatalf("Detail() = %q, want direct-I/O argument", w.Detail())
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/cloudapp3/vmbench/bench/netio"
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
@@ -285,13 +286,24 @@ func pingResultCard(r suite.SuiteReport, width int) string {
 	for _, p := range r.Ping.Results {
 		name := firstStr(p.Name, "?")
 		nameStyled := lipgloss.NewStyle().Foreground(t.Fg).Width(28).Render(truncStr(name, 28))
+		connectionState := strings.ToLower(strings.TrimSpace(p.ConnectionState))
 		var metric string
 		if strings.EqualFold(p.Status, "ok") {
-			metric = lipgloss.NewStyle().Foreground(t.Success).Render(
-				fmt.Sprintf("%s avg  %.0f%% loss", fmtMs(p.AvgLatencyMs), p.PacketLoss),
-			)
+			color := t.Success
+			if connectionState == netio.PingConnectionStateRefused || connectionState == netio.PingConnectionStateMixed {
+				color = t.Warning
+			}
+			text := fmt.Sprintf("%s avg  %.0f%% loss", fmtMs(p.AvgLatencyMs), p.PacketLoss)
+			if connectionState != "" {
+				text += "  " + connectionState
+			}
+			metric = lipgloss.NewStyle().Foreground(color).Render(text)
 		} else {
-			metric = lipgloss.NewStyle().Foreground(t.Danger).Render(firstStr(p.Status, "fail"))
+			text := firstStr(p.Status, "fail")
+			if connectionState != "" {
+				text += "  " + connectionState
+			}
+			metric = lipgloss.NewStyle().Foreground(t.Danger).Render(text)
 		}
 		lines = append(lines, nameStyled+" "+metric)
 	}
@@ -314,7 +326,7 @@ func routeResultCard(r suite.SuiteReport, width int) string {
 		name := fmt.Sprintf("%s %s", item.Target.City, item.Target.Carrier)
 		nameStyled := lipgloss.NewStyle().Foreground(t.Fg).Width(28).Render(truncStr(name, 28))
 		hops := lipgloss.NewStyle().Foreground(t.Accent).Render(fmt.Sprintf("%d hops", len(item.Hops)))
-		status := tuiCellStatus(item.Error == "")
+		status := tuiTraceStatus(item.EffectiveStatus())
 		lines = append(lines, nameStyled+" "+hops+"  "+status)
 	}
 	return comp.Card{
@@ -326,6 +338,18 @@ func routeResultCard(r suite.SuiteReport, width int) string {
 	}.Render()
 }
 
+func tuiTraceStatus(status string) string {
+	t := theme.Active
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "ok":
+		return lipgloss.NewStyle().Foreground(t.Success).Bold(true).Render("✓ OK")
+	case "partial":
+		return lipgloss.NewStyle().Foreground(t.Warning).Bold(true).Render("! PARTIAL")
+	default:
+		return lipgloss.NewStyle().Foreground(t.Danger).Bold(true).Render("✗ ERROR")
+	}
+}
+
 func ipQualityResultCard(r suite.SuiteReport, width int) string {
 	t := theme.Active
 	if r.IPQuality.Result == nil {
@@ -333,6 +357,13 @@ func ipQualityResultCard(r suite.SuiteReport, width int) string {
 	}
 	res := r.IPQuality.Result
 	var lines []string
+	valueWidth := cardWidth(width) - 16
+	if valueWidth < 12 {
+		valueWidth = 12
+	}
+	if message := strings.TrimSpace(r.IPQuality.Message); message != "" && !strings.EqualFold(r.IPQuality.Status, "ok") {
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.Danger).Render(truncStr(message, valueWidth+10)))
+	}
 	if res.BasicInfo != nil {
 		info := res.BasicInfo
 		lines = append(lines,
@@ -360,6 +391,39 @@ func ipQualityResultCard(r suite.SuiteReport, width int) string {
 				),
 			lipgloss.NewStyle().Foreground(t.Muted).Width(10).Render("Level")+
 				lipgloss.NewStyle().Foreground(t.Fg).Render(score.Level),
+		)
+	}
+	if res.RiskSummary != nil {
+		if summary := strings.TrimSpace(res.RiskSummary.Summary); summary != "" {
+			lines = append(lines,
+				lipgloss.NewStyle().Foreground(t.Muted).Width(10).Render("Evidence")+
+					lipgloss.NewStyle().Foreground(t.Fg).Render(truncStr(summary, valueWidth)),
+			)
+		}
+	}
+	port25 := res.Port25
+	if port25 == nil {
+		for i := range res.MailPorts {
+			if res.MailPorts[i].Port == 25 {
+				port25 = &res.MailPorts[i]
+				break
+			}
+		}
+	}
+	if port25 != nil {
+		detail := firstStr(port25.Status, "unknown")
+		if message := strings.TrimSpace(port25.Message); message != "" {
+			detail += ": " + message
+		}
+		color := t.Warning
+		if strings.EqualFold(port25.Status, "open") {
+			color = t.Success
+		} else if strings.EqualFold(port25.Status, "error") {
+			color = t.Danger
+		}
+		lines = append(lines,
+			lipgloss.NewStyle().Foreground(t.Muted).Width(10).Render("Port 25")+
+				lipgloss.NewStyle().Foreground(color).Render(truncStr(detail, valueWidth)),
 		)
 	}
 	return comp.Card{

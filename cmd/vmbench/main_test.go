@@ -1,6 +1,24 @@
 package main
 
-import "testing"
+import (
+	"bytes"
+	"strings"
+	"testing"
+)
+
+func TestRunRejectsRemovedECSDiffCommands(t *testing.T) {
+	for _, command := range []string{"ecs-diff", "ecs-compare"} {
+		if code := run([]string{command}); code != 2 {
+			t.Fatalf("run(%q) = %d, want unknown command exit 2", command, code)
+		}
+	}
+
+	var output bytes.Buffer
+	printUsage(&output)
+	if strings.Contains(output.String(), "ecs-diff") || strings.Contains(output.String(), "ecs-compare") {
+		t.Fatalf("usage still advertises removed ECS command:\n%s", output.String())
+	}
+}
 
 func TestRunRejectsInvalidBenchmarkArguments(t *testing.T) {
 	tests := [][]string{

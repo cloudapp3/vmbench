@@ -31,24 +31,51 @@ func runRouteSection(ctx context.Context, opts Options, report *SuiteReport) {
 		return
 	}
 	section.Results = results
-	okCount := 0
+	section.Status, section.Message = summarizeRouteResults(results)
+}
+
+func summarizeRouteResults(results []netio.TraceProbeResult) (string, string) {
+	if len(results) == 0 {
+		return "error", "no traceroute targets selected"
+	}
+	reachedCount := 0
+	partialCount := 0
+	errorCount := 0
 	for _, item := range results {
-		if strings.TrimSpace(item.Error) == "" {
-			okCount++
+		switch item.EffectiveStatus() {
+		case netio.TraceStatusOK:
+			reachedCount++
+		case netio.TraceStatusPartial:
+			partialCount++
+		default:
+			errorCount++
 		}
 	}
-	if len(results) == 0 {
-		section.Status = "error"
-		section.Message = "no traceroute targets selected"
-		return
+	status := "partial"
+	switch {
+	case reachedCount == len(results):
+		status = "ok"
+	case errorCount == len(results):
+		status = "error"
 	}
-	if okCount == 0 {
-		section.Status = "error"
-		section.Message = fmt.Sprintf("0/%d traces ok", len(results))
-		return
+	message := fmt.Sprintf("%d/%d destinations reached", reachedCount, len(results))
+	if partialCount > 0 {
+		message += fmt.Sprintf("; %d partial", partialCount)
 	}
-	section.Status = statusFromCounts(okCount, len(results)-okCount)
-	section.Message = fmt.Sprintf("%d/%d traces ok", okCount, len(results))
+	if errorCount > 0 {
+		message += fmt.Sprintf("; %d errors", errorCount)
+	}
+	return status, message
+}
+
+func traceDestinationReachedText(value *bool) string {
+	if value == nil {
+		return "unknown"
+	}
+	if *value {
+		return "yes"
+	}
+	return "no"
 }
 
 func routeTargetsForPresets(presets []string) []netio.TraceTarget {

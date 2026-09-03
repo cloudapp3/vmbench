@@ -253,6 +253,8 @@ func extractKnownSection(out map[string]measurement, name string, section map[st
 		extractPing(out, section, revision)
 	case "speed":
 		extractSpeed(out, section, revision)
+	case "mail":
+		extractMail(out, section)
 	default:
 		extractGenericSection(out, name, section, revision)
 	}
@@ -310,12 +312,23 @@ func extractRoute(out map[string]measurement, section map[string]any, revision s
 		if !ok || strings.TrimSpace(stringValue(item["error"])) != "" {
 			continue
 		}
+		status := strings.ToLower(strings.TrimSpace(stringValue(item["status"])))
+		if status != "ok" {
+			continue
+		}
+		if reached, exists := boolValue(item["destination_reached"]); !exists || !reached {
+			continue
+		}
 		target, _ := asMap(item["target"])
 		identity := firstString(target, "id", "name", "endpoint")
 		if identity == "" {
 			identity = strconv.Itoa(index + 1)
 		}
-		endpoint := endpointWithPort(firstString(target, "endpoint", "id", "name"), target["port"])
+		endpointHost := firstString(item, "resolved_target")
+		if endpointHost == "" {
+			endpointHost = firstString(target, "endpoint", "id", "name")
+		}
+		endpoint := endpointWithPort(endpointHost, target["port"])
 		protocol := firstString(item, "probe_protocol")
 		legacyProtocol := protocol == ""
 		if legacyProtocol {
@@ -468,6 +481,35 @@ func extractSpeed(out map[string]measurement, section map[string]any, revision s
 	}
 }
 
+func extractMail(out map[string]measurement, section map[string]any) {
+	results, _ := section["results"].([]any)
+	for index, raw := range results {
+		item, ok := asMap(raw)
+		if !ok || !strings.EqualFold(strings.TrimSpace(stringValue(item["status"])), "open") {
+			continue
+		}
+		identity := ""
+		if port, ok := numberValue(item["port"]); ok && port > 0 {
+			identity = strconv.Itoa(int(port))
+		}
+		if identity == "" {
+			identity = firstString(item, "title")
+		}
+		if identity == "" {
+			identity = strconv.Itoa(index + 1)
+		}
+		target := endpointWithPort(firstString(item, "target"), item["port"])
+		protocol := firstString(item, "method")
+		if protocol == "" {
+			protocol = "tcp_connect"
+		}
+		addNumber(out, measurementKey("mail", identity, "latency_ms"), measurement{
+			section: "mail", name: identity + "/latency", unit: "ms",
+			protocol: protocol, provider: "mail", target: target, direction: directionLower,
+		}, item["latency_ms"])
+	}
+}
+
 func extractGenericSection(out map[string]measurement, name string, section map[string]any, revision string) {
 	if enabled, exists := boolValue(section["enabled"]); exists && !enabled {
 		return
@@ -486,6 +528,9 @@ func walkGeneric(out map[string]measurement, section string, value any, path []s
 	switch current := value.(type) {
 	case map[string]any:
 		ctx = updateContext(ctx, current)
+		if strings.EqualFold(section, "ip_quality") && isPortProbe(current) && !strings.EqualFold(stringValue(current["status"]), "open") {
+			return
+		}
 		if strings.EqualFold(stringValue(current["status"]), "error") || strings.TrimSpace(stringValue(current["error"])) != "" {
 			return
 		}
@@ -524,6 +569,16 @@ func walkGeneric(out map[string]measurement, section string, value any, path []s
 			walkGeneric(out, section, child, append(path, identity), ctx, revision)
 		}
 	}
+}
+
+func isPortProbe(object map[string]any) bool {
+	if _, ok := numberValue(object["port"]); !ok {
+		return false
+	}
+	if _, ok := numberValue(object["latency_ms"]); !ok {
+		return false
+	}
+	return stringValue(object["status"]) != ""
 }
 
 func alignMeasurement(key string, reports []decodedReport) MetricComparison {

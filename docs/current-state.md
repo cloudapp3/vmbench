@@ -44,8 +44,10 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
   - ip quality
   - media unlock
   - iperf3
-- traceroute 使用系统 `traceroute` / `tcptraceroute` / `tracepath` / `tracert`，最多 4 路并发；命令缺失、无有效 hop、全超时都结构化报错
-- IP Quality fail-closed：元数据、公网 IPv4 或 DNSBL 结论不完整时不生成风险 score；DNSBL zone 并发查询
+- traceroute 使用系统 `traceroute` / `tcptraceroute` / `tracepath` / `tracert`，最多 4 路并发；逐项记录解析目标、是否到达和 `ok/partial/error`，命令缺失或无有效 hop 结构化报错
+- TCP Ping 将 connect 成功和 RST/refused 都作为响应计入 RTT/received，并用 `connection_state` 区分 open/refused/mixed/no_response
+- Mail 端口顺序探测并区分 `open/refused/timeout/error`；DNS 失败保持为 probe error
+- IP Quality fail-closed：元数据、公网 IPv4、DNSBL 或 Port 25 结论不完整时不生成风险 score；DNSBL zone 并发查询
 - Cloudflare upload 使用流式请求体，避免分配 50 MiB payload；所有 HTTP 传输保留状态码/body copy 错误
 - `nodecatalog/` 用 embedded/auto/path 三种 source 提供版本化节点；revision pin 在 probe 前检查，Ed25519 signed update 通过严格 schema 验证后才原子写入缓存
 - embedded snapshot 已覆盖成都、CERNET、CSTNET 与 IPv6 route/ping；节点 ID、protocol、ASN、流量预算和 revision 进入可追溯证据
@@ -66,7 +68,7 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 - 默认 timeout 为 5 分钟：hardware 按 workload 应用，其他网络 section 各自派生 timeout context，并把 deadline/cancel 写成结构化 error
 - Net Ping 全目标失败会保留逐目标 results 并返回聚合 error；iperf3 provider 无可用 host 直接失败
 - suite 事件驱动仍然是主线：start / done / fail / skip / suite.done
-- `vmbench compare` 自动识别 benchmark/Suite；Suite 只有在 unit/protocol/provider/target-node/catalog revision 兼容时才产生 delta
+- `vmbench compare` 自动识别 benchmark/Suite；Suite 只有在 unit/protocol/provider/target-node/catalog revision 兼容时才产生 delta，Route 另要求显式到达目标，Mail/IP Quality 端口延迟只接受 open
 - `history add/list/show/delete/compare --last N` 提供原子本地记录（Unix `0700/0600`）；run/suite 可用 `--save-history` 直接落盘
 
 ### 4. MCP
@@ -94,9 +96,9 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 - Results 只展示原始时间、吞吐、延迟、detail/error
 - benchmark JSON 使用 schema v2；config 记录实际 scope/可选 iperf hosts，network/all 另记录 catalog source/revision/node IDs；hardware 清除网络 provenance 且 `extensions=false`
 - 结果保留实际 iterations 与 `samples_ms`；processed 字段仅在明确为累计 bytes/ops 且 sample 语义一致时出现
-- TUI benchmark Compare 忽略 error metric；CLI/history Suite Compare 另检查 protocol/provider/node/catalog revision，并提示所有不兼容原因
+- TUI benchmark Compare 忽略 error metric；CLI/history Suite Compare 另检查 protocol/provider/node/catalog revision 与 Route 到达证据，并提示所有不兼容原因
 - Console / JSON / HTML 是同一数据模型的不同视图
-- Suite HTML 已覆盖硬件 workload、网络身份、route hops、ping/speed/IP/reachability/mail/media 明细与结构化失败
+- Suite HTML 已覆盖硬件 workload、网络身份、route hops/到达状态、ping connection state、speed/IP/reachability/mail/media 明细与结构化失败；TUI 在 IP Quality fail-closed 时保留 error、风险摘要和 Port 25 证据
 - sysinfo 采集向所有平台 collector 传递调用方 context；外部命令同时受 parent deadline 与 30 秒上限约束
 
 ## 文档入口
@@ -105,7 +107,6 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 - [技术栈](tech-stack.md)
 - [TUI 设计](tui-design.md)
 - [变更记录](CHANGELOG.md)
-- [ECS 对标差异](ecs-comparison.md)
 
 ## 当前结论
 

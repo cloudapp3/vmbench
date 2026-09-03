@@ -31,18 +31,18 @@ vmbench 是一款跨平台 VPS 测评工具，用 Go 编写，强调：
 ### Hardware
 - CPU：sysbench single-core / multi-core prime，openssl speed；Geekbench 可选启用
 - Memory：sysbench 顺序读/写带宽、随机读延迟；STREAM / mbw 可选启用
-- Disk：fio 4K 随机读/写 Q1/Q32、1M 顺序读/写 Q1/Q8；dd sequential write/read 可选启用
+- Disk：fio 4K 随机读/写 Q1/Q32、1M 顺序读/写 Q1/Q8；dd sequential write/read 可选启用，Linux read 使用 direct I/O
 - Windows：默认使用 WinSAT CPU / memory / disk
-- 说明：硬件跑分只依赖外部工具；缺失工具会进入结构化 error，不回退到进程内算法
+- 说明：硬件跑分只依赖外部工具；CLI 只为当前 filter 会命中的 workload 预检缺失工具，并提示可用的 Debian/Ubuntu 安装命令，受影响 workload 仍进入结构化 error，不回退到进程内算法
 
 ### Network
 - Network Info：本机虚拟化 + 公网 IPv4/IPv6、ASN、provider、location 与 `direct/translated/unknown` NAT 证据
-- Route：基于版本化 catalog 的三网、成都、CERNET、CSTNET、IPv4/IPv6 traceroute
-- Ping：同一 catalog 节点上的 TCP latency / jitter / loss
+- Route：基于版本化 catalog 的三网、成都、CERNET、CSTNET、IPv4/IPv6 traceroute，记录解析目标、是否到达和 `ok|partial|error`
+- Ping：同一 catalog 节点上的 TCP latency / jitter / loss；RST/refused 作为收到响应，另记 `connection_state`
 - Speed：可选 provider，包括 Cloudflare、Speedtest.net、Speedtest.cn、iperf3
 - IP Quality：IP、DNSBL、邮件端口
 - Reachability：Google/GitHub/Cloudflare HTTPS 与 Telegram DC TCP 可达性，保留 latency/status/error
-- Mail：25/465/587/2525/110/143/993/995
+- Mail：顺序探测 25/465/587/2525/110/143/993/995，并区分 `open|refused|timeout|error`
 - Media：Netflix / YouTube / Disney+ / ChatGPT / TikTok / Prime 等
 
 ## 输出模型
@@ -60,7 +60,7 @@ vmbench 输出的是原始测量数据：
 
 不输出综合评分、等级或 category score。
 
-Suite JSON 使用 schema v2 envelope：`report_kind`、`report_id`、app build、system、timestamps/duration、规范化 config、catalog provenance 和九个 section，同时保留旧 `version`/Unix time 字段给 v1 consumer。Suite HTML 展示硬件 workload、网络身份、完整 route hops、ping、speed provider、IP quality、网站/TG、mail、media 及其 detail/error，而不是只给 section 摘要。
+Suite JSON 使用 schema v2 envelope：`report_kind`、`report_id`、app build、system、timestamps/duration、规范化 config、catalog provenance 和九个 section，同时保留旧 `version`/Unix time 字段给 v1 consumer。Route 结果包含 `resolved_target/destination_reached/status`，Ping 结果包含 `connection_state`。Suite HTML 展示硬件 workload、网络身份、完整 route hops、ping、speed provider、IP quality、网站/TG、mail、media 及其 detail/error，而不是只给 section 摘要。
 
 ## 使用方式
 
@@ -76,17 +76,16 @@ vmbench suite --preset quick
 vmbench suite --preset website
 vmbench suite --only ping,mail
 vmbench suite --ip-version dual
+vmbench suite --quiet --json suite.json
 vmbench suite --node-catalog auto --node-revision 2026-07-13.1 --save-history
 vmbench mcp serve --transport stdio
 vmbench compare a.json b.json
 vmbench history compare --last 3
 vmbench nodes list --node-catalog embedded
 vmbench nodes health --node-catalog auto --ip-family v6
-vmbench ecs-diff
-vmbench ecs-diff --json
 ```
 
-`vmbench run` 默认 `scope=hardware`。只有显式使用 `--scope network` 或 `--scope all` 才运行网络 workload；这类运行会输出约 1.75 GB 的流量提示，网络 workload 最多执行一次并在报告中记录实际 `iterations=1`。报告 config 会保留规范化后的 `scope`、可选 `iperf_hosts` 和网络实际使用的 `catalog_source/catalog_revision/node_ids`；hardware 的 `extensions=false`，network/all 为 `true`。所有 workload 串行隔离执行，线程数和队列深度由 sysbench/fio/OpenSSL/WinSAT 适配器定义；旧的 `--mode multi/all` 仅为兼容保留，不再并发 workload 或生成重复 pass。
+`vmbench run` 默认 `scope=hardware`。只有显式使用 `--scope network` 或 `--scope all` 才运行网络 workload；这类运行会输出约 1.75 GB 的流量提示，网络 workload 最多执行一次并在报告中记录实际 `iterations=1`。报告 config 会保留规范化后的 `scope`、可选 `iperf_hosts` 和网络实际使用的 `catalog_source/catalog_revision/node_ids`；hardware 的 `extensions=false`，network/all 为 `true`。所有 workload 串行隔离执行，线程数和队列深度由 sysbench/fio/OpenSSL/WinSAT 适配器定义；旧的 `--mode multi/all` 仅为兼容保留，不再并发 workload 或生成重复 pass。`run` 和启用 hardware 的 `suite` 会在执行前检查当前 filter 实际涉及的工具是否可解析，但缺失工具不会被静默跳过。
 
 ## Suite 场景预设
 
@@ -120,7 +119,9 @@ vmbench suite --only hardware --hardware-tool geekbench
 
 Suite 只有在每个 enabled section 都是 `status=ok` 时成功。enabled section 的空状态、`skipped`、`partial`、`error` 都会使总体失败并让 CLI 返回非零；disabled section 才只发 `section.skip`。选择 iperf3 provider 但没有可用 host 会直接返回 speed error。
 
-默认 timeout 仍为 5 分钟：hardware 按 workload 应用，其余网络 section 各自派生 section timeout；调用方 cancel/deadline 会写成结构化 section error。Ping 会保留逐目标结果，全部目标失败时额外返回聚合错误，避免“全失败但 workload 成功”。
+默认 timeout 仍为 5 分钟：hardware 按 workload 应用，其余网络 section 各自派生 section timeout；调用方 cancel/deadline 会写成结构化 section error。Suite CLI 默认把 section 的 running/完成状态实时写到 stderr，`--quiet` 可关闭进度而不改变报告。
+
+Ping 会保留逐目标结果，全部目标失败时额外返回聚合错误。TCP connect 成功和 TCP RST/refused 都证明目标已响应，均计入 `received` 和延迟而不计为丢包；`connection_state` 区分 `open/refused/mixed/no_response`。Route 会先解析实际目标并记录 `resolved_target`；只有到达该地址才是 `status=ok`，已有有效 hop 但未到达为 `partial`，无有效证据或探测失败为 `error`。Mail 对内置端口逐个顺序连接，避免共享目标对并发突发限流，逐项状态为 `open/refused/timeout/error`；DNS 失败保持为探测 `error`，不会伪装成端口 timeout。
 
 输出层级：
 
@@ -141,7 +142,7 @@ vmbench nodes health --node-catalog auto --kind route --ip-family v6 --json
 
 更新流程要求显式 Ed25519 公钥，先验证 detached signature 和严格 schema，再原子替换缓存；Unix 文件 mode 为 `0600`。签名、revision 或 schema 不满足时 fail-closed，不启动探测也不覆盖旧缓存。
 
-`vmbench run` / `vmbench suite` 可用 `--save-history [--history-tag TAG]` 保存；也可用 `history add/list/show/delete` 管理已有 JSON，`history compare --last N` 比较最近 N 份同类型报告。历史在 Unix 使用目录 `0700` / 文件 `0600`，其他平台仍应依赖系统 ACL 保护；报告可能包含 hostname、公网 IP 和 route hops，任何未来 upload/share 都必须显式授权并支持脱敏。Route/Ping 报告区分 catalog protocol 与实际 `probe_protocol/probe_tool`；Suite Compare 只有在 unit、实际 protocol/IP family、provider/probe tool、target/node 以及需要时 catalog revision 全部兼容时才计算 delta。不兼容值仍展示，但明确给出 reason。
+`vmbench run` / `vmbench suite` 可用 `--save-history [--history-tag TAG]` 保存；也可用 `history add/list/show/delete` 管理已有 JSON，`history compare --last N` 比较最近 N 份同类型报告。CLI 的 `--json` / `--html` 导出和 history 都先写同目录临时文件、sync 后 rename；Unix 导出/历史文件 mode 为 `0600`，其他平台仍应依赖系统 ACL 保护。报告可能包含 hostname、公网 IP 和 route hops，任何未来 upload/share 都必须显式授权并支持脱敏。Route/Ping 报告区分 catalog protocol 与实际 `probe_protocol/probe_tool`；Suite Compare 只有在 unit、实际 protocol/IP family、provider/probe tool、target/node 以及需要时 catalog revision 全部兼容时才计算 delta。不兼容值仍展示，但明确给出 reason。Route 还必须显式为 `status=ok` 且 `destination_reached=true`，旧报告没有到达证据时不计算 delta。Mail 只比较 `status=open` 的成功连接延迟，拒绝、超时和错误耗时不参与 latency delta。
 
 ## MCP 给大模型调用
 
@@ -170,27 +171,6 @@ MCP 输出仍然遵守 vmbench 的产品原则：只返回原始指标和结构�
 - `iterations` 最大 9，`timeout_ms` 最大 15 分钟。
 - 同一时间只允许一个 benchmark 运行，避免压垮机器。
 - 参数校验失败返回 `isError=true` 和错误文本；测量失败仍返回完整 `structuredContent.report`，同时设置 `isError=true`，便于调用方读取 workload/section 的结构化错误。
-
-## ECS 对标差异输出
-
-`vmbench ecs-diff` 用于输出当前 vmbench 与 ECS/GoECS 的产品差异快照。它只读内置快照，不执行测评，也不生成 benchmark 总分。
-
-输出包括：
-
-- 来源：`spiritLHLS/ecs` shell 版与 `oneclickvirt/ecs` Go 版
-- 差异行：项目形态、系统信息、硬件基准、路由、Ping、速度、IP 质量、流媒体、网站/TG、报告分享、TUI、结果对比、评分策略
-- 优先级：P1/P2 后续补齐项
-
-常用方式：
-
-```bash
-vmbench ecs-diff
-vmbench ecs-diff --json
-```
-
-当前已对齐：网站/TG 可达性、虚拟化/公网 IP/ASN/NAT 网络身份、成都/CERNET/CSTNET/IPv6 节点、版本化节点更新与 Suite Compare。剩余差距集中在可选分享上传、第三方 IP 数据深度、长期运营节点规模和工具分发。
-
-完整快照见 [`docs/ecs-comparison.md`](ecs-comparison.md)。
 
 ## Go API
 

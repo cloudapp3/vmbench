@@ -91,6 +91,51 @@ func TestProbeIPQualityScoresOnlyConclusiveInputs(t *testing.T) {
 	}
 }
 
+func TestProbeIPQualityPreservesPort25FailureStatus(t *testing.T) {
+	deps := validIPQualityDependencies()
+	deps.mailPorts = func(context.Context, []int) []PortProbe {
+		return []PortProbe{{Port: 25, Status: MailPortStatusRefused, Message: "connection refused"}}
+	}
+
+	result, err := probeIPQuality(context.Background(), deps)
+	if err != nil {
+		t.Fatalf("probeIPQuality() error = %v", err)
+	}
+	if result.Port25 == nil || result.Port25.Status != MailPortStatusRefused {
+		t.Fatalf("Port25 = %+v, want refused status", result.Port25)
+	}
+	if len(result.MailPorts) != 1 || result.MailPorts[0].Status != MailPortStatusRefused {
+		t.Fatalf("MailPorts = %+v, want refused status", result.MailPorts)
+	}
+	if result.Score == nil || result.Score.Total != 95 {
+		t.Fatalf("Score = %+v, want 95/100", result.Score)
+	}
+	if result.RiskSummary == nil || !strings.Contains(result.RiskSummary.Summary, "port25 refused") || strings.Contains(result.RiskSummary.Summary, "port25 blocked") {
+		t.Fatalf("RiskSummary = %+v, want explicit refused status", result.RiskSummary)
+	}
+}
+
+func TestProbeIPQualityFailsClosedWhenPort25ProbeIsInconclusive(t *testing.T) {
+	deps := validIPQualityDependencies()
+	deps.mailPorts = func(context.Context, []int) []PortProbe {
+		return []PortProbe{{Port: 25, Status: MailPortStatusError, Message: "resolver unavailable"}}
+	}
+
+	result, err := probeIPQuality(context.Background(), deps)
+	if err == nil || !strings.Contains(err.Error(), "port 25 probe inconclusive") {
+		t.Fatalf("probeIPQuality() error = %v, want inconclusive port 25 error", err)
+	}
+	if result.Score != nil {
+		t.Fatalf("Score = %+v, want nil for inconclusive evidence", result.Score)
+	}
+	if result.Port25 == nil || result.Port25.Status != MailPortStatusError {
+		t.Fatalf("Port25 = %+v, want structured error evidence", result.Port25)
+	}
+	if result.RiskSummary == nil || !strings.Contains(result.RiskSummary.Summary, "port25 error") {
+		t.Fatalf("RiskSummary = %+v, want explicit port25 error", result.RiskSummary)
+	}
+}
+
 func TestCheckDNSBLDistinguishesNotListedFromLookupFailure(t *testing.T) {
 	notFound := &net.DNSError{Err: "no such host", IsNotFound: true}
 	lookup := func(_ context.Context, host string) ([]string, error) {

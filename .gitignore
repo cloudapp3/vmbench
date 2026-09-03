@@ -40,3 +40,7 @@ AGENTS.md
 .cursor/
 .roo/
 .windsurf/
+
+# Private test publication workflow; keep deployment details out of releases.
+/scripts/deploy_test.sh
+/scripts/publish_test_back.sh

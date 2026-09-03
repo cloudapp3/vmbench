@@ -109,7 +109,6 @@ curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh |
 | `vmbench sysinfo [--json]` | Show system information |
 | `vmbench compare <a.json> <b.json> [...]` | Auto-detect and compare benchmark or Suite reports |
 | `vmbench history <command>` | Add, list, show, delete, or compare local reports |
-| `vmbench ecs-diff [--json]` | Show current product gaps between vmbench and ECS/GoECS |
 | `vmbench version` | Show version |
 
 ## CLI Flags (run)
@@ -143,12 +142,12 @@ Sections:
 |---------|---------|
 | `hardware` | CPU / memory / disk benchmark report |
 | `network_info` | Virtualization plus public IPv4/IPv6, ASN/provider/location, and conservative NAT evidence |
-| `route` | Versioned China carrier/CERNET/CSTNET IPv4/IPv6 route diagnostics |
-| `ping` | Versioned China carrier/CERNET/CSTNET IPv4/IPv6 latency / jitter / loss |
+| `route` | Versioned China carrier/CERNET/CSTNET IPv4/IPv6 route diagnostics with destination-reached evidence |
+| `ping` | Versioned China carrier/CERNET/CSTNET IPv4/IPv6 TCP latency / jitter / loss and connection state |
 | `speed` | Cloudflare / speedtest provider download/upload measurements |
 | `ip_quality` | IP reputation and risk diagnosis |
 | `reachability` | Website HTTPS and Telegram DC TCP reachability with latency/status/error |
-| `mail` | Mail-related port reachability |
+| `mail` | Sequential mail-port reachability with open/refused/timeout/error states |
 | `media` | Streaming / unlock probes |
 
 Presets:
@@ -183,6 +182,7 @@ vmbench suite --only hardware --hardware-tool sysbench,openssl,fio,dd
 vmbench suite --only hardware --hardware-tool geekbench
 vmbench suite --node-catalog embedded --node-revision 2026-07-13.1
 vmbench suite --node-catalog auto --save-history --history-tag weekly
+vmbench suite --quiet --json suite.json
 ```
 
 `--node-catalog` accepts `embedded`, `auto`, or a JSON path. `embedded` is the deterministic offline snapshot. `auto` uses the validated user cache when available and falls back to the embedded snapshot; it does not download during a benchmark. `--node-revision` pins an exact revision and fails before probes start if the selected snapshot differs. Reports retain the resolved catalog source/revision and selected node identities. A download node's `traffic_bytes` is enforced as the maximum response-body bytes read by that probe.
@@ -195,7 +195,9 @@ vmbench suite --node-catalog auto --save-history --history-tag weekly
 
 Suite succeeds only when every enabled section ends with `status=ok`. An enabled section with an empty, `skipped`, `partial`, or `error` status makes the overall report fail; disabled sections alone emit `section.skip`. Selecting `iperf3` without a usable host is an error.
 
-The default timeout remains 5 minutes. Hardware applies it per workload. Network identity, route, ping, speed, IP quality, reachability, mail, and media each derive a section timeout from the caller context; cancellation/deadline is recorded as a structured section error. Ping retains per-target results, but returns an aggregate error when every target fails.
+The default timeout remains 5 minutes. Hardware applies it per workload. Network identity, route, ping, speed, IP quality, reachability, mail, and media each derive a section timeout from the caller context; cancellation/deadline is recorded as a structured section error. By default the Suite CLI writes each section's running/final lifecycle to stderr; `--quiet` suppresses this progress stream without changing reports.
+
+TCP Ping treats an accepted connection and a TCP RST/connection-refused response as received evidence: both contribute latency and do not count as packet loss. Each target records `connection_state=open|refused|mixed|no_response`, while a true timeout or other no-response failure remains loss. Route results record `resolved_target`, `destination_reached`, and `status=ok|partial|error`; valid hops that never reach the resolved destination are `partial`, not a successful trace. Mail probes run the built-in ports sequentially so the shared target is not hit with a connection burst, and classify each result as `open`, `refused`, `timeout`, or `error`; DNS failures remain probe errors rather than port timeouts.
 
 ### Node catalog
 
@@ -248,27 +250,6 @@ Safety defaults:
 - validation errors return `isError=true` without starting a measurement. Measurement failures retain the full `structuredContent.report` and also set `isError=true`.
 - results contain raw metrics and structured errors, not benchmark total scores or grades.
 
-## ECS Gap Snapshot
-
-`vmbench ecs-diff` outputs a maintained comparison snapshot against
-[`spiritLHLS/ecs`](https://github.com/spiritLHLS/ecs) and the current Go version
-[`oneclickvirt/ecs`](https://github.com/oneclickvirt/ecs). It is a product-gap
-report, not a benchmark run:
-
-```bash
-vmbench ecs-diff
-vmbench ecs-diff --json
-```
-
-Versioned network nodes, network identity, website/Telegram reachability, and Suite comparison are now aligned at the evidence-model level. Remaining gaps are mainly breadth and distribution:
-
-- optional upload/share links with explicit redaction and consent
-- broader third-party IP intelligence and region-specific media targets
-- richer hardware tool distribution/auto-install and multi-disk modes
-- larger continuously operated node coverage beyond the embedded/catalog-managed set
-
-The same snapshot is documented in [`docs/ecs-comparison.md`](docs/ecs-comparison.md).
-
 ## Hardware Benchmark Architecture
 
 vmbench hardware measurements are external-tool based. Go only orchestrates commands, parses output, and writes structured reports; CPU / memory / disk benchmark numbers are not produced by in-process Go algorithms.
@@ -278,14 +259,14 @@ vmbench hardware measurements are external-tool based. Go only orchestrates comm
 | **sysbench** | CPU single-core + multi-core prime; memory read/write bandwidth + random-read latency | Linux default; PATH or executable-adjacent `binaries/` directory |
 | **fio** | 4K random read/write Q1/Q32 IOPS + 1M sequential read/write Q1/Q8 throughput | Linux default; direct I/O with unique auto-cleaned files |
 | **openssl speed** | AES-256-CBC + SHA256 throughput | Linux/macOS default; System PATH |
-| **dd** | Disk sequential write/read throughput | Opt-in via `--hardware-tool dd` |
+| **dd** | Disk sequential write/read throughput | Opt-in; Linux reads use `iflag=direct`, while platforms without a guaranteed uncached read fail closed and direct users to fio |
 | **STREAM** | Memory bandwidth kernels | Opt-in via `--hardware-tool stream` |
 | **mbw** | Memory copy bandwidth | Opt-in via `--hardware-tool mbw` |
 | **Geekbench** | Upstream CPU single/multi score | Opt-in via `--hardware-tool geekbench`; not a vmbench total score |
 | **WinSAT** | Windows CPU/memory/disk probes | Windows default; selectable via `--hardware-tool winsat` |
 | **iperf3** | Network TCP bandwidth | System PATH / user-provided host |
 
-Missing external tools are kept as workload errors when the workload is selected; vmbench does not silently replace them with in-process benchmark implementations.
+Before `run` or a Suite with hardware enabled starts, vmbench reports unresolved external tools only when the current `--filter` selects at least one workload from that adapter; on Linux it also prints a Debian/Ubuntu package hint when known. The affected workloads are still kept as structured errors instead of being silently skipped or replaced with in-process benchmark implementations.
 
 The default hardware set now emits separate rows for memory read bandwidth, memory write bandwidth, memory random-read latency, and eight fio disk probes: 4K random read/write at Q1/Q32 plus 1M sequential read/write at Q1/Q8. Reports still contain raw throughput, latency, detail, and error fields only; no disk, memory, category, or total score is generated.
 
@@ -336,9 +317,11 @@ This keeps reports comparable without implying an immature global ranking formul
 | JSON | `--json report.json` | Schema v2 with scope/optional iperf hosts, actual iterations, raw samples, optional cumulative processed quantities, metrics, detail, and errors |
 | HTML | `--html report.html` | Visual report with system cards and measured workload tables |
 
-Suite JSON uses a schema-v2 envelope with `report_kind`, `report_id`, app build metadata, system information, timestamps/duration, normalized config, section states, and catalog provenance while retaining legacy v1 fields for existing consumers. Route and ping results distinguish catalog protocol from the actual `probe_protocol` / `probe_tool`; successful zero-valued ping latency, jitter, and loss remain explicit raw metrics. Suite HTML renders this probe evidence plus hardware workload metrics, network identity, route hops, provider-level speed, IP quality, reachability, mail, media, warnings, and structured failures.
+Suite JSON uses a schema-v2 envelope with `report_kind`, `report_id`, app build metadata, system information, timestamps/duration, normalized config, section states, and catalog provenance while retaining legacy v1 fields for existing consumers. Route results include resolved-destination evidence and ping results include `connection_state` in addition to the actual `probe_protocol` / `probe_tool`; successful zero-valued ping latency, jitter, and loss remain explicit raw metrics. Suite HTML renders hardware workload metrics, network identity, route evidence, ping metrics/status, provider-level speed, IP quality, reachability, mail, media, warnings, and structured failures.
 
-`vmbench compare` auto-detects benchmark versus Suite JSON and rejects mixed report kinds. Suite Compare aligns raw metrics across two or more reports, but calculates a delta only when unit, actual protocol/IP family, provider/probe tool, target/node identity, and required catalog revision are compatible; otherwise it preserves values and prints the incompatibility reason. `vmbench history add/list/show/delete` manages atomic local records (`0700` directory and `0600` files on Unix), `run`/`suite --save-history [--history-tag TAG]` saves directly, and `vmbench history compare --last N` compares the latest same-kind reports.
+CLI `--json` and `--html` exports are written through a same-directory temporary file, synced, and renamed into place. Exported files use mode `0600` on Unix because reports can contain hostnames, public addresses, and route hops.
+
+`vmbench compare` auto-detects benchmark versus Suite JSON and rejects mixed report kinds. Suite Compare aligns raw metrics across two or more reports, but calculates a delta only when unit, actual protocol/IP family, provider/probe tool, target/node identity, and required catalog revision are compatible; otherwise it preserves values and prints the incompatibility reason. Route metrics additionally require explicit `status=ok` and `destination_reached=true`; legacy route entries without destination evidence are unavailable for delta calculation. Mail latency is comparable only for `status=open`; refused, timeout, and error durations are not successful connection latency. `vmbench history add/list/show/delete` manages atomic local records (`0700` directory and `0600` files on Unix), `run`/`suite --save-history [--history-tag TAG]` saves directly, and `vmbench history compare --last N` compares the latest same-kind reports.
 
 `run` exits with status 1 when no workload matches or any selected workload fails. Its JSON config records normalized `scope`, optional `iperf_hosts`, and network-only catalog source/revision/node IDs; hardware reports set `extensions=false`, while network/all set it to `true`. Suite returns a non-zero CLI exit unless every enabled section is `ok`; enabled empty/skipped/partial/error states all fail. No report or comparison produces a benchmark total score, grade, or category score.
 
@@ -377,11 +360,9 @@ vmbench/
 ├── cmd/vmbench/
 │   ├── main.go        # CLI entry (run/suite/nodes/history/mcp/list/sysinfo/compare/...)
 │   ├── mcp.go         # MCP stdio server command
-│   ├── ecs_diff.go    # Maintained vmbench vs ECS gap snapshot
 │   └── tui.go         # TUI entry
 ├── docs/
 │   ├── product.md     # Product spec (Chinese)
-│   ├── ecs-comparison.md # vmbench vs ECS gap snapshot
 │   ├── tech-stack.md  # Technical architecture (Chinese)
 │   ├── tui-design.md  # TUI design document
 │   ├── README.zh-CN.md # Chinese quick reference
@@ -441,10 +422,15 @@ vmbench/
 # Standard build
 go build -ldflags "-X github.com/cloudapp3/vmbench.Version=$(git describe --tags 2>/dev/null || echo dev)" -o vmbench ./cmd/vmbench/
 
+# Project build script: writes /root/temp/vmbench with CGO disabled
+./sh/build.sh
+
 # Cross-compile
 GOOS=linux GOARCH=arm64 go build -ldflags "..." -o vmbench-arm64 ./cmd/vmbench/
 GOOS=darwin GOARCH=arm64 go build -ldflags "..." -o vmbench-mac ./cmd/vmbench/
 ```
+
+`sh/build.sh` sets `CGO_ENABLED=0`, matching the static-build policy used by GoReleaser.
 
 ## Development
 

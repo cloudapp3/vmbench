@@ -78,7 +78,9 @@ var htmlTemplate = template.Must(template.New("suite-report").Funcs(template.Fun
 		switch strings.ToLower(strings.TrimSpace(status)) {
 		case "ok", "reachable", "open", "available", "direct":
 			return "ok"
-		case "error", "failed", "partial", "unreachable", "blocked", "invalid", "http_error":
+		case "partial", "refused", "mixed", "timeout":
+			return "warn"
+		case "error", "failed", "no_response", "unreachable", "blocked", "invalid", "http_error":
 			return "err"
 		default:
 			return "muted"
@@ -90,6 +92,10 @@ var htmlTemplate = template.Must(template.New("suite-report").Funcs(template.Fun
 		}
 		return "no"
 	},
+	"traceStatus": func(value RouteRun) string {
+		return value.EffectiveStatus()
+	},
+	"traceReached": traceDestinationReachedText,
 	"sectionNames": func(value SectionSelector) string {
 		return strings.Join(value.Names(), ", ")
 	},
@@ -107,7 +113,7 @@ var htmlTemplate = template.Must(template.New("suite-report").Funcs(template.Fun
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VMBench Suite Report</title>
 <style>
-:root { color-scheme:light; --bg:#f6f7f9; --surface:#fff; --line:#dfe3e8; --text:#17202a; --muted:#65717e; --ok:#08783f; --okbg:#eaf7ef; --err:#a72b2b; --errbg:#fff0f0; --accent:#1565c0; }
+:root { color-scheme:light; --bg:#f6f7f9; --surface:#fff; --line:#dfe3e8; --text:#17202a; --muted:#65717e; --ok:#08783f; --okbg:#eaf7ef; --warn:#7a5200; --warnbg:#fff6d8; --err:#a72b2b; --errbg:#fff0f0; --accent:#1565c0; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--text); font:14px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
 main { width:min(1500px,calc(100% - 32px)); margin:24px auto 48px; }
@@ -124,6 +130,7 @@ p { margin:6px 0; }
 .label,.small { color:var(--muted); font-size:12px; }
 .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; }
 .badge.ok { color:var(--ok); background:var(--okbg); }
+.badge.warn { color:var(--warn); background:var(--warnbg); }
 .badge.err { color:var(--err); background:var(--errbg); }
 .badge.muted { color:var(--muted); background:#edf0f3; }
 .table-wrap { width:100%; overflow-x:auto; }
@@ -212,7 +219,7 @@ ul { margin:8px 0 0; padding-left:20px; }
 {{ if .Route.Results }}
 <section class="section"><h2>Route Evidence</h2>
 {{ range .Route.Results }}
-	  <div class="subsection"><h3>{{ .Target.Name }}</h3><p class="small"><code>{{ defaultText .Target.ID "legacy" }}</code> / {{ .Target.City }} / {{ .Target.Carrier }} / AS{{ .Target.AS }} / {{ defaultText .Target.IPFamily "-" }} / catalog {{ defaultText .Target.Protocol "-" }} / probe {{ defaultText .ProbeProtocol "unknown" }} via {{ defaultText .ProbeTool "unknown" }} / {{ defaultText .Target.Source "-" }} / <code>{{ formatEndpoint .Target.Endpoint .Target.Port }}</code></p>
+	  <div class="subsection"><h3>{{ .Target.Name }} <span class="badge {{ statusClass (traceStatus .) }}">{{ traceStatus . }}</span></h3><p class="small"><code>{{ defaultText .Target.ID "legacy" }}</code> / {{ .Target.City }} / {{ .Target.Carrier }} / AS{{ .Target.AS }} / {{ defaultText .Target.IPFamily "-" }} / catalog {{ defaultText .Target.Protocol "-" }} / probe {{ defaultText .ProbeProtocol "unknown" }} via {{ defaultText .ProbeTool "unknown" }} / {{ defaultText .Target.Source "-" }} / requested <code>{{ formatEndpoint .Target.Endpoint .Target.Port }}</code> / resolved <code>{{ defaultText .ResolvedTarget "unknown" }}</code> / destination reached {{ traceReached .DestinationReached }}</p>
   {{ if .Error }}<p class="error">{{ .Error }}</p>{{ end }}
   {{ if .Hops }}<div class="table-wrap"><table><thead><tr><th>TTL</th><th>IP</th><th>RTT</th><th>Timeout</th></tr></thead><tbody>{{ range .Hops }}<tr><td>{{ .TTL }}</td><td><code>{{ defaultText .IP "-" }}</code></td><td>{{ formatFloat .RTTMs "ms" }}</td><td>{{ boolText .Timeout }}</td></tr>{{ end }}</tbody></table></div>{{ end }}</div>
 {{ end }}
@@ -220,8 +227,8 @@ ul { margin:8px 0 0; padding-left:20px; }
 {{ end }}
 
 {{ if .Ping.Results }}
-<section class="section"><h2>Ping Evidence</h2><div class="table-wrap"><table><thead><tr><th>ID</th><th>Target</th><th>City</th><th>Carrier</th><th>Family</th><th>Average</th><th>Jitter</th><th>Loss</th><th>Sent/Received</th><th>Status</th><th>Message</th></tr></thead><tbody>
-{{ range .Ping.Results }}<tr><td>{{ defaultText .ID "-" }}<br><span class="small">catalog {{ defaultText .Protocol "-" }} / probe {{ defaultText .ProbeProtocol "unknown" }} via {{ defaultText .ProbeTool "unknown" }} / {{ defaultText .Source "-" }}</span></td><td>{{ defaultText .Name .Target }}<br><code>{{ formatEndpoint .Target .Port }}</code></td><td>{{ defaultText .City "-" }}</td><td>{{ defaultText .Carrier "-" }} / AS{{ .ASN }}</td><td>{{ defaultText .IPFamily "-" }}</td><td>{{ formatFloat .AvgLatencyMs "ms" }}</td><td>{{ formatFloat .JitterMs "ms" }}</td><td>{{ printf "%.1f%%" .PacketLoss }}</td><td>{{ .Sent }}/{{ .Received }}</td><td><span class="badge {{ statusClass .Status }}">{{ defaultText .Status "unknown" }}</span></td><td>{{ defaultText .Message "-" }}</td></tr>{{ end }}
+<section class="section"><h2>Ping Evidence</h2><div class="table-wrap"><table><thead><tr><th>ID</th><th>Target</th><th>City</th><th>Carrier</th><th>Family</th><th>Connection</th><th>Average</th><th>Jitter</th><th>Loss</th><th>Sent/Received</th><th>Status</th><th>Message</th></tr></thead><tbody>
+{{ range .Ping.Results }}<tr><td>{{ defaultText .ID "-" }}<br><span class="small">catalog {{ defaultText .Protocol "-" }} / probe {{ defaultText .ProbeProtocol "unknown" }} via {{ defaultText .ProbeTool "unknown" }} / {{ defaultText .Source "-" }}</span></td><td>{{ defaultText .Name .Target }}<br><code>{{ formatEndpoint .Target .Port }}</code></td><td>{{ defaultText .City "-" }}</td><td>{{ defaultText .Carrier "-" }} / AS{{ .ASN }}</td><td>{{ defaultText .IPFamily "-" }}</td><td><span class="badge {{ statusClass .ConnectionState }}">{{ defaultText .ConnectionState "unknown" }}</span></td><td>{{ formatFloat .AvgLatencyMs "ms" }}</td><td>{{ formatFloat .JitterMs "ms" }}</td><td>{{ printf "%.1f%%" .PacketLoss }}</td><td>{{ .Sent }}/{{ .Received }}</td><td><span class="badge {{ statusClass .Status }}">{{ defaultText .Status "unknown" }}</span></td><td>{{ defaultText .Message "-" }}</td></tr>{{ end }}
 </tbody></table></div></section>
 {{ end }}
 

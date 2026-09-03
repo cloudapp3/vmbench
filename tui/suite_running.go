@@ -114,8 +114,20 @@ func updateSuiteEvent(m Model, ev suite.Event) (tea.Model, tea.Cmd) {
 		updateSection("done", ev.Message)
 		addLog("✓ done   " + string(ev.Section) + "  " + ev.Message)
 	case suite.EventSectionFail:
-		updateSection("fail", ev.Message)
-		addLog("✗ fail   " + string(ev.Section) + "  " + ev.Message)
+		status := strings.ToLower(strings.TrimSpace(ev.Status))
+		marker := "✗"
+		switch status {
+		case "partial":
+			marker = "!"
+		case "skip", "skipped":
+			status = "skipped"
+			marker = "⊘"
+		case "error", "fail", "failed":
+		default:
+			status = "fail"
+		}
+		updateSection(status, ev.Message)
+		addLog(marker + " " + status + "   " + string(ev.Section) + "  " + ev.Message)
 	case suite.EventSectionSkip:
 		updateSection("skip", "")
 	case suite.EventSuiteDone:
@@ -155,7 +167,10 @@ func viewSuiteRunning(m Model) string {
 		switch s.status {
 		case "done":
 			done++
-		case "fail":
+		case "partial":
+			done++
+			failed++
+		case "fail", "failed", "error", "skipped":
 			done++
 			failed++
 		case "skip":
@@ -281,9 +296,11 @@ func suiteSectionStatus(m Model, s suiteSection, maxWidth int) string {
 	switch s.status {
 	case "done":
 		return comp.StatusPill(comp.StatusDone, truncStr(firstStr(s.message, "ok"), maxWidth-2))
-	case "fail":
+	case "partial":
+		return comp.StatusPill(comp.StatusPartial, truncStr(firstStr(s.message, "partial"), maxWidth-2))
+	case "fail", "failed", "error":
 		return comp.StatusPill(comp.StatusFail, truncStr(firstStr(s.message, "failed"), maxWidth-2))
-	case "skip":
+	case "skip", "skipped":
 		return comp.StatusPill(comp.StatusSkip, "skipped")
 	case "running":
 		return m.spinner.View() + " " + lipgloss.NewStyle().Foreground(theme.Active.Warning).Render("running...")

@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/cloudapp3/vmbench/bench/netio"
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/sysinfo"
 )
@@ -69,6 +70,64 @@ func TestSuitePagesFitCompactTerminalWidth(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRouteResultCardShowsPartialDestinationStatus(t *testing.T) {
+	notReached := false
+	report := suite.SuiteReport{Route: suite.RouteSection{
+		SectionState: suite.SectionState{Enabled: true, Status: "partial"},
+		Results: []suite.RouteRun{{
+			Target:             netio.TraceTarget{City: "Chengdu", Carrier: "CERNET"},
+			DestinationReached: &notReached,
+			Status:             netio.TraceStatusPartial,
+			Hops:               []netio.Hop{{TTL: 1, IP: "192.0.2.1"}},
+		}},
+	}}
+	view := routeResultCard(report, 80)
+	if !strings.Contains(view, "PARTIAL") {
+		t.Fatalf("route result card did not show partial status:\n%s", view)
+	}
+}
+
+func TestPingResultCardShowsRefusedConnectionState(t *testing.T) {
+	report := suite.SuiteReport{Ping: suite.PingSection{
+		SectionState: suite.SectionState{Enabled: true, Status: "ok"},
+		Results: []suite.PingResult{{
+			Name:            "Closed port",
+			Status:          "ok",
+			ConnectionState: netio.PingConnectionStateRefused,
+			Sent:            10,
+			Received:        10,
+		}},
+	}}
+	view := pingResultCard(report, 80)
+	if !strings.Contains(view, "refused") {
+		t.Fatalf("ping result card did not show refused state:\n%s", view)
+	}
+}
+
+func TestIPQualityResultCardShowsFailClosedPortEvidence(t *testing.T) {
+	report := suite.SuiteReport{IPQuality: suite.IPQualitySection{
+		SectionState: suite.SectionState{
+			Enabled: true,
+			Status:  "error",
+			Message: "ip quality: port 25 probe inconclusive",
+		},
+		Result: &suite.IPQualityResult{
+			BasicInfo:   &netio.IPBasicInfo{IP: "203.0.113.10", CountryCode: "ZZ", ASN: 64500},
+			RiskSummary: &netio.IPRiskSummary{Summary: "port25 error"},
+			Port25: &netio.PortProbe{
+				Port: 25, Status: netio.MailPortStatusError, Message: "resolver unavailable",
+			},
+		},
+	}}
+
+	view := ipQualityResultCard(report, 80)
+	for _, want := range []string{"port 25 probe inconclusive", "port25 error", "Port 25", "resolver unavailable"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("IP Quality result card missing %q:\n%s", want, view)
+		}
 	}
 }
 

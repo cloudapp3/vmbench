@@ -1,6 +1,8 @@
 package comp
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/cloudapp3/vmbench/tui/theme"
@@ -15,6 +17,7 @@ const (
 	StatusFail    Status = "fail"
 	StatusSkip    Status = "skip"
 	StatusOK      Status = "ok"
+	StatusPartial Status = "partial"
 )
 
 func StatusPill(s Status, text string) string {
@@ -27,6 +30,9 @@ func StatusPill(s Status, text string) string {
 		color = t.Success
 	case StatusRunning:
 		icon = "◐"
+		color = t.Warning
+	case StatusPartial:
+		icon = "!"
 		color = t.Warning
 	case StatusFail:
 		icon = "✗"
@@ -50,11 +56,13 @@ func StatusIcon(s Status) string {
 }
 
 func StatusFromString(s string) Status {
-	switch s {
+	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "done", "ok":
 		return StatusDone
 	case "running":
 		return StatusRunning
+	case "partial":
+		return StatusPartial
 	case "fail", "error":
 		return StatusFail
 	case "skip", "skipped":

@@ -74,14 +74,23 @@ func WriteConsole(w io.Writer, report SuiteReport) error {
 		}
 		if len(report.Route.Results) > 0 {
 			tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
-			_, _ = fmt.Fprintln(tw, "Target\tCity\tCarrier\tProbe\tHops\tStatus")
+			_, _ = fmt.Fprintln(tw, "Target\tCity\tCarrier\tResolved\tProbe\tHops\tReached\tStatus")
 			for _, item := range report.Route.Results {
-				status := "ok"
-				if item.Error != "" {
-					status = item.Error
+				status := item.EffectiveStatus()
+				if message := strings.TrimSpace(item.Error); message != "" {
+					status += ": " + message
 				}
 				probe := defaultText(item.ProbeProtocol, "unknown") + "/" + defaultText(item.ProbeTool, "unknown")
-				_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\n", item.Target.Name, item.Target.City, item.Target.Carrier, probe, len(item.Hops), status)
+				_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
+					item.Target.Name,
+					item.Target.City,
+					item.Target.Carrier,
+					defaultText(item.ResolvedTarget, "unknown"),
+					probe,
+					len(item.Hops),
+					traceDestinationReachedText(item.DestinationReached),
+					status,
+				)
 			}
 			if err := tw.Flush(); err != nil {
 				return err
@@ -103,18 +112,19 @@ func WriteConsole(w io.Writer, report SuiteReport) error {
 		}
 		if len(report.Ping.Results) > 0 {
 			tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
-			_, _ = fmt.Fprintln(tw, "Target\tCity\tCarrier\tIP\tProbe\tAvg\tJitter\tLoss\tStatus")
+			_, _ = fmt.Fprintln(tw, "Target\tCity\tCarrier\tIP\tProbe\tConnection\tAvg\tJitter\tLoss\tStatus")
 			for _, item := range report.Ping.Results {
 				status := defaultText(item.Status, "unknown")
 				if item.Status != "ok" && item.Message != "" {
 					status = item.Message
 				}
-				_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%.0f%%\t%s\n",
+				_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%.0f%%\t%s\n",
 					defaultText(item.Name, "-"),
 					defaultText(item.City, "-"),
 					defaultText(item.Carrier, "-"),
 					defaultText(item.IPFamily, "-"),
 					defaultText(item.ProbeProtocol, "unknown")+"/"+defaultText(item.ProbeTool, "unknown"),
+					defaultText(item.ConnectionState, "unknown"),
 					formatMaybeFloat(item.AvgLatencyMs, "ms"),
 					formatMaybeFloat(item.JitterMs, "ms"),
 					item.PacketLoss,

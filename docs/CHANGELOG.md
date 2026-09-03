@@ -4,6 +4,12 @@
 
 ### Go v0.2 可比较 VPS 证据
 
+- 移除容易过时的 `vmbench ecs-diff` / `ecs-compare` 静态差异快照命令及其独立对标文档；实际能力以当前 CLI、结构化报告和产品文档为准。
+- 修正 TCP Ping 对拒绝连接的误判：TCP RST/refused 现在作为目标响应计入 RTT/received，不再误算 100% 丢包；逐目标新增 `connection_state=open|refused|mixed|no_response`。
+- Mail 端口改为顺序探测，避免对共享探测目标的并发突发导致随机假阴性；Suite 与 IP Quality 统一输出 `open|refused|timeout|error`，DNS 超时保持为探测错误，Compare 只使用 `open` 连接延迟。Route 新增 `resolved_target`、`destination_reached` 和 `status=ok|partial|error`，有 hop 但未到目标不再显示为成功；Compare 只接受显式到达目标的 Route 指标，旧报告缺少到达证据时不计算 delta。
+- TUI Running 保留 `partial` 独立状态并按严格 Suite 规则计入非成功数量；IP Quality fail-closed 时结果卡继续显示 section error、风险摘要与 Port 25 证据。
+- `run` 和启用 hardware 的 `suite` 新增外部工具预检提示；预检复用 workload Name/Category filter，只检查本次实际可能运行的 adapter，Linux 同时输出已知 Debian/Ubuntu 安装命令。Suite CLI 默认在 stderr 实时输出 section 生命周期，新增 `--quiet` 抑制进度。
+- CLI JSON/HTML 改为同目录临时文件、fsync、rename 原子写入，Unix mode 收紧为 `0600`。Linux dd read 使用 `iflag=direct` 避免页缓存虚高，其他平台无法保证 uncached read 时 fail-closed；`sh/build.sh` 设置 `CGO_ENABLED=0`，与 GoReleaser 构建保持一致。
 - 新增版本化 `nodecatalog/`：Manifest 记录 schema/revision/生成与过期时间；节点记录稳定 ID、地区/城市、运营商、ASN、IP family、protocol、endpoint、source 和流量预算，download 的 `traffic_bytes` 实际限制响应体读取量。默认 embedded 离线快照，并支持 `embedded` / `auto` / 显式 path 与精确 revision pin。
 - 新增 `vmbench nodes list|verify|update|health`。远程更新必须由调用方提供 Ed25519 trust root 和 detached signature；验证精确 manifest 字节及严格 schema 后才原子替换缓存（Unix mode `0600`），篡改或 revision 不匹配时 fail-closed。
 - embedded route/ping 节点扩展到成都、CERNET、CSTNET 与 IPv6；报告保留实际 catalog source/revision、节点 identity、`probe_protocol` 和 `probe_tool`，IPv6 route 按 family 选址，节点及探测方式变化可追踪。成功 Ping 的零值 latency/jitter/loss 也显式保留。
@@ -45,7 +51,7 @@
 - 本地 Linux fallback 只从解析后的 vmbench 可执行文件相邻 `binaries/` 或可执行文件同目录加载，不再信任当前工作目录下的同名文件。
 - sysbench/fio/OpenSSL/WinSAT 在解析不到主指标时 fail-closed；fio 使用唯一临时文件、`--unlink=1`、defer 清理，并按 Linux/macOS/Windows 选择对应 AIO engine。
 - Go traceroute 改为系统 `traceroute` / `tcptraceroute` / `tracepath` / `tracert`，最多 4 路并发；命令缺失、无有效 hop、全超时或全部目标失败均结构化报错。
-- IP Quality 改为 fail-closed：元数据、公网 IPv4 或 DNSBL 结论不完整时不生成 0-100 score；DNSBL zone 改为并发查询。
+- IP Quality 改为 fail-closed：元数据、公网 IPv4、DNSBL 或 Port 25 结论不完整时不生成 0-100 score；DNSBL zone 改为并发查询。
 - Cloudflare upload 改为流式零数据请求体，不再为 50 MiB payload 分配等量内存；Suite 的 Cloudflare 速率换算修正为十进制 Mbps。
 - Linux CPU `base_frequency` 修正 kHz 到 MHz 的换算；sysinfo 外部命令统一增加 30 秒超时。
 - `sysinfo.Collect(ctx)` 现在把调用方 context 传给所有平台 collector；已取消 context 立即返回 warning，外部命令可被调用方 deadline 提前终止。
@@ -100,13 +106,6 @@
 - 新增可选 `WinSAT` CPU / memory / disk workload。
 - 外部命令 workload 跳过 runner 的 warm-up 二次执行，避免同一外部工具被额外跑一遍。
 - TUI Dashboard 移除 Native / Full 硬件跑分入口，保留 External 与 Suite 入口。
-
-### ECS 对标差异输出
-
-- 新增 `vmbench ecs-diff`，输出 vmbench 与 ECS/GoECS 的当前产品差异快照。
-- 新增 `vmbench ecs-diff --json`，便于自动化读取差异行、来源和后续优先级。
-- 新增 `docs/ecs-comparison.md`，同步记录 FEAT-001 对标结论。
-- 该能力只输出产品差异，不执行 benchmark，不产生综合评分。
 
 ### TUI 重新设计
 

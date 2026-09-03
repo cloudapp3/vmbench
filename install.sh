@@ -6,6 +6,12 @@ BINARY_NAME="vmbench"
 INSTALL_DIR="${VMBENCH_INSTALL_DIR:-}"
 VERSION=""
 SKIP_VERIFY=0
+PRINT_INSTALL_DIR=0
+ARCHIVE_URL_OVERRIDE="${VMBENCH_ARCHIVE_URL:-}"
+CHECKSUMS_URL_OVERRIDE="${VMBENCH_CHECKSUMS_URL:-}"
+DOWNLOAD_HEADER_1="${VMBENCH_DOWNLOAD_HEADER_1:-}"
+DOWNLOAD_HEADER_2="${VMBENCH_DOWNLOAD_HEADER_2:-}"
+CUSTOM_RELEASE_SOURCE=0
 
 usage() {
   cat <<'EOF'
@@ -13,12 +19,15 @@ Install vmbench from GitHub Releases.
 
 Usage:
   install.sh [--version vX.Y.Z] [--dir PATH] [--skip-verify]
+             [--print-install-dir]
 
 Options:
   --version <tag>   Install a specific release tag. Defaults to the latest release.
   --dir <path>      Install directory. Auto-detected in order: /usr/local/bin,
                     ~/.local/bin, ~/bin. Override with VMBENCH_INSTALL_DIR env var.
   --skip-verify     Skip SHA-256 checksum verification.
+  --print-install-dir
+                    Print the selected install directory to stdout after success.
   -h, --help        Show this help message.
 
 Examples:
@@ -62,6 +71,9 @@ while [ "$#" -gt 0 ]; do
     --skip-verify)
       SKIP_VERIFY=1
       ;;
+    --print-install-dir)
+      PRINT_INSTALL_DIR=1
+      ;;
     -h|--help)
       usage
       exit 0
@@ -71,6 +83,31 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
   shift
+done
+
+if [ -n "$ARCHIVE_URL_OVERRIDE" ] || [ -n "$CHECKSUMS_URL_OVERRIDE" ]; then
+  [ -n "$ARCHIVE_URL_OVERRIDE" ] && [ -n "$CHECKSUMS_URL_OVERRIDE" ] \
+    || die "VMBENCH_ARCHIVE_URL and VMBENCH_CHECKSUMS_URL must be set together"
+  [ -n "$VERSION" ] \
+    || die "--version is required with a custom release source"
+  for release_url in "$ARCHIVE_URL_OVERRIDE" "$CHECKSUMS_URL_OVERRIDE"; do
+    case "$release_url" in
+      http://*|https://*) ;;
+      *) die "custom release URLs must start with http:// or https://" ;;
+    esac
+  done
+  CUSTOM_RELEASE_SOURCE=1
+elif [ -n "$DOWNLOAD_HEADER_1" ] || [ -n "$DOWNLOAD_HEADER_2" ]; then
+  die "custom download headers require VMBENCH_ARCHIVE_URL and VMBENCH_CHECKSUMS_URL"
+fi
+
+for download_header in "$DOWNLOAD_HEADER_1" "$DOWNLOAD_HEADER_2"; do
+  [ -z "$download_header" ] && continue
+  case "$download_header" in
+    *$'\r'*|*$'\n'*) die "custom download headers must be single-line values" ;;
+    *:*) ;;
+    *) die "custom download headers must use 'Name: value' syntax" ;;
+  esac
 done
 
 require_cmd curl
@@ -113,6 +150,13 @@ if [ -n "${TOKEN}" ]; then
     -H "X-GitHub-Api-Version: 2022-11-28"
   )
 fi
+DOWNLOAD_CURL_ARGS=("${CURL_ARGS[@]}")
+if [ "$CUSTOM_RELEASE_SOURCE" -eq 1 ]; then
+  # Do not forward GitHub credentials to an explicitly configured host.
+  DOWNLOAD_CURL_ARGS=(-fsSL)
+  [ -z "$DOWNLOAD_HEADER_1" ] || DOWNLOAD_CURL_ARGS+=(-H "$DOWNLOAD_HEADER_1")
+  [ -z "$DOWNLOAD_HEADER_2" ] || DOWNLOAD_CURL_ARGS+=(-H "$DOWNLOAD_HEADER_2")
+fi
 
 curl_text() {
   curl "${CURL_ARGS[@]}" "$1"
@@ -121,7 +165,7 @@ curl_text() {
 curl_download() {
   local url="$1"
   local output="$2"
-  curl "${CURL_ARGS[@]}" -o "$output" "$url"
+  curl "${DOWNLOAD_CURL_ARGS[@]}" -o "$output" "$url"
 }
 
 if [ -z "$VERSION" ]; then
@@ -142,8 +186,13 @@ esac
 VERSION_NO_V="${VERSION#v}"
 ARCHIVE_NAME="${BINARY_NAME}-${VERSION_NO_V}-${OS}-${ARCH}.tar.gz"
 BASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
-ARCHIVE_URL="${BASE_URL}/${ARCHIVE_NAME}"
-CHECKSUMS_URL="${BASE_URL}/checksums.txt"
+if [ "$CUSTOM_RELEASE_SOURCE" -eq 1 ]; then
+  ARCHIVE_URL="$ARCHIVE_URL_OVERRIDE"
+  CHECKSUMS_URL="$CHECKSUMS_URL_OVERRIDE"
+else
+  ARCHIVE_URL="${BASE_URL}/${ARCHIVE_NAME}"
+  CHECKSUMS_URL="${BASE_URL}/checksums.txt"
+fi
 
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
@@ -202,3 +251,6 @@ fi
 log "Installed ${BINARY_NAME} ${VERSION} to ${TARGET_PATH}"
 log "Verify the installation with:"
 log "  ${TARGET_PATH} version"
+if [ "$PRINT_INSTALL_DIR" -eq 1 ]; then
+  printf '%s\n' "$INSTALL_DIR"
+fi
