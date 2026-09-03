@@ -80,8 +80,6 @@ Screenshots and richer docs are being staged in the external docs repository: [c
 
 ## Install from GitHub Releases
 
-After the first tagged release is published:
-
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash
 ```
