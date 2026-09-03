@@ -30,7 +30,7 @@
 
 ### Go 主线测量可信度与安全默认值
 
-- Go 工具链基线升级到 `1.26.5`，CI 与正式 Release 在测试、vet 后运行 `govulncheck`，阻止带可达标准库漏洞的构建发布。
+- Go 工具链基线升级到 `1.26.6`，CI 与正式 Release 在测试、vet 后运行 `govulncheck`，阻止带可达标准库漏洞的构建发布。
 - Runner 改为始终串行、隔离执行 workload，不再并发不同 benchmark，也不再修改进程级 `GOMAXPROCS`、GC 或 OS 线程绑定状态。
 - `vmbench run` 默认范围改为 `hardware`；新增 `--scope hardware|network|all`，只有显式启用 network/all 才注册网络 workload，并提示基础网络测试可能传输约 1.75 GB 数据。
 - 所有 `bench/netio` workload 最多执行一次真实探测；报告记录实际 `iterations=1`，硬件 workload 继续按请求的 1-9 次迭代聚合。

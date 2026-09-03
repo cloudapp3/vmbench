@@ -6,7 +6,7 @@
 
 | 项目 | 说明 |
 |---|---|
-| 语言 | Go 1.26.5 |
+| 语言 | Go 1.26.6 |
 | CLI | 标准库 `flag` |
 | TUI | Bubble Tea / Lip Gloss |
 | 系统信息 | gopsutil |

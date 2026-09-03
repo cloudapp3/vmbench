@@ -931,7 +931,7 @@ CLI、TUI、MCP 复用同一 Suite normalization/validation contract，避免相
     "name": "Ubuntu 22.04 LTS",
     "kernel": "5.15.0-91-generic",
     "hostname": "vps-01",
-    "go_version": "go1.26.5"
+    "go_version": "go1.26.6"
   },
   "disks": [
     {
