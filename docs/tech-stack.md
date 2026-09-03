@@ -18,10 +18,6 @@
 ```text
 vmbench/
 ├── bench/              # workload 接口、runner 与网络 probe
-│   ├── integer/        # legacy 进程内 workload，不注册到硬件跑分
-│   ├── float/          # legacy 进程内 workload，不注册到硬件跑分
-│   ├── memory/         # legacy 进程内 workload，不注册到硬件跑分
-│   ├── diskio/         # legacy 进程内 workload，不注册到硬件跑分
 │   ├── netio/          # identity/reachability/ping/route/speed/ip/media/mail probe
 │   └── runner.go
 ├── catalog/            # 外部工具 workload registry + parser

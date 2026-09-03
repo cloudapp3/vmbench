@@ -4,6 +4,10 @@
 
 ### Go v0.2 可比较 VPS 证据
 
+- 删除未被任何入口引用的 legacy 进程内 workload 包 `bench/integer|float|memory|diskio` 及仅被其使用的 `bench/common` GC/随机源/sink 工具，只保留仍被 runner 使用的统计函数；硬件测量继续完全依赖外部工具。
+- 网络响应读取统一加上限：ip-api.com（4 KiB）、ipify（256 B）、流媒体探测（2 MiB）改用 `io.LimitReader`，防止恶意或异常端点无上限响应体耗尽内存；流媒体探测的读取错误不再被吞掉。
+- `sh/build.sh` 与文档中的硬编码 `/root/temp` 输出路径改为 `${VMBENCH_OUTPUT_DIR:-${TMPDIR:-/tmp}}`，其余构建示例直接输出到仓库根目录（已被 .gitignore 覆盖）。
+
 - 移除容易过时的 `vmbench ecs-diff` / `ecs-compare` 静态差异快照命令及其独立对标文档；实际能力以当前 CLI、结构化报告和产品文档为准。
 - 修正 TCP Ping 对拒绝连接的误判：TCP RST/refused 现在作为目标响应计入 RTT/received，不再误算 100% 丢包；逐目标新增 `connection_state=open|refused|mixed|no_response`。
 - Mail 端口改为顺序探测，避免对共享探测目标的并发突发导致随机假阴性；Suite 与 IP Quality 统一输出 `open|refused|timeout|error`，DNS 超时保持为探测错误，Compare 只使用 `open` 连接延迟。Route 新增 `resolved_target`、`destination_reached` 和 `status=ok|partial|error`，有 hop 但未到目标不再显示为成功；Compare 只接受显式到达目标的 Route 指标，旧报告缺少到达证据时不计算 delta。

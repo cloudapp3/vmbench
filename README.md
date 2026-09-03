@@ -346,11 +346,7 @@ Network-related suite sections depend on local routing, DNS, firewall, IPv6, and
 ```
 vmbench/
 ├── bench/
-│   ├── common/        # GC control, random source, stats, sink
-│   ├── integer/       # Legacy in-process workloads (not registered for hardware suite)
-│   ├── float/         # Legacy in-process workloads (not registered for hardware suite)
-│   ├── memory/        # Legacy in-process workloads (not registered for hardware suite)
-│   ├── diskio/        # Legacy in-process workloads (not registered for hardware suite)
+│   ├── common/        # Statistics helpers (medians, throughput)
 │   ├── runner.go      # Multi-iteration executor with progress
 │   └── workload.go    # Workload interface
 ├── catalog/

@@ -1386,14 +1386,7 @@ vmbench/
 │
 ├── bench/                          # 基准测试核心
 │   ├── common/                     # 通用工具
-│   │   ├── gc.go                   # GC 控制（禁用 GC 进行精确测量）
-│   │   ├── random.go               # 随机数据源
-│   │   ├── stats.go                # 统计工具（中位数等）
-│   │   └── sink.go                 # 数据汇聚工具
-│   ├── diskio/                     # Legacy 进程内磁盘 workload（未注册）
-│   ├── float/                      # Legacy 进程内浮点 workload（未注册）
-│   ├── integer/                    # Legacy 进程内整数 workload（未注册）
-│   ├── memory/                     # Legacy 进程内内存 workload（未注册）
+│   │   └── stats.go                # 统计工具（中位数等）
 │   ├── netio/                      # 网络探测 workload
 │   │   ├── download.go             # HTTP 下载测速
 │   │   ├── upload.go               # HTTP 上传测速
