@@ -52,9 +52,47 @@ jobs:
           go run ./cmd/vmbench sysinfo --json
           go run ./cmd/vmbench run --filter 'SHA|AES' --iterations 1 --quiet --json /tmp/vmbench-smoke.json
 
+  cross-build:
+    needs:
+      - verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build and vet (${{ matrix.goos }}/${{ matrix.goarch }})
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          go build ./...
+          go vet ./...
+
   snapshot:
     needs:
       - verify
+      - cross-build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
