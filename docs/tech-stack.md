@@ -285,7 +285,7 @@ Mail Compare 只比较 `status=open` 的成功连接延迟；`refused/timeout/er
 
 ## 构建一致性
 
-`sh/build.sh` 显式设置 `CGO_ENABLED=0` 后构建 `/root/temp/vmbench`，与 GoReleaser 的无 CGO 构建策略保持一致，避免本地验证产物意外依赖宿主动态库。
+`sh/build.sh` 显式设置 `CGO_ENABLED=0` 后把产物构建到临时目录（默认 `${TMPDIR:-/tmp}`，可用 `VMBENCH_OUTPUT_DIR` 覆盖），与 GoReleaser 的无 CGO 构建策略保持一致，避免本地验证产物意外依赖宿主动态库。
 
 ## 许可证注意
 

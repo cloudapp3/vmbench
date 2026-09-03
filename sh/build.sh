@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
 # vmbench 构建脚本
-# 将构建产物输出到 /root/temp 目录
+# 将构建产物输出到临时目录（可用 VMBENCH_OUTPUT_DIR 覆盖）
 #
 set -euo pipefail
 
 # ── 配置 ──
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-OUTPUT_DIR="/root/temp"
+OUTPUT_DIR="${VMBENCH_OUTPUT_DIR:-${TMPDIR:-/tmp}}"
 BINARY_NAME="vmbench"
 
 # ── 版本信息 ──

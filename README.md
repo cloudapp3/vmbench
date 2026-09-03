@@ -187,11 +187,11 @@ vmbench suite --quiet --json suite.json
 
 `--node-catalog` accepts `embedded`, `auto`, or a JSON path. `embedded` is the deterministic offline snapshot. `auto` uses the validated user cache when available and falls back to the embedded snapshot; it does not download during a benchmark. `--node-revision` pins an exact revision and fails before probes start if the selected snapshot differs. Reports retain the resolved catalog source/revision and selected node identities. A download node's `traffic_bytes` is enforced as the maximum response-body bytes read by that probe.
 
-`speed` section 现在会同时输出：
+The `speed` section emits:
 
-- `groups[]`：按 provider 聚合的分组结果
-- `providers[]`：每个具体探测项的原始结果
-- `summary`：单 provider 时为 provider 摘要；多 provider 时标记 `aggregation=best_per_metric`，不把不同来源误写成同一节点
+- `groups[]`: results grouped per provider
+- `providers[]`: raw results for each individual probe
+- `summary`: a single-provider summary when one provider is selected; with multiple providers it records `aggregation=best_per_metric` so results from different sources are not misrepresented as one node
 
 Suite succeeds only when every enabled section ends with `status=ok`. An enabled section with an empty, `skipped`, `partial`, or `error` status makes the overall report fail; disabled sections alone emit `section.skip`. Selecting `iperf3` without a usable host is an error.
 
@@ -422,7 +422,8 @@ vmbench/
 # Standard build
 go build -ldflags "-X github.com/cloudapp3/vmbench.Version=$(git describe --tags 2>/dev/null || echo dev)" -o vmbench ./cmd/vmbench/
 
-# Project build script: writes /root/temp/vmbench with CGO disabled
+# Project build script: CGO-disabled build into a temp directory
+# (override the destination with VMBENCH_OUTPUT_DIR)
 ./sh/build.sh
 
 # Cross-compile
@@ -439,7 +440,7 @@ gofmt -w $(git ls-files '*.go')
 go mod tidy
 go test ./...
 go vet ./...
-go build -o /root/temp/vmbench ./cmd/vmbench
+go build -o vmbench ./cmd/vmbench
 ```
 
 Useful smoke checks:

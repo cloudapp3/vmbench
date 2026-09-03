@@ -318,7 +318,7 @@ func queryIPAPIInfo(ctx context.Context) (*IPBasicInfo, riskFlags, error) {
 		return nil, riskFlags{}, err
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if err != nil {
 		return nil, riskFlags{}, err
 	}
@@ -367,7 +367,7 @@ func getPublicIP(ctx context.Context) (string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 256))
 	if err != nil {
 		return "", err
 	}

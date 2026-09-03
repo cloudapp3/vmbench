@@ -41,7 +41,7 @@ Thanks for helping improve vmbench. Bug reports, feature ideas, documentation fi
 ```bash
 go test ./...
 go vet ./...
-go build -o /root/temp/vmbench ./cmd/vmbench
+go build -o vmbench ./cmd/vmbench
 
 ./vmbench list
 ./vmbench sysinfo --json
@@ -60,7 +60,7 @@ Notes:
 - [ ] Modified Go files have been formatted with `gofmt -w`
 - [ ] `go test ./...` passes
 - [ ] `go vet ./...` passes
-- [ ] `go build -o /root/temp/vmbench ./cmd/vmbench` passes
+- [ ] `go build -o vmbench ./cmd/vmbench` passes
 - [ ] README / docs / tests were updated when CLI, JSON schema, TUI, or report output changed
 - [ ] No benchmark total score, grade, or category score was introduced
 - [ ] No unrelated files were reverted
@@ -72,7 +72,7 @@ go mod tidy
 gofmt -w <changed-go-files>
 go test ./...
 go vet ./...
-go build -o /root/temp/vmbench ./cmd/vmbench
+go build -o vmbench ./cmd/vmbench
 git diff --check
 ```
 

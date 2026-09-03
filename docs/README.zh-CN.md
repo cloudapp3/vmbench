@@ -28,7 +28,7 @@ go install github.com/cloudapp3/vmbench/cmd/vmbench@latest
 # 或本地构建
 go build -o vmbench ./cmd/vmbench
 
-# 项目验证脚本使用 CGO_ENABLED=0，另输出 /root/temp/vmbench
+# 项目验证脚本使用 CGO_ENABLED=0，输出到临时目录（可用 VMBENCH_OUTPUT_DIR 覆盖）
 ./sh/build.sh
 
 # 默认进入 TUI

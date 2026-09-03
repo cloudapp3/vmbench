@@ -166,7 +166,10 @@ func httpGet(ctx context.Context, url string) (string, http.Header, error) {
 		return "", nil, err
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if err != nil {
+		return "", nil, err
+	}
 	return string(body), resp.Header, nil
 }
 

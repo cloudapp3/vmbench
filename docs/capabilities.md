@@ -1282,7 +1282,7 @@ type Event struct {
 ### Go 构建
 
 ```bash
-# 项目构建脚本：CGO_ENABLED=0，输出 /root/temp/vmbench
+# 项目构建脚本：CGO_ENABLED=0，输出到临时目录（可用 VMBENCH_OUTPUT_DIR 覆盖）
 ./sh/build.sh
 
 # 标准构建
