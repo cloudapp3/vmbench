@@ -1,6 +1,6 @@
 # VMBench Changelog
 
-## Unreleased
+## v0.4.0（2026-09-05）
 
 ### 第三批：TUI 配置补齐 + IPv6 子网 / CIDR 活跃邻居
 
