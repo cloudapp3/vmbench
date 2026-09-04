@@ -22,6 +22,7 @@ func TestPopulateIPBGPFromReport(t *testing.T) {
 			Entities:         []bgptools.RDAPEntity{{Handle: "GL-718", Roles: []string{"registrant"}}},
 		},
 		Prefixes: []string{"96.9.228.0/23"},
+		RIR:      bgptools.RIRInfo{Name: "ARIN", Source: "rdap", Status: "available"},
 		Relationships: &bgptools.ASNRelationshipReport{
 			TargetASN: "133752",
 			Status:    "available",
@@ -43,7 +44,9 @@ func TestPopulateIPBGPFromReport(t *testing.T) {
 	if evidence.ASN != "AS133752" {
 		t.Errorf("ASN = %q, want AS133752", evidence.ASN)
 	}
-	if evidence.NetworkName != "365GROUP-GL-718" || evidence.RIR != "GL-718" {
+	// The registrant handle (GL-718) is an organization identifier, not a
+	// registry; RIR must come from the registry inference instead.
+	if evidence.NetworkName != "365GROUP-GL-718" || evidence.RIR != "ARIN" {
 		t.Errorf("ownership not carried: %+v", evidence)
 	}
 	if evidence.RegistrationDate != "2022-11-16" {

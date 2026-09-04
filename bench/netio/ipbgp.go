@@ -103,17 +103,11 @@ func populateIPBGPFromReport(evidence *IPBGPEvidence, report *bgptools.IPBGPRepo
 		if report.RDAP.StartAddress != "" || report.RDAP.EndAddress != "" {
 			evidence.Range = report.RDAP.StartAddress + " - " + report.RDAP.EndAddress
 		}
-		for _, entity := range report.RDAP.Entities {
-			for _, role := range entity.Roles {
-				if strings.EqualFold(role, "registrant") && entity.Handle != "" {
-					evidence.RIR = firstNonEmpty(entity.Handle, evidence.RIR)
-				}
-			}
-		}
 	}
-	if rir := strings.TrimSpace(report.RIR.Name); rir != "" && evidence.RIR == "" {
-		evidence.RIR = rir
-	}
+	// RIR carries the registry inference (ARIN, RIPE NCC, ...). RDAP
+	// registrant entities are organization identifiers, not registries, so
+	// they must not fill this field.
+	evidence.RIR = strings.TrimSpace(report.RIR.Name)
 	evidence.Prefixes = append([]string(nil), report.Prefixes...)
 	for _, geofeed := range report.Geofeeds {
 		if strings.TrimSpace(geofeed.URL) != "" {
