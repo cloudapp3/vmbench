@@ -43,7 +43,7 @@ jobs:
         run: go vet ./...
 
       - name: Run vulnerability scan
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+        run: bash .github/scripts/vulncheck-gate.sh
 
       - name: Smoke checks
         run: |
