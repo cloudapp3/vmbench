@@ -32,7 +32,7 @@ func TestRunNodesRejectsInvalidArguments(t *testing.T) {
 }
 
 func TestRunNodesVerifiesPinnedEmbeddedCatalog(t *testing.T) {
-	if code := run([]string{"nodes", "verify", "--node-revision", "2026-07-13.1", "--json"}); code != 0 {
+	if code := run([]string{"nodes", "verify", "--node-revision", "2026-09-04.1", "--json"}); code != 0 {
 		t.Fatalf("nodes verify exit = %d, want 0", code)
 	}
 	if code := run([]string{"nodes", "verify", "--node-revision", "not-the-embedded-revision"}); code != 1 {

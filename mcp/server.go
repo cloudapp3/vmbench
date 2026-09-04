@@ -329,6 +329,8 @@ type suiteArgs struct {
 	HardwareTools    []string        `json:"hardware_tools,omitempty"`
 	IperfHosts       []string        `json:"iperf_hosts,omitempty"`
 	IPVersion        string          `json:"ip_version,omitempty"`
+	MediaSet         string          `json:"media_set,omitempty"`
+	IPSources        []string        `json:"ip_sources,omitempty"`
 	CatalogSource    string          `json:"catalog_source,omitempty"`
 	CatalogRevision  string          `json:"catalog_revision,omitempty"`
 	CatalogCachePath string          `json:"catalog_cache_path,omitempty"`
@@ -394,6 +396,8 @@ func normalizeSuiteArgs(args suiteArgs) (suite.Options, []string) {
 		Sections:         sections,
 		IperfHosts:       cleanList(args.IperfHosts),
 		IPVersion:        strings.TrimSpace(args.IPVersion),
+		MediaSet:         strings.TrimSpace(args.MediaSet),
+		IPSources:        cleanList(args.IPSources),
 		CatalogSource:    strings.TrimSpace(args.CatalogSource),
 		CatalogRevision:  strings.TrimSpace(args.CatalogRevision),
 		CatalogCachePath: strings.TrimSpace(args.CatalogCachePath),
@@ -510,6 +514,8 @@ func capabilitiesPayload() map[string]any {
 		"suite_presets":      suite.Presets(),
 		"route_presets":      suite.RoutePresets(),
 		"speed_providers":    suite.SpeedProviders(),
+		"media_sets":         suite.MediaSets(),
+		"ip_sources":         suite.IPSources(),
 		"hardware_tools":     catalog.HardwareTools(),
 		"default_hardware":   catalog.DefaultHardwareTools(),
 		"default_suite_only": []string{"hardware"},
@@ -571,6 +577,8 @@ func toolSpecs() []toolSpec {
 				"hardware_tools":     enumArraySchema(catalog.HardwareToolIDs(), "External hardware tools."),
 				"iperf_hosts":        stringArraySchema("iperf3 hosts; adds iperf3 speed provider when speed is enabled."),
 				"ip_version":         map[string]any{"type": "string", "enum": []string{"v4", "v6", "dual"}, "description": "Network IP version."},
+				"media_set":          map[string]any{"type": "string", "enum": suite.MediaSets(), "description": "Media unlock set. Default all (full platform list)."},
+				"ip_sources":         enumArraySchema(suite.IPSourceIDs(), "IP quality evidence sources. securitycheck requires the external binary."),
 				"catalog_source":     map[string]any{"type": "string", "description": "Node catalog source: embedded, auto, or a local JSON path."},
 				"catalog_revision":   map[string]any{"type": "string", "description": "Require an exact node catalog revision before Suite sections start."},
 				"catalog_cache_path": map[string]any{"type": "string", "description": "Optional cache path used with catalog_source=auto."},

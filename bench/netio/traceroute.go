@@ -65,14 +65,16 @@ type Hop struct {
 
 // TraceProbeResult stores one traceroute outcome.
 type TraceProbeResult struct {
-	Target             TraceTarget `json:"target"`
-	ResolvedTarget     string      `json:"resolved_target,omitempty"`
-	DestinationReached *bool       `json:"destination_reached,omitempty"`
-	Status             string      `json:"status,omitempty"`
-	ProbeProtocol      string      `json:"probe_protocol"`
-	ProbeTool          string      `json:"probe_tool"`
-	Hops               []Hop       `json:"hops,omitempty"`
-	Error              string      `json:"error,omitempty"`
+	Target             TraceTarget          `json:"target"`
+	ResolvedTarget     string               `json:"resolved_target,omitempty"`
+	DestinationReached *bool                `json:"destination_reached,omitempty"`
+	Status             string               `json:"status,omitempty"`
+	ProbeProtocol      string               `json:"probe_protocol"`
+	ProbeTool          string               `json:"probe_tool"`
+	Hops               []Hop                `json:"hops,omitempty"`
+	Classification     *RouteClassification `json:"classification,omitempty"`
+	ObservedASNs       []string             `json:"observed_asns,omitempty"`
+	Error              string               `json:"error,omitempty"`
 }
 
 const (

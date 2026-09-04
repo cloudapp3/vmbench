@@ -10,6 +10,8 @@
 | CLI | 标准库 `flag` |
 | TUI | Bubble Tea / Lip Gloss |
 | 系统信息 | gopsutil |
+| 流媒体解锁 | oneclickvirt/UnlockTests（Apache-2.0，`executor.RunStructured` 结构化输出） |
+| 回程线路分类 | oneclickvirt/backtrace（Apache-2.0，`bk.RunRouteReport` + 内置 AS prefix 数据） |
 | 报告 | Console / JSON / HTML |
 | MCP Server | 标准库 JSON-RPC over stdio，暴露给大模型客户端 |
 

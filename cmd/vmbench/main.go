@@ -268,6 +268,8 @@ func runSuite(args []string) int {
 		only            string
 		skip            string
 		ipVersion       string
+		mediaSet        string
+		ipSource        string
 		noHardware      bool
 		noRoute         bool
 		noPing          bool
@@ -293,12 +295,14 @@ func runSuite(args []string) int {
 	fs.StringVar(&htmlOut, "html", "", "write suite HTML report to file")
 	fs.StringVar(&preset, "preset", "", "scenario preset: quick, website, proxy, mail")
 	fs.StringVar(&routePreset, "route-presets", "", "comma-separated route presets (gz,bj,sh,cd,cernet,cstnet)")
-	fs.StringVar(&speedProvider, "speed-provider", "", "speed providers (comma-separated: cloudflare,speedtest_net,speedtest_cn,iperf3)")
+	fs.StringVar(&speedProvider, "speed-provider", "", "speed providers (comma-separated: cloudflare,speedtest_net,speedtest_cn,iperf3,china_isp,speedtest_isp)")
 	fs.StringVar(&hardwareTool, "hardware-tool", "", "hardware tools (comma-separated: sysbench,openssl,fio,dd,stream,mbw,geekbench,winsat; use all for every adapter)")
 	fs.StringVar(&iperfHost, "iperf-host", "", "iperf3 server(s) for speed section (comma-separated)")
 	fs.StringVar(&only, "only", "", "run only selected sections (comma-separated: hardware,network_info,route,ping,speed,ip,reachability,mail,media)")
 	fs.StringVar(&skip, "skip", "", "skip selected sections (comma-separated: hardware,network_info,route,ping,speed,ip,reachability,mail,media)")
 	fs.StringVar(&ipVersion, "ip-version", "v4", "network IP version: v4, v6, or dual")
+	fs.StringVar(&mediaSet, "media-set", "all", "media unlock set: all, globe, tw, hk, jp, kr, na, sa, eu, afr, sea, oce, ai, or comma combinations")
+	fs.StringVar(&ipSource, "ip-quality-source", "builtin", "IP quality evidence sources (comma-separated: builtin,securitycheck)")
 	fs.BoolVar(&noHardware, "no-hardware", false, "skip hardware section")
 	fs.BoolVar(&noNetworkInfo, "no-network-info", false, "skip network identity section")
 	fs.BoolVar(&noRoute, "no-route", false, "skip route section")
@@ -385,6 +389,16 @@ func runSuite(args []string) int {
 	}
 	if bad := invalidCSVValue(hardwareTool, catalog.StandardizeHardwareTools); bad != "" {
 		fmt.Fprintf(os.Stderr, "error: unknown hardware tool %q\n", bad)
+		return 2
+	}
+	if strings.TrimSpace(mediaSet) != "" {
+		if _, err := suite.StandardizeMediaSet(mediaSet); err != nil {
+			fmt.Fprintf(os.Stderr, "error: unknown media set %q (available: %s)\n", mediaSet, strings.Join(suite.MediaSets(), ", "))
+			return 2
+		}
+	}
+	if bad := invalidCSVValue(ipSource, suite.StandardizeIPSources); bad != "" {
+		fmt.Fprintf(os.Stderr, "error: unknown IP quality source %q (available: %s)\n", bad, strings.Join(suite.IPSourceIDs(), ", "))
 		return 2
 	}
 
@@ -474,6 +488,8 @@ func runSuite(args []string) int {
 		Sections:         sections,
 		IperfHosts:       parseHosts(iperfHost),
 		IPVersion:        ipVersion,
+		MediaSet:         mediaSet,
+		IPSources:        parseHosts(ipSource),
 		CatalogSource:    catalogSource,
 		CatalogRevision:  catalogRevision,
 		CatalogCachePath: catalogCache,

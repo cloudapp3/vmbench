@@ -24,6 +24,8 @@ type Config struct {
 	Sections        SectionSelector `json:"sections"`
 	IperfHosts      []string        `json:"iperf_hosts,omitempty"`
 	IPVersion       string          `json:"ip_version,omitempty"`
+	MediaSet        string          `json:"media_set,omitempty"`
+	IPSources       []string        `json:"ip_sources,omitempty"`
 	CatalogSource   string          `json:"catalog_source,omitempty"`
 	CatalogRevision string          `json:"catalog_revision,omitempty"`
 	NodeIDs         []string        `json:"node_ids,omitempty"`
@@ -105,6 +107,8 @@ func NewSuiteReport(opts Options) SuiteReport {
 			Sections:        norm.Sections,
 			IperfHosts:      append([]string(nil), norm.IperfHosts...),
 			IPVersion:       norm.IPVersion,
+			MediaSet:        norm.MediaSet,
+			IPSources:       append([]string(nil), norm.IPSources...),
 			CatalogSource:   norm.CatalogSource,
 			CatalogRevision: norm.CatalogRevision,
 			NodeIDs:         append([]string(nil), norm.NodeIDs...),

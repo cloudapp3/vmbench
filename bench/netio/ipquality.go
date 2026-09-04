@@ -62,11 +62,21 @@ type IPScore struct {
 
 // IPQualityResult stores structured IP quality assessment output.
 type IPQualityResult struct {
-	BasicInfo   *IPBasicInfo   `json:"basic_info,omitempty"`
-	RiskSummary *IPRiskSummary `json:"risk_summary,omitempty"`
-	Port25      *PortProbe     `json:"port_25,omitempty"`
-	MailPorts   []PortProbe    `json:"mail_ports,omitempty"`
-	Score       *IPScore       `json:"score,omitempty"`
+	BasicInfo     *IPBasicInfo         `json:"basic_info,omitempty"`
+	IPAPIIS       *IPAPIISInfo         `json:"ipapi_is,omitempty"`
+	SecurityCheck *SecurityCheckResult `json:"securitycheck,omitempty"`
+	Sources       []IPSourceStatus     `json:"sources,omitempty"`
+	RiskSummary   *IPRiskSummary       `json:"risk_summary,omitempty"`
+	Port25        *PortProbe           `json:"port_25,omitempty"`
+	MailPorts     []PortProbe          `json:"mail_ports,omitempty"`
+	Score         *IPScore             `json:"score,omitempty"`
+}
+
+// IPSourceStatus records the state of one evidence source.
+type IPSourceStatus struct {
+	Source  string `json:"source"`
+	Status  string `json:"status"` // ok | unavailable | error
+	Message string `json:"message,omitempty"`
 }
 
 type dnsblCheckResult struct {
@@ -76,23 +86,70 @@ type dnsblCheckResult struct {
 }
 
 type ipQualityDependencies struct {
-	queryInfo  func(context.Context) (*IPBasicInfo, riskFlags, error)
-	publicIP   func(context.Context) (string, error)
-	checkDNSBL func(context.Context, string) dnsblCheckResult
-	mailPorts  func(context.Context, []int) []PortProbe
+	queryInfo        func(context.Context) (*IPBasicInfo, riskFlags, error)
+	publicIP         func(context.Context) (string, error)
+	checkDNSBL       func(context.Context, string) dnsblCheckResult
+	mailPorts        func(context.Context, []int) []PortProbe
+	queryIPAPIIS     func(context.Context, string) *IPAPIISInfo
+	runSecurityCheck func(context.Context) *SecurityCheckResult
 }
 
-// ProbeIPQuality performs the structured IP quality assessment.
+// IPQualityOptions selects the evidence sources for the probe.
+type IPQualityOptions struct {
+	// Sources lists enabled sources; empty defaults to builtin only.
+	// builtin = ip-api.com + ipapi.is ownership cross-check + DNSBL + ports.
+	// securitycheck = additionally runs the opt-in external binary.
+	Sources []string
+}
+
+// HasSource reports whether a source is enabled.
+func (opts IPQualityOptions) HasSource(source string) bool {
+	if len(opts.Sources) == 0 {
+		return source == IPSourceBuiltin
+	}
+	for _, value := range opts.Sources {
+		if strings.EqualFold(strings.TrimSpace(value), source) {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidateIPSources reports unknown source names.
+func ValidateIPSources(sources []string) error {
+	for _, value := range sources {
+		normalized := strings.ToLower(strings.TrimSpace(value))
+		switch normalized {
+		case IPSourceBuiltin, IPSourceSecurityCheck:
+		default:
+			return fmt.Errorf("unknown IP quality source %q (valid: %s, %s)", value, IPSourceBuiltin, IPSourceSecurityCheck)
+		}
+	}
+	return nil
+}
+
+// ProbeIPQuality performs the structured IP quality assessment with the
+// default builtin sources.
 func ProbeIPQuality(ctx context.Context) (*IPQualityResult, error) {
-	return probeIPQuality(ctx, ipQualityDependencies{
-		queryInfo:  queryIPAPIInfo,
-		publicIP:   getPublicIP,
-		checkDNSBL: checkDNSBL,
-		mailPorts:  ProbeMailPorts,
-	})
+	return ProbeIPQualityWithOptions(ctx, IPQualityOptions{})
 }
 
-func probeIPQuality(ctx context.Context, deps ipQualityDependencies) (*IPQualityResult, error) {
+// ProbeIPQualityWithOptions performs the assessment with selected sources.
+func ProbeIPQualityWithOptions(ctx context.Context, opts IPQualityOptions) (*IPQualityResult, error) {
+	if err := ValidateIPSources(opts.Sources); err != nil {
+		return nil, err
+	}
+	return probeIPQuality(ctx, ipQualityDependencies{
+		queryInfo:        queryIPAPIInfo,
+		publicIP:         getPublicIP,
+		checkDNSBL:       checkDNSBL,
+		mailPorts:        ProbeMailPorts,
+		queryIPAPIIS:     queryIPAPIIS,
+		runSecurityCheck: runSecurityCheck,
+	}, opts)
+}
+
+func probeIPQuality(ctx context.Context, deps ipQualityDependencies, opts IPQualityOptions) (*IPQualityResult, error) {
 	result := &IPQualityResult{}
 	info, flags, err := deps.queryInfo(ctx)
 	if err != nil {
@@ -152,6 +209,33 @@ func probeIPQuality(ctx context.Context, deps ipQualityDependencies) (*IPQuality
 		score -= deduct
 	}
 
+	// Supplementary evidence sources. They never gate the probe or change the
+	// 0-100 score; availability and findings are recorded as structured status.
+	result.Sources = append(result.Sources, IPSourceStatus{Source: IPSourceBuiltin, Status: "ok"})
+	var ownershipNote string
+	if deps.queryIPAPIIS != nil {
+		ipapiis := deps.queryIPAPIIS(ctx, publicIP)
+		result.IPAPIIS = ipapiis
+		status := "ok"
+		message := ""
+		if !ipapiis.Supported {
+			status = "unavailable"
+			message = ipapiis.Message
+		} else {
+			ownershipNote = ipapiis.CrossCheck(info)
+		}
+		result.Sources = append(result.Sources, IPSourceStatus{Source: "ipapi.is", Status: status, Message: message})
+	}
+	if opts.HasSource(IPSourceSecurityCheck) && deps.runSecurityCheck != nil {
+		securityCheck := deps.runSecurityCheck(ctx)
+		result.SecurityCheck = securityCheck
+		result.Sources = append(result.Sources, IPSourceStatus{
+			Source:  IPSourceSecurityCheck,
+			Status:  securityCheck.Status,
+			Message: securityCheck.Message,
+		})
+	}
+
 	mailPorts := deps.mailPorts(ctx, []int{25})
 	var port25 *PortProbe
 	found25Open := false
@@ -183,6 +267,9 @@ func probeIPQuality(ctx context.Context, deps ipQualityDependencies) (*IPQuality
 	}
 	if len(listed) > 0 {
 		evidenceSummary = append(evidenceSummary, fmt.Sprintf("dnsbl listed x%d", len(listed)))
+	}
+	if strings.Contains(ownershipNote, "mismatch") {
+		evidenceSummary = append(evidenceSummary, "ownership: "+ownershipNote)
 	}
 	if !port25Conclusive {
 		evidenceSummary = append(evidenceSummary, "port25 "+port25Status)

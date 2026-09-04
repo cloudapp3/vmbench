@@ -30,6 +30,9 @@ func runRouteSection(ctx context.Context, opts Options, report *SuiteReport) {
 		section.Message = err.Error()
 		return
 	}
+	// Best-effort line classification from the collected hop evidence; a
+	// classification miss never fails the route section.
+	netio.ClassifyTraceResults(ctx, results)
 	section.Results = results
 	section.Status, section.Message = summarizeRouteResults(results)
 }
@@ -76,6 +79,18 @@ func traceDestinationReachedText(value *bool) string {
 		return "yes"
 	}
 	return "no"
+}
+
+// traceClassificationText renders the optional line classification label.
+func traceClassificationText(classification *netio.RouteClassification) string {
+	if classification == nil {
+		return "-"
+	}
+	label := strings.TrimSpace(classification.Label)
+	if label == "" {
+		return defaultText(classification.Code, "-")
+	}
+	return label
 }
 
 func routeTargetsForPresets(presets []string) []netio.TraceTarget {

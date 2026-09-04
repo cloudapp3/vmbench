@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudapp3/vmbench/bench/netio"
 	"github.com/cloudapp3/vmbench/catalog"
 	"github.com/cloudapp3/vmbench/nodecatalog"
 )
@@ -27,6 +28,7 @@ type PresetSpec struct {
 	Sections     SectionSelector `json:"sections"`
 	IPVersion    string          `json:"ip_version,omitempty"`
 	RoutePresets []string        `json:"route_presets,omitempty"`
+	MediaSet     string          `json:"media_set,omitempty"`
 }
 
 type Options struct {
@@ -41,6 +43,8 @@ type Options struct {
 	Sections         SectionSelector       `json:"sections"`
 	IperfHosts       []string              `json:"iperf_hosts,omitempty"`
 	IPVersion        string                `json:"ip_version,omitempty"`
+	MediaSet         string                `json:"media_set,omitempty"`
+	IPSources        []string              `json:"ip_sources,omitempty"`
 	CatalogSource    string                `json:"catalog_source,omitempty"`
 	CatalogRevision  string                `json:"catalog_revision,omitempty"`
 	CatalogCachePath string                `json:"catalog_cache_path,omitempty"`
@@ -102,9 +106,11 @@ const (
 	SpeedProviderSpeedtestNet = "speedtest_net"
 	SpeedProviderSpeedtestCN  = "speedtest_cn"
 	SpeedProviderIperf3       = "iperf3"
+	SpeedProviderChinaISP     = "china_isp"
+	SpeedProviderSpeedtestISP = "speedtest_isp"
 )
 
-var defaultSpeedProviderOrder = []string{SpeedProviderCloudflare, SpeedProviderSpeedtestNet, SpeedProviderSpeedtestCN, SpeedProviderIperf3}
+var defaultSpeedProviderOrder = []string{SpeedProviderCloudflare, SpeedProviderSpeedtestNet, SpeedProviderSpeedtestCN, SpeedProviderIperf3, SpeedProviderChinaISP, SpeedProviderSpeedtestISP}
 
 var speedProviderSpecs = map[string]SpeedProviderSpec{
 	SpeedProviderCloudflare: {
@@ -130,6 +136,65 @@ var speedProviderSpecs = map[string]SpeedProviderSpec{
 		Description: "TCP bandwidth to user-provided --iperf-host targets.",
 		Requires:    "iperf3 CLI and --iperf-host",
 	},
+	SpeedProviderChinaISP: {
+		ID:          SpeedProviderChinaISP,
+		Name:        "China ISP (speedtest.cn)",
+		Description: "Direct HTTP download per China carrier (telecom/unicom/mobile) from versioned catalog isp_download nodes.",
+	},
+	SpeedProviderSpeedtestISP: {
+		ID:          SpeedProviderSpeedtestISP,
+		Name:        "China ISP (speedtest.net)",
+		Description: "Ookla speedtest CLI pinned to per-carrier China server IDs.",
+		Requires:    "speedtest CLI",
+	},
+}
+
+// IP quality evidence sources.
+const (
+	IPSourceBuiltin       = netio.IPSourceBuiltin
+	IPSourceSecurityCheck = netio.IPSourceSecurityCheck
+)
+
+var defaultIPSourceOrder = []string{IPSourceBuiltin, IPSourceSecurityCheck}
+
+// IPSourceSpec describes one IP quality evidence source.
+type IPSourceSpec struct {
+	ID          string
+	Name        string
+	Description string
+	Requires    string
+}
+
+var ipSourceSpecs = map[string]IPSourceSpec{
+	IPSourceBuiltin: {
+		ID:          IPSourceBuiltin,
+		Name:        "Builtin",
+		Description: "ip-api.com metadata, ipapi.is ownership cross-check, DNSBL, mail ports.",
+	},
+	IPSourceSecurityCheck: {
+		ID:          IPSourceSecurityCheck,
+		Name:        "securityCheck",
+		Description: "18-database IP quality view from the external securityCheck binary.",
+		Requires:    "securityCheck binary (github.com/oneclickvirt/securityCheck)",
+	},
+}
+
+// IPSourceIDs lists the selectable IP quality sources.
+func IPSourceIDs() []string { return append([]string(nil), defaultIPSourceOrder...) }
+
+// StandardizeIPSources filters and orders raw source names.
+func StandardizeIPSources(raw []string) []string {
+	seen := make(map[string]struct{}, len(raw))
+	for _, item := range raw {
+		seen[strings.ToLower(strings.TrimSpace(item))] = struct{}{}
+	}
+	out := make([]string, 0, len(defaultIPSourceOrder))
+	for _, item := range defaultIPSourceOrder {
+		if _, ok := seen[item]; ok {
+			out = append(out, item)
+		}
+	}
+	return out
 }
 
 var presetSpecs = map[string]PresetSpec{
@@ -235,6 +300,20 @@ func PrepareOptions(opts Options) Options {
 		norm.Timeout = 5 * time.Minute
 	}
 	norm.IPVersion = normalizeIPVersion(norm.IPVersion)
+	norm.MediaSet = normalizeMediaSet(norm.MediaSet)
+	if norm.Sections.Media && strings.TrimSpace(norm.MediaSet) == "" {
+		norm.MediaSet = DefaultMediaSet()
+	}
+	if !norm.Sections.Media {
+		norm.MediaSet = ""
+	}
+	norm.IPSources = StandardizeIPSources(norm.IPSources)
+	if norm.Sections.IPQuality && len(norm.IPSources) == 0 {
+		norm.IPSources = []string{IPSourceBuiltin}
+	}
+	if !norm.Sections.IPQuality {
+		norm.IPSources = nil
+	}
 	if !norm.Sections.AnyEnabled() {
 		norm.Sections = DefaultSections()
 	}
@@ -292,6 +371,32 @@ func normalizeIPVersion(value string) string {
 	default:
 		return "v4"
 	}
+}
+
+// DefaultMediaSet is the full-platform unlock set.
+func DefaultMediaSet() string { return "all" }
+
+// mediaSetIDs lists the UnlockTests region selections exposed to users.
+var mediaSetIDs = []string{"all", "globe", "tw", "hk", "jp", "kr", "na", "sa", "eu", "afr", "sea", "oce", "ai"}
+
+// MediaSets returns the selectable media set IDs.
+func MediaSets() []string { return append([]string(nil), mediaSetIDs...) }
+
+func normalizeMediaSet(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+// StandardizeMediaSet validates one media set token; comma-separated
+// combinations are accepted as-is because UnlockTests resolves them.
+func StandardizeMediaSet(value string) (string, error) {
+	normalized := normalizeMediaSet(value)
+	if normalized == "" {
+		return DefaultMediaSet(), nil
+	}
+	if err := netio.ValidateMediaSet(normalized); err != nil {
+		return "", err
+	}
+	return normalized, nil
 }
 
 func SectionsFromList(raw string, base SectionSelector, enable bool) SectionSelector {
@@ -435,6 +540,15 @@ func SpeedProviders() []SpeedProviderSpec {
 
 func SpeedProviderIDs() []string {
 	return append([]string(nil), defaultSpeedProviderOrder...)
+}
+
+// IPSources returns the ordered IP quality source specifications.
+func IPSources() []IPSourceSpec {
+	out := make([]IPSourceSpec, 0, len(defaultIPSourceOrder))
+	for _, id := range defaultIPSourceOrder {
+		out = append(out, ipSourceSpecs[id])
+	}
+	return out
 }
 
 func DefaultSpeedProviders() []string {

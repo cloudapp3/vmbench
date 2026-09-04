@@ -74,14 +74,14 @@ func WriteConsole(w io.Writer, report SuiteReport) error {
 		}
 		if len(report.Route.Results) > 0 {
 			tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
-			_, _ = fmt.Fprintln(tw, "Target\tCity\tCarrier\tResolved\tProbe\tHops\tReached\tStatus")
+			_, _ = fmt.Fprintln(tw, "Target\tCity\tCarrier\tResolved\tProbe\tHops\tReached\tLine\tStatus")
 			for _, item := range report.Route.Results {
 				status := item.EffectiveStatus()
 				if message := strings.TrimSpace(item.Error); message != "" {
 					status += ": " + message
 				}
 				probe := defaultText(item.ProbeProtocol, "unknown") + "/" + defaultText(item.ProbeTool, "unknown")
-				_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
+				_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\n",
 					item.Target.Name,
 					item.Target.City,
 					item.Target.Carrier,
@@ -89,6 +89,7 @@ func WriteConsole(w io.Writer, report SuiteReport) error {
 					probe,
 					len(item.Hops),
 					traceDestinationReachedText(item.DestinationReached),
+					traceClassificationText(item.Classification),
 					status,
 				)
 			}
@@ -238,6 +239,39 @@ func WriteConsole(w io.Writer, report SuiteReport) error {
 					return err
 				}
 			}
+			if cross := result.IPAPIIS; cross != nil && cross.Supported {
+				if _, err := fmt.Fprintf(w, "ipapi.is: %s | %s | %s\n", defaultText(cross.Company, "-"), defaultText(cross.ASN, "-"), defaultText(cross.Location, "-")); err != nil {
+					return err
+				}
+			}
+			if len(result.Sources) > 0 {
+				parts := make([]string, 0, len(result.Sources))
+				for _, source := range result.Sources {
+					note := source.Source + "=" + source.Status
+					if source.Message != "" {
+						note += " (" + source.Message + ")"
+					}
+					parts = append(parts, note)
+				}
+				if _, err := fmt.Fprintf(w, "sources: %s\n", strings.Join(parts, ", ")); err != nil {
+					return err
+				}
+			}
+			if sc := result.SecurityCheck; sc != nil {
+				if _, err := fmt.Fprintf(w, "securitycheck: %s%s\n", sc.Status, scMessageSuffix(sc)); err != nil {
+					return err
+				}
+				if len(sc.Fields) > 0 {
+					tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
+					_, _ = fmt.Fprintln(tw, "Field\tValue")
+					for _, field := range sc.Fields {
+						_, _ = fmt.Fprintf(tw, "%s\t%s\n", field.Name, field.Value)
+					}
+					if err := tw.Flush(); err != nil {
+						return err
+					}
+				}
+			}
 		}
 	}
 
@@ -290,10 +324,19 @@ func WriteConsole(w io.Writer, report SuiteReport) error {
 			}
 		}
 		if report.Media.Result != nil && len(report.Media.Result.Items) > 0 {
+			if set := strings.TrimSpace(report.Media.Result.Set); set != "" {
+				if _, err := fmt.Fprintf(w, "set: %s\n", set); err != nil {
+					return err
+				}
+			}
 			tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
-			_, _ = fmt.Fprintln(tw, "Item\tRegion\tStatus\tMessage")
+			_, _ = fmt.Fprintln(tw, "Item\tIP\tRegion\tStatus\tMessage")
 			for _, item := range report.Media.Result.Items {
-				_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", defaultText(item.Title, item.ID), defaultText(item.Region, "-"), defaultText(item.Status, "unknown"), defaultText(item.Message, "-"))
+				status := item.Status
+				if item.RawStatus == "Restricted" {
+					status = "restricted"
+				}
+				_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", defaultText(item.Title, item.ID), defaultText(item.IPVersion, "-"), defaultText(item.Region, "-"), defaultText(status, "unknown"), defaultText(item.Message, "-"))
 			}
 			if err := tw.Flush(); err != nil {
 				return err

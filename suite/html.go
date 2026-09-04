@@ -78,7 +78,7 @@ var htmlTemplate = template.Must(template.New("suite-report").Funcs(template.Fun
 		switch strings.ToLower(strings.TrimSpace(status)) {
 		case "ok", "reachable", "open", "available", "direct":
 			return "ok"
-		case "partial", "refused", "mixed", "timeout":
+		case "restricted", "partial", "refused", "mixed", "timeout":
 			return "warn"
 		case "error", "failed", "no_response", "unreachable", "blocked", "invalid", "http_error":
 			return "err"
@@ -91,6 +91,12 @@ var htmlTemplate = template.Must(template.New("suite-report").Funcs(template.Fun
 			return "yes"
 		}
 		return "no"
+	},
+	"mediaStatus": func(item MediaServiceResult) string {
+		if item.RawStatus == "Restricted" {
+			return "restricted"
+		}
+		return item.Status
 	},
 	"traceStatus": func(value RouteRun) string {
 		return value.EffectiveStatus()
@@ -219,7 +225,7 @@ ul { margin:8px 0 0; padding-left:20px; }
 {{ if .Route.Results }}
 <section class="section"><h2>Route Evidence</h2>
 {{ range .Route.Results }}
-	  <div class="subsection"><h3>{{ .Target.Name }} <span class="badge {{ statusClass (traceStatus .) }}">{{ traceStatus . }}</span></h3><p class="small"><code>{{ defaultText .Target.ID "legacy" }}</code> / {{ .Target.City }} / {{ .Target.Carrier }} / AS{{ .Target.AS }} / {{ defaultText .Target.IPFamily "-" }} / catalog {{ defaultText .Target.Protocol "-" }} / probe {{ defaultText .ProbeProtocol "unknown" }} via {{ defaultText .ProbeTool "unknown" }} / {{ defaultText .Target.Source "-" }} / requested <code>{{ formatEndpoint .Target.Endpoint .Target.Port }}</code> / resolved <code>{{ defaultText .ResolvedTarget "unknown" }}</code> / destination reached {{ traceReached .DestinationReached }}</p>
+	  <div class="subsection"><h3>{{ .Target.Name }} <span class="badge {{ statusClass (traceStatus .) }}">{{ traceStatus . }}</span>{{ if .Classification }} <span class="badge warn">{{ .Classification.Label }}</span>{{ end }}</h3><p class="small"><code>{{ defaultText .Target.ID "legacy" }}</code> / {{ .Target.City }} / {{ .Target.Carrier }} / AS{{ .Target.AS }} / {{ defaultText .Target.IPFamily "-" }} / catalog {{ defaultText .Target.Protocol "-" }} / probe {{ defaultText .ProbeProtocol "unknown" }} via {{ defaultText .ProbeTool "unknown" }} / {{ defaultText .Target.Source "-" }} / requested <code>{{ formatEndpoint .Target.Endpoint .Target.Port }}</code> / resolved <code>{{ defaultText .ResolvedTarget "unknown" }}</code> / destination reached {{ traceReached .DestinationReached }}{{ if .Classification }} / line <code>{{ .Classification.Code }}</code> ({{ .Classification.Confidence }}){{ if .ObservedASNs }} / ASNs {{ .ObservedASNs }}{{ end }}{{ end }}</p>
   {{ if .Error }}<p class="error">{{ .Error }}</p>{{ end }}
   {{ if .Hops }}<div class="table-wrap"><table><thead><tr><th>TTL</th><th>IP</th><th>RTT</th><th>Timeout</th></tr></thead><tbody>{{ range .Hops }}<tr><td>{{ .TTL }}</td><td><code>{{ defaultText .IP "-" }}</code></td><td>{{ formatFloat .RTTMs "ms" }}</td><td>{{ boolText .Timeout }}</td></tr>{{ end }}</tbody></table></div>{{ end }}</div>
 {{ end }}
@@ -249,6 +255,9 @@ ul { margin:8px 0 0; padding-left:20px; }
   {{ with .BasicInfo }}<div class="grid"><div class="metric"><span class="label">IP</span><strong><code>{{ defaultText .IP "-" }}</code></strong><span class="small">source {{ defaultText .Source "unknown" }}</span></div><div class="metric"><span class="label">ASN</span><strong>{{ .ASN }}</strong><span class="small">{{ defaultText .Org .ISP }}</span></div><div class="metric"><span class="label">Location</span><strong>{{ defaultText .CountryCode .Country }}</strong></div><div class="metric"><span class="label">Flags</span><strong>hosting={{ boolText .Hosting }} / proxy={{ boolText .Proxy }}</strong><span class="error">{{ .Error }}</span></div></div>{{ end }}
   {{ with .RiskSummary }}<h3>Risk Evidence</h3><p>{{ defaultText .Summary "-" }}</p><div class="table-wrap"><table><tbody><tr><th>Risk level</th><td>{{ defaultText .RiskLevel "unknown" }}</td><th>DNSBL</th><td>{{ boolText .DNSBLSupported }} via {{ defaultText .DNSBLTool "-" }}</td><th>Listed</th><td>{{ .DNSBLListedCount }} {{ range .DNSBLListed }}<code>{{ . }}</code> {{ end }}</td></tr><tr><th>DNSBL detail</th><td colspan="5">{{ defaultText .DNSBLMessage "-" }}</td></tr></tbody></table></div>{{ end }}
   {{ with .Score }}<p><strong>Business risk diagnostic: {{ .Total }}/{{ .MaxTotal }} ({{ .Level }})</strong></p>{{ end }}
+  {{ with .IPAPIIS }}{{ if .Supported }}<h3>ipapi.is Ownership Cross-check</h3><p class="small">{{ defaultText .Company "-" }} / {{ defaultText .ASN "-" }} / {{ defaultText .Location "-" }}</p>{{ end }}{{ end }}
+  {{ with .SecurityCheck }}<h3>securityCheck (external, 18 databases)</h3><p class="small"><span class="badge {{ statusClass .Status }}">{{ .Status }}</span> {{ defaultText .Message "" }} {{ if .Binary }}via <code>{{ .Binary }}</code>{{ end }}</p>{{ if .Fields }}<div class="table-wrap"><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>{{ range .Fields }}<tr><td>{{ .Name }}</td><td>{{ .Value }}</td></tr>{{ end }}</tbody></table></div>{{ end }}{{ if .Raw }}<details><summary>Raw output</summary><pre>{{ .Raw }}</pre></details>{{ end }}{{ end }}
+  {{ if .Sources }}<h3>Evidence Sources</h3><div class="table-wrap"><table><thead><tr><th>Source</th><th>Status</th><th>Message</th></tr></thead><tbody>{{ range .Sources }}<tr><td>{{ .Source }}</td><td><span class="badge {{ statusClass .Status }}">{{ .Status }}</span></td><td>{{ defaultText .Message "-" }}</td></tr>{{ end }}</tbody></table></div>{{ end }}
   {{ if .MailPorts }}<h3>IP Quality Mail Probe</h3><div class="table-wrap"><table><thead><tr><th>Port</th><th>Target</th><th>Method</th><th>Latency</th><th>Status</th><th>Message</th></tr></thead><tbody>{{ range .MailPorts }}<tr><td>{{ .Port }}</td><td>{{ defaultText .Target "-" }}</td><td>{{ defaultText .Method "-" }}</td><td>{{ formatFloat .LatencyMs "ms" }}</td><td><span class="badge {{ statusClass .Status }}">{{ defaultText .Status "unknown" }}</span></td><td>{{ defaultText .Message "-" }}</td></tr>{{ end }}</tbody></table></div>{{ end }}
 </section>
 {{ end }}
@@ -258,7 +267,7 @@ ul { margin:8px 0 0; padding-left:20px; }
 {{ end }}
 
 {{ with .Media.Result }}{{ if .Items }}
-<section class="section"><h2>Media Availability</h2><p class="small">Available {{ .Summary.Available }} / blocked {{ .Summary.Blocked }} / unknown {{ .Summary.Unknown }}</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Service</th><th>Region</th><th>Status</th><th>Message</th></tr></thead><tbody>{{ range .Items }}<tr><td>{{ .ID }}</td><td>{{ .Title }}</td><td>{{ defaultText .Region "-" }}</td><td><span class="badge {{ statusClass .Status }}">{{ .Status }}</span></td><td>{{ defaultText .Message "-" }}</td></tr>{{ end }}</tbody></table></div></section>
+<section class="section"><h2>Media Availability</h2><p class="small">Set {{ defaultText .Set "all" }} · available {{ .Summary.Available }} (restricted {{ .Summary.Restricted }}) / blocked {{ .Summary.Blocked }} / unknown {{ .Summary.Unknown }}</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>Service</th><th>IP</th><th>Region</th><th>Status</th><th>Message</th></tr></thead><tbody>{{ range .Items }}<tr><td>{{ .ID }}</td><td>{{ .Title }}</td><td>{{ defaultText .IPVersion "-" }}</td><td>{{ defaultText .Region "-" }}</td><td><span class="badge {{ statusClass (mediaStatus .) }}">{{ mediaStatus . }}</span></td><td>{{ defaultText .Message "-" }}</td></tr>{{ end }}</tbody></table></div></section>
 {{ end }}{{ end }}
 
 {{ if .Warnings }}<section class="section"><h2>Warnings</h2><ul>{{ range .Warnings }}<li>{{ . }}</li>{{ end }}</ul></section>{{ end }}

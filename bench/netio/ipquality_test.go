@@ -14,7 +14,7 @@ func TestProbeIPQualityFailsClosedWhenMetadataUnavailable(t *testing.T) {
 		return nil, riskFlags{}, errors.New("metadata offline")
 	}
 
-	result, err := probeIPQuality(context.Background(), deps)
+	result, err := probeIPQuality(context.Background(), deps, IPQualityOptions{})
 	if err == nil || !strings.Contains(err.Error(), "metadata unavailable") {
 		t.Fatalf("probeIPQuality() error = %v, want metadata unavailable", err)
 	}
@@ -38,7 +38,7 @@ func TestProbeIPQualityFailsClosedWhenPublicIPUnavailable(t *testing.T) {
 		return "", errors.New("public IP offline")
 	}
 
-	result, err := probeIPQuality(context.Background(), deps)
+	result, err := probeIPQuality(context.Background(), deps, IPQualityOptions{})
 	if err == nil || !strings.Contains(err.Error(), "public IPv4 unavailable") {
 		t.Fatalf("probeIPQuality() error = %v, want public IPv4 unavailable", err)
 	}
@@ -53,7 +53,7 @@ func TestProbeIPQualityFailsClosedWhenDNSBLUnavailable(t *testing.T) {
 		return dnsblCheckResult{Errors: []string{"zen.spamhaus.org: DNS timeout"}}
 	}
 
-	result, err := probeIPQuality(context.Background(), deps)
+	result, err := probeIPQuality(context.Background(), deps, IPQualityOptions{})
 	if err == nil || !strings.Contains(err.Error(), "DNSBL unavailable") {
 		t.Fatalf("probeIPQuality() error = %v, want DNSBL unavailable", err)
 	}
@@ -71,7 +71,7 @@ func TestProbeIPQualityFailsClosedWhenDNSBLIsPartial(t *testing.T) {
 		return dnsblCheckResult{Checked: len(dnsblZones) - 1, Errors: []string{"one zone timed out"}}
 	}
 
-	result, err := probeIPQuality(context.Background(), deps)
+	result, err := probeIPQuality(context.Background(), deps, IPQualityOptions{})
 	if err == nil || !strings.Contains(err.Error(), "DNSBL unavailable") {
 		t.Fatalf("probeIPQuality() error = %v, want partial DNSBL failure", err)
 	}
@@ -82,7 +82,7 @@ func TestProbeIPQualityFailsClosedWhenDNSBLIsPartial(t *testing.T) {
 
 func TestProbeIPQualityScoresOnlyConclusiveInputs(t *testing.T) {
 	deps := validIPQualityDependencies()
-	result, err := probeIPQuality(context.Background(), deps)
+	result, err := probeIPQuality(context.Background(), deps, IPQualityOptions{})
 	if err != nil {
 		t.Fatalf("probeIPQuality() error = %v", err)
 	}
@@ -97,7 +97,7 @@ func TestProbeIPQualityPreservesPort25FailureStatus(t *testing.T) {
 		return []PortProbe{{Port: 25, Status: MailPortStatusRefused, Message: "connection refused"}}
 	}
 
-	result, err := probeIPQuality(context.Background(), deps)
+	result, err := probeIPQuality(context.Background(), deps, IPQualityOptions{})
 	if err != nil {
 		t.Fatalf("probeIPQuality() error = %v", err)
 	}
@@ -121,7 +121,7 @@ func TestProbeIPQualityFailsClosedWhenPort25ProbeIsInconclusive(t *testing.T) {
 		return []PortProbe{{Port: 25, Status: MailPortStatusError, Message: "resolver unavailable"}}
 	}
 
-	result, err := probeIPQuality(context.Background(), deps)
+	result, err := probeIPQuality(context.Background(), deps, IPQualityOptions{})
 	if err == nil || !strings.Contains(err.Error(), "port 25 probe inconclusive") {
 		t.Fatalf("probeIPQuality() error = %v, want inconclusive port 25 error", err)
 	}

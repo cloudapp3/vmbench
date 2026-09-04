@@ -130,6 +130,16 @@ func ValidateOptions(opts Options) error {
 	if invalid := firstInvalidValue(opts.RoutePresets, StandardizeRoutePresets); invalid != "" {
 		problems = append(problems, fmt.Sprintf("unknown route preset %q", invalid))
 	}
+	if opts.Sections.Media && strings.TrimSpace(opts.MediaSet) != "" {
+		if _, err := StandardizeMediaSet(opts.MediaSet); err != nil {
+			problems = append(problems, fmt.Sprintf("unknown media set %q (valid: %s or comma combinations)",
+				opts.MediaSet, strings.Join(MediaSets(), ", ")))
+		}
+	}
+	if invalid := firstInvalidValue(opts.IPSources, StandardizeIPSources); invalid != "" {
+		problems = append(problems, fmt.Sprintf("unknown IP quality source %q (valid: %s)",
+			invalid, strings.Join(IPSourceIDs(), ", ")))
+	}
 	if invalid := firstInvalidValue(opts.SpeedProviders, StandardizeSpeedProviders); invalid != "" {
 		problems = append(problems, fmt.Sprintf("unknown speed provider %q", invalid))
 	}

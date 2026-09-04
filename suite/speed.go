@@ -3,6 +3,7 @@ package suite
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -23,7 +24,7 @@ func runSpeedSection(ctx context.Context, opts Options, report *SuiteReport) {
 	failed := 0
 
 	for _, provider := range opts.SpeedProviders {
-		group := buildSpeedGroup(ctx, provider, opts.IperfHosts)
+		group := buildSpeedGroup(ctx, provider, opts)
 		if group.ID == "" {
 			continue
 		}
@@ -75,7 +76,7 @@ func runSpeedSection(ctx context.Context, opts Options, report *SuiteReport) {
 	section.Message = strings.Join(msgParts, " · ")
 }
 
-func buildSpeedGroup(ctx context.Context, provider string, hosts []string) SpeedProviderGroup {
+func buildSpeedGroup(ctx context.Context, provider string, opts Options) SpeedProviderGroup {
 	switch provider {
 	case SpeedProviderCloudflare:
 		return buildCloudflareSpeedGroup(ctx)
@@ -84,10 +85,124 @@ func buildSpeedGroup(ctx context.Context, provider string, hosts []string) Speed
 	case SpeedProviderSpeedtestCN:
 		return buildSpeedtestCNGroup(ctx)
 	case SpeedProviderIperf3:
-		return buildIperfSpeedGroup(ctx, hosts)
+		return buildIperfSpeedGroup(ctx, opts.IperfHosts)
+	case SpeedProviderChinaISP:
+		return buildChinaISPGroup(ctx, opts)
+	case SpeedProviderSpeedtestISP:
+		return buildSpeedtestISPGroup(ctx)
 	default:
 		return SpeedProviderGroup{}
 	}
+}
+
+var ispCarrierLabels = map[string]string{
+	"telecom": "China Telecom",
+	"unicom":  "China Unicom",
+	"mobile":  "China Mobile",
+}
+
+// ispDownloadNodesForOptions resolves isp_download catalog nodes, preferring
+// the caller-resolved catalog and falling back to the embedded snapshot.
+func ispDownloadNodesForOptions(opts Options) []netio.SpeedNode {
+	if opts.ResolvedCatalog != nil {
+		return netio.ISPDownloadNodesFromManifest(*opts.ResolvedCatalog)
+	}
+	return netio.DefaultISPDownloadNodes()
+}
+
+// buildChinaISPGroup downloads one speedtest.cn endpoint per China carrier
+// sequentially so carriers do not contend for bandwidth.
+func buildChinaISPGroup(ctx context.Context, opts Options) SpeedProviderGroup {
+	builder := newSpeedProviderGroupBuilder(SpeedProviderChinaISP, "China ISP (speedtest.cn)")
+	nodes := ispDownloadNodesForOptions(opts)
+	if len(nodes) == 0 {
+		builder.addError("china-isp", "download", "", fmt.Errorf("no isp_download nodes in the selected node catalog"))
+		return builder.finish()
+	}
+	for _, carrier := range netio.CarrierOrder() {
+		var carrierNodes []netio.SpeedNode
+		for _, node := range nodes {
+			if node.Carrier == carrier {
+				carrierNodes = append(carrierNodes, node)
+			}
+		}
+		if len(carrierNodes) == 0 {
+			builder.addError("china-isp-"+carrier, "download", "", fmt.Errorf("no %s node in the selected node catalog", carrier))
+			continue
+		}
+		// Try same-carrier nodes in catalog order until one succeeds so a
+		// single unreachable city does not fail the whole carrier.
+		var (
+			probe   *netio.DownloadProbeResult
+			node    netio.SpeedNode
+			lastErr error
+			tried   []string
+		)
+		for _, candidate := range carrierNodes {
+			if ctx.Err() != nil {
+				break
+			}
+			probe, lastErr = netio.ProbeDownload(ctx, candidate)
+			if lastErr == nil {
+				node = candidate
+				break
+			}
+			tried = append(tried, candidate.ID+": "+lastErr.Error())
+		}
+		if probe == nil || lastErr != nil {
+			builder.addError("china-isp-"+carrier, "download", "", fmt.Errorf("all %s nodes failed: %s", carrier, strings.Join(tried, "; ")))
+			continue
+		}
+		dlMbps := mebibytesPerSecondToMegabitsPerSecond(probe.ThroughputMiBPerSec())
+		builder.addOK(SpeedProviderResult{
+			ID:            "china-isp-" + carrier,
+			Provider:      SpeedProviderChinaISP,
+			ProviderLabel: "China ISP (speedtest.cn)",
+			Kind:          "download",
+			Status:        "ok",
+			NodeID:        node.ID,
+			Node:          node.Name,
+			Endpoint:      speedNodeEndpoint(node),
+			Region:        "China · " + node.City,
+			DownloadMbps:  dlMbps,
+			ElapsedMs:     durationMillis(probe.Elapsed),
+		}, dlMbps, 0, 0)
+	}
+	return builder.finish()
+}
+
+// buildSpeedtestISPGroup pins the Ookla speedtest CLI to per-carrier China
+// server IDs, trying fallback IDs when the preferred server fails.
+func buildSpeedtestISPGroup(ctx context.Context) SpeedProviderGroup {
+	builder := newSpeedProviderGroupBuilder(SpeedProviderSpeedtestISP, "China ISP (speedtest.net)")
+	servers := netio.OoklaCarrierServers()
+	for _, carrier := range netio.CarrierOrder() {
+		ids := servers[carrier]
+		if len(ids) == 0 {
+			builder.addError("speedtest-isp-"+carrier, "download_upload", "", fmt.Errorf("no speedtest.net server IDs recorded for %s", carrier))
+			continue
+		}
+		var (
+			probe *netio.SpeedtestCLIResult
+			err   error
+		)
+		for _, id := range ids {
+			probe, err = netio.ProbeSpeedtestISPServer(ctx, id)
+			if err == nil {
+				break
+			}
+		}
+		if err != nil {
+			builder.addError("speedtest-isp-"+carrier, "download_upload", "", err)
+			continue
+		}
+		item := speedtestProviderResult("speedtest-isp-"+carrier, SpeedProviderSpeedtestISP, "China ISP (speedtest.net)", probe)
+		if item.Region == "" {
+			item.Region = ispCarrierLabels[carrier]
+		}
+		builder.addOK(item, item.DownloadMbps, item.UploadMbps, item.LatencyMs)
+	}
+	return builder.finish()
 }
 
 func buildCloudflareSpeedGroup(ctx context.Context) SpeedProviderGroup {
@@ -325,6 +440,14 @@ func durationMillis(d time.Duration) float64 {
 		return 0
 	}
 	return float64(d) / float64(time.Millisecond)
+}
+
+// speedNodeEndpoint extracts a host:port display endpoint from a node URL.
+func speedNodeEndpoint(node netio.SpeedNode) string {
+	if parsed, err := url.Parse(node.TestURL); err == nil && parsed.Host != "" {
+		return parsed.Host
+	}
+	return node.TestURL
 }
 
 func mebibytesPerSecondToMegabitsPerSecond(value float64) float64 {

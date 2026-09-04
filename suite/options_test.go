@@ -105,7 +105,7 @@ func TestPrepareOptionsDefaultSpeedProviders(t *testing.T) {
 }
 
 func TestSpeedProviderCatalogKeepsAllProviders(t *testing.T) {
-	want := []string{SpeedProviderCloudflare, SpeedProviderSpeedtestNet, SpeedProviderSpeedtestCN, SpeedProviderIperf3}
+	want := []string{SpeedProviderCloudflare, SpeedProviderSpeedtestNet, SpeedProviderSpeedtestCN, SpeedProviderIperf3, SpeedProviderChinaISP, SpeedProviderSpeedtestISP}
 	got := SpeedProviderIDs()
 	if len(got) != len(want) {
 		t.Fatalf("SpeedProviderIDs() = %v, want %v", got, want)

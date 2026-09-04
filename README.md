@@ -140,13 +140,13 @@ Sections:
 |---------|---------|
 | `hardware` | CPU / memory / disk benchmark report |
 | `network_info` | Virtualization plus public IPv4/IPv6, ASN/provider/location, and conservative NAT evidence |
-| `route` | Versioned China carrier/CERNET/CSTNET IPv4/IPv6 route diagnostics with destination-reached evidence |
+| `route` | Versioned China carrier/CERNET/CSTNET IPv4/IPv6 route diagnostics with destination-reached evidence and return-route line classification (163 / 9929 / 4837 / CN2GIA / CN2GT / CTGNET / CMIN2 / CMI) via the Apache-2.0 backtrace library |
 | `ping` | Versioned China carrier/CERNET/CSTNET IPv4/IPv6 TCP latency / jitter / loss and connection state |
-| `speed` | Cloudflare / speedtest provider download/upload measurements |
-| `ip_quality` | IP reputation and risk diagnosis |
+| `speed` | Cloudflare / speedtest provider download/upload measurements, optional China carrier (三网) providers |
+| `ip_quality` | IP reputation and risk diagnosis: ip-api.com metadata, ipapi.is ownership cross-check, DNSBL, mail ports, and an opt-in securityCheck external source (18 databases) |
 | `reachability` | Website HTTPS and Telegram DC TCP reachability with latency/status/error |
 | `mail` | Sequential mail-port reachability with open/refused/timeout/error states |
-| `media` | Streaming / unlock probes |
+| `media` | Streaming / AI platform unlock probes via the Apache-2.0 UnlockTests library (200+ services, full-platform default) |
 
 Presets:
 
@@ -165,6 +165,12 @@ Speed providers:
 | `speedtest_net` | Ookla Speedtest CLI JSON |
 | `speedtest_cn` | speedtest.cn compatible CLI JSON |
 | `iperf3` | user-provided iperf3 host |
+| `china_isp` | Direct HTTP download per China carrier (telecom/unicom/mobile) from versioned `isp_download` catalog nodes sourced from speedtest.cn-CN-ID (MIT); same-carrier nodes are tried in order until one succeeds |
+| `speedtest_isp` | Ookla speedtest CLI pinned to per-carrier China server IDs from speedtest.net-CN-ID (MIT); requires the `speedtest` CLI |
+
+Media sets (`--media-set`, default `all`): `all`, `globe`, `tw`, `hk`, `jp`, `kr`, `na`, `sa`, `eu`, `afr`, `sea`, `oce`, `ai`, or comma combinations. A full-platform dual-stack run takes roughly 2–4 minutes.
+
+IP quality sources (`--ip-quality-source`, default `builtin`): `builtin` (ip-api.com + ipapi.is ownership cross-check + DNSBL + mail ports) and opt-in `securitycheck` (the external 18-database binary from oneclickvirt/securityCheck; install it yourself, vmbench records its findings as structured evidence and never changes the 0-100 score from it).
 
 Common flags:
 
@@ -175,10 +181,14 @@ vmbench suite --only ping,mail
 vmbench suite --skip media
 vmbench suite --route-presets gz,bj,sh,cd,cernet,cstnet
 vmbench suite --speed-provider cloudflare,speedtest_net
+vmbench suite --speed-provider china_isp
+vmbench suite --speed-provider speedtest_isp
+vmbench suite --media-set jp,kr
+vmbench suite --ip-quality-source builtin,securitycheck
 vmbench suite --speed-provider iperf3 --iperf-host 1.2.3.4
 vmbench suite --only hardware --hardware-tool sysbench,openssl,fio,dd
 vmbench suite --only hardware --hardware-tool geekbench
-vmbench suite --node-catalog embedded --node-revision 2026-07-13.1
+vmbench suite --node-catalog embedded --node-revision 2026-09-04.1
 vmbench suite --node-catalog auto --save-history --history-tag weekly
 vmbench suite --quiet --json suite.json
 ```
@@ -195,11 +205,11 @@ Suite succeeds only when every enabled section ends with `status=ok`. An enabled
 
 The default timeout remains 5 minutes. Hardware applies it per workload. Network identity, route, ping, speed, IP quality, reachability, mail, and media each derive a section timeout from the caller context; cancellation/deadline is recorded as a structured section error. By default the Suite CLI writes each section's running/final lifecycle to stderr; `--quiet` suppresses this progress stream without changing reports.
 
-TCP Ping treats an accepted connection and a TCP RST/connection-refused response as received evidence: both contribute latency and do not count as packet loss. Each target records `connection_state=open|refused|mixed|no_response`, while a true timeout or other no-response failure remains loss. Route results record `resolved_target`, `destination_reached`, and `status=ok|partial|error`; valid hops that never reach the resolved destination are `partial`, not a successful trace. Mail probes run the built-in ports sequentially so the shared target is not hit with a connection burst, and classify each result as `open`, `refused`, `timeout`, or `error`; DNS failures remain probe errors rather than port timeouts.
+TCP Ping treats an accepted connection and a TCP RST/connection-refused response as received evidence: both contribute latency and do not count as packet loss. Each target records `connection_state=open|refused|mixed|no_response`, while a true timeout or other no-response failure remains loss. Route results record `resolved_target`, `destination_reached`, and `status=ok|partial|error`; valid hops that never reach the resolved destination are `partial`, not a successful trace. Each route result may also carry a `classification` (line type with code/label/confidence/evidence) computed from the collected hop evidence — no raw sockets or root are required because classification runs on the system-traceroute hops already recorded. Mail probes run the built-in ports sequentially so the shared target is not hit with a connection burst, and classify each result as `open`, `refused`, `timeout`, or `error`; DNS failures remain probe errors rather than port timeouts.
 
 ### Node catalog
 
-The embedded catalog is a versioned data snapshot, not executable code. Each entry carries a stable node ID plus region/city, carrier, ASN, IP family, protocol, endpoint, source, and traffic budget where applicable. The current snapshot extends route/ping evidence to Chengdu, CERNET, CSTNET, and IPv6 targets.
+The embedded catalog is a versioned data snapshot, not executable code. Each entry carries a stable node ID plus region/city, carrier, ASN, IP family, protocol, endpoint, source, and traffic budget where applicable. The current snapshot extends route/ping evidence to Chengdu, CERNET, CSTNET, and IPv6 targets, and adds `isp_download` nodes — direct China carrier (telecom/unicom/mobile) speedtest.cn endpoints sourced from the MIT-licensed speedtest.cn-CN-ID dataset with a 50 MiB per-node traffic budget. Refresh those nodes with `go run scripts/gen_isp_nodes.go` (prints entries and the per-carrier Ookla server ID table) or `go run scripts/gen_isp_nodes.go -out nodecatalog/nodes.json` to rewrite them in place before bumping the revision.
 
 ```bash
 vmbench nodes list [--node-catalog embedded|auto|PATH] [--node-revision REV] [--json]
@@ -396,6 +406,8 @@ vmbench/
 | charmbracelet/lipgloss | v1.1+ | TUI styling |
 | charmbracelet/bubbles | v1.0+ | TUI components (keys) |
 | shirou/gopsutil | v4.25 | System info collection |
+| oneclickvirt/UnlockTests | v0.0.51 | Streaming / AI platform unlock probes (Apache-2.0) |
+| oneclickvirt/backtrace | v0.0.21 | China carrier return-route line classification (Apache-2.0) |
 
 ### Runtime (external tools, auto-detected)
 | Tool | Platforms | Required? |
@@ -409,6 +421,8 @@ vmbench/
 | geekbench | Platforms supported by Geekbench | Optional hardware tool, not default |
 | winsat | Windows | Optional hardware tool |
 | iperf3 | All | Optional network tool, requires `--iperf-host` |
+| speedtest (Ookla) | All | Optional network tool for `speedtest_net` / `speedtest_isp` providers |
+| securityCheck | All | Optional IP quality source (`--ip-quality-source securitycheck`), user-installed from oneclickvirt/securityCheck releases |
 
 ## Build from source
 

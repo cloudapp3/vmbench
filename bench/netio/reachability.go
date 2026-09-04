@@ -47,6 +47,9 @@ type reachabilityDependencies struct {
 	dial   func(context.Context, string, string) (net.Conn, error)
 }
 
+// ua is the browser User-Agent used by HTTP reachability probes.
+const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
 var defaultReachabilityTargets = []ReachabilityTarget{
 	{ID: "google", Category: "website", Protocol: "https", Endpoint: "https://www.google.com/generate_204"},
 	{ID: "github", Category: "website", Protocol: "https", Endpoint: "https://github.com/"},

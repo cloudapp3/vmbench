@@ -1,5 +1,15 @@
 # VMBench Changelog
 
+## v0.3.0（2026-09-04）
+
+### 对齐 ecs 的四大能力（流媒体 / IP 质量 / 回程线路 / 三网测速）
+
+- 流媒体解锁切换到 Apache-2.0 的 [UnlockTests](https://github.com/oneclickvirt/UnlockTests) 库：`media` section 默认全平台 200+ 服务（原先内置 6 项手写探测已删除），新增 `--media-set`（`all|globe|tw|hk|jp|kr|na|sa|eu|afr|sea|oce|ai` 或逗号组合）与 suite/MCP 的 `media_set` 字段。结果新增 `raw_status` / `unlock_type` / `ip_version`，`Restricted` 计入 available 并在 summary 单列 `restricted`；全量双栈默认约 2-4 分钟。TUI 媒体卡修复此前 `yes/ok/unlock` 判定失效的问题并限制渲染行数。
+- `route` section 新增回程线路类型判定：接入 Apache-2.0 的 [backtrace](https://github.com/oneclickvirt/backtrace) 库，基于已采集的系统 traceroute hop 证据（注入缓存 TraceFunc，无需 raw socket / root）输出每目标 `classification{code,label,confidence,rank,evidence}`（163 / 9929 / 4837 / CN2GIA / CN2GT / CTGNET / CMIN2 / CMI）与 `observed_asns`。分类失败只降级不失败 section，compare 仅作证据不参与 delta。
+- `ip_quality` 扩展数据源：新增 ipapi.is 归属交叉验证（company/ASN 与 ip-api 不一致时记入 evidence；2026-09 起该 API 匿名档不再提供风险字段，故仅作归属证据、不影响 0-100 评分），结果新增 `sources[]` 状态表；新增 opt-in 外部源 `securitycheck`（`--ip-quality-source builtin,securitycheck`），复用 oneclickvirt/securityCheck 闭源二进制（PATH 或可执行文件旁 `binaries/`），输出 18 库视角的结构化字段与原文证据，二进制缺失时记录 `unavailable` 不影响 section 成败。
+- 三网测速：新增 `china_isp` provider（node catalog 新 kind `isp_download`，12 个 speedtest.cn 直连节点按运营商分组顺序下载，50 MiB/节点预算，同运营商节点 fallback；节点数据来自 MIT 的 speedtest.cn-CN-ID，可用 `go run scripts/gen_isp_nodes.go` 刷新）与 `speedtest_isp` provider（Ookla `speedtest` CLI `-s` 按运营商 server ID 分组，ID 来自 MIT 的 speedtest.net-CN-ID）。embedded catalog revision 升至 `2026-09-04.1`。
+- 新增 Go 依赖：`oneclickvirt/UnlockTests`、`oneclickvirt/backtrace`（Apache-2.0，与 MIT 兼容）；未复制任何 GPL（oneclickvirt/ecs 编排层）或无许可（securityCheck）代码。
+
 ## v0.2.0（2026-09-04）
 
 ### Go v0.2 可比较 VPS 证据

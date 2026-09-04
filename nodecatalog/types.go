@@ -16,11 +16,12 @@ const (
 	SourceAuto     = "auto"
 	SourcePath     = "path"
 
-	KindDownload  = "download"
-	KindUpload    = "upload"
-	KindRoute     = "route"
-	KindPing      = "ping"
-	KindRoutePing = "route_ping"
+	KindDownload    = "download"
+	KindUpload      = "upload"
+	KindRoute       = "route"
+	KindPing        = "ping"
+	KindRoutePing   = "route_ping"
+	KindISPDownload = "isp_download"
 )
 
 var nodeIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,127}$`)
@@ -108,7 +109,7 @@ func (n Node) Validate() error {
 		return fmt.Errorf("node %q name is required", n.ID)
 	}
 	switch n.Kind {
-	case KindDownload, KindUpload, KindRoute, KindPing, KindRoutePing:
+	case KindDownload, KindUpload, KindRoute, KindPing, KindRoutePing, KindISPDownload:
 	default:
 		return fmt.Errorf("node %q has unsupported kind %q", n.ID, n.Kind)
 	}
@@ -133,7 +134,7 @@ func (n Node) Validate() error {
 	}
 
 	switch n.Kind {
-	case KindDownload, KindUpload:
+	case KindDownload, KindUpload, KindISPDownload:
 		parsed, err := url.Parse(n.URL)
 		if err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 			return fmt.Errorf("node %q has invalid HTTP URL %q", n.ID, n.URL)

@@ -30,6 +30,15 @@ func ProbeSpeedtestNet(ctx context.Context) (*SpeedtestCLIResult, error) {
 	return probeSpeedtestCommand(ctx, "speedtest_net", []string{"speedtest", "--format=json", "--accept-license", "--accept-gdpr"})
 }
 
+// ProbeSpeedtestISPServer runs the Ookla speedtest CLI pinned to one server
+// ID (China carrier nodes from speedtest.net-CN-ID) and parses JSON.
+func ProbeSpeedtestISPServer(ctx context.Context, serverID int) (*SpeedtestCLIResult, error) {
+	return probeSpeedtestCommand(ctx, "speedtest_isp", []string{
+		"speedtest", "--format=json", "--accept-license", "--accept-gdpr",
+		"-s", strconv.Itoa(serverID),
+	})
+}
+
 // ProbeSpeedtestCN runs a speedtest.cn-compatible CLI and parses JSON.
 func ProbeSpeedtestCN(ctx context.Context) (*SpeedtestCLIResult, error) {
 	candidates := [][]string{

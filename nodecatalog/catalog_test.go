@@ -24,7 +24,7 @@ func TestEmbeddedCatalogCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Embedded() error = %v", err)
 	}
-	if manifest.Revision != "2026-07-13.1" {
+	if manifest.Revision != "2026-09-04.1" {
 		t.Fatalf("Revision = %q", manifest.Revision)
 	}
 	if got := len(manifest.Select(Filter{Kind: KindDownload})); got != 15 {
@@ -306,7 +306,7 @@ func mustManifestJSON(t *testing.T, manifest Manifest) []byte {
 }
 
 func ExampleLoad_revisionPin() {
-	loaded, err := Load(LoadOptions{Source: SourceEmbedded, Revision: "2026-07-13.1"})
+	loaded, err := Load(LoadOptions{Source: SourceEmbedded, Revision: "2026-09-04.1"})
 	fmt.Println(err == nil, loaded.Manifest.Revision)
-	// Output: true 2026-07-13.1
+	// Output: true 2026-09-04.1
 }

@@ -17,10 +17,10 @@ vmbench 是一款跨平台 VPS 测评工具，用 Go 编写，强调：
 
 - **硬件测评**：CPU / 内存 / 磁盘
 - **网络身份**：虚拟化、公网 IPv4/IPv6、ASN/provider/location、保守 NAT 证据
-- **网络诊断**：版本化节点上的 route、ping、speed，以及网站/Telegram 可达性
-- **IP 质量**：IP reputation / DNSBL / 邮件端口
-- **流媒体检测**：常见平台解锁状态
-- **速度测试**：Cloudflare / Speedtest.net / Speedtest.cn / iperf3 provider
+- **网络诊断**：版本化节点上的 route（含回程线路类型 163/9929/4837/CN2/CTGNET/CMIN2/CMI 判定）、ping、speed，以及网站/Telegram 可达性
+- **IP 质量**：IP reputation / DNSBL / 邮件端口 / ipapi.is 归属交叉验证，opt-in 的 securityCheck 外部 18 库视角
+- **流媒体检测**：UnlockTests 全平台 200+ 流媒体/AI 服务解锁状态（可按地区子集运行）
+- **速度测试**：Cloudflare / Speedtest.net / Speedtest.cn / iperf3，以及三网（电信/联通/移动）provider
 - **报告输出**：console / JSON / HTML
 - **结果对比**：自动识别 benchmark/Suite，按兼容的原始指标比较两份或更多报告
 - **本地历史**：安全保存、查询、删除并比较最近 N 份报告
@@ -110,12 +110,14 @@ vmbench suite --only ping,mail
 
 ```bash
 vmbench suite --speed-provider cloudflare,speedtest_net
+vmbench suite --speed-provider china_isp
+vmbench suite --speed-provider speedtest_isp
 vmbench suite --speed-provider iperf3 --iperf-host 1.2.3.4
 vmbench suite --only hardware --hardware-tool dd,stream,mbw
 vmbench suite --only hardware --hardware-tool geekbench
 ```
 
-`speed` section 的输出会按 provider 分组展示下载、上传、延迟、状态和错误信息，便于区分 Cloudflare / Ookla / speedtest.cn / iperf3 的失败原因。
+`speed` section 的输出会按 provider 分组展示下载、上传、延迟、状态和错误信息，便于区分 Cloudflare / Ookla / speedtest.cn / iperf3 的失败原因。`china_isp` 使用版本化 catalog 中的 `isp_download` 节点（speedtest.cn 直连端点，数据来自 MIT 的 speedtest.cn-CN-ID），按电信/联通/移动顺序下载，同运营商节点依次 fallback；`speedtest_isp` 将 Ookla `speedtest` CLI 固定到按运营商的 speedtest.net 节点 ID（数据来自 MIT 的 speedtest.net-CN-ID），需要本机安装 speedtest CLI。流媒体与 IP 质量可分别用 `--media-set jp,kr` 与 `--ip-quality-source builtin,securitycheck` 收敛范围（securityCheck 二进制需自行安装，缺失时记录 `unavailable` 而不影响 section）。
 
 Suite 只有在每个 enabled section 都是 `status=ok` 时成功。enabled section 的空状态、`skipped`、`partial`、`error` 都会使总体失败并让 CLI 返回非零；disabled section 才只发 `section.skip`。选择 iperf3 provider 但没有可用 host 会直接返回 speed error。
 

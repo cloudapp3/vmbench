@@ -82,3 +82,46 @@ func TestCatalogRouteAndPingMappings(t *testing.T) {
 		t.Fatalf("DefaultTraceTargets() count = %d, want %d", len(DefaultTraceTargets()), len(v4))
 	}
 }
+
+func TestISPDownloadNodesUseEmbeddedCatalog(t *testing.T) {
+	nodes := DefaultISPDownloadNodes()
+	if len(nodes) != 12 {
+		t.Fatalf("DefaultISPDownloadNodes() count = %d, want 12", len(nodes))
+	}
+	perCarrier := map[string]int{}
+	for _, node := range nodes {
+		if node.Carrier == "" || node.Region != "China" {
+			t.Fatalf("unexpected isp node %+v", node)
+		}
+		if node.TrafficBytes <= 0 {
+			t.Fatalf("isp node %s missing traffic budget", node.ID)
+		}
+		perCarrier[node.Carrier]++
+	}
+	for _, carrier := range CarrierOrder() {
+		if perCarrier[carrier] != 4 {
+			t.Fatalf("carrier %s node count = %d, want 4", carrier, perCarrier[carrier])
+		}
+	}
+	// isp_download nodes must not leak into the generic download node list.
+	for _, node := range DefaultNodes() {
+		if node.Carrier == "telecom" || node.Carrier == "unicom" || node.Carrier == "mobile" {
+			t.Fatalf("isp node %s leaked into DefaultNodes()", node.ID)
+		}
+	}
+}
+
+func TestOoklaCarrierServersCoverAllCarriers(t *testing.T) {
+	servers := OoklaCarrierServers()
+	for _, carrier := range CarrierOrder() {
+		ids := servers[carrier]
+		if len(ids) == 0 {
+			t.Fatalf("carrier %s has no Ookla server IDs", carrier)
+		}
+		for _, id := range ids {
+			if id <= 0 {
+				t.Fatalf("carrier %s has invalid server ID %d", carrier, id)
+			}
+		}
+	}
+}

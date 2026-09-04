@@ -474,7 +474,7 @@ func NetworkDefinitionsWithManifest(iperfHosts []string, manifest nodecatalog.Ma
 		}},
 		Definition{Name: "Net Multi-Thread Download", Category: bench.CategoryNetwork, Description: "Concurrent download (4 threads, Cloudflare)", Factory: func(string) bench.Workload { return netio.NewMultiDownloadWorkload() }},
 		Definition{Name: "Net Upload", Category: bench.CategoryNetwork, Description: "Upload speed via Cloudflare (50MB)", Factory: func(string) bench.Workload { return netio.NewUploadWorkload() }},
-		Definition{Name: "Net Streaming Unlock", Category: bench.CategoryNetwork, Description: "Netflix / Disney+ / YouTube / ChatGPT / TikTok / Prime detection", Factory: func(string) bench.Workload { return netio.NewStreamingUnlockWorkload() }},
+		Definition{Name: "Net Streaming Unlock", Category: bench.CategoryNetwork, Description: "UnlockTests streaming / AI platform unlock detection", Factory: func(string) bench.Workload { return netio.NewStreamingUnlockWorkload() }},
 		Definition{Name: "Net Traceroute", Category: bench.CategoryNetwork, Description: "TCP traceroute to versioned China carrier, CERNET, and CSTNET targets", Factory: func(string) bench.Workload {
 			return netio.NewTracerouteWorkloadWithManifest(manifest, ipFamily)
 		}},

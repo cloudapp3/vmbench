@@ -53,6 +53,60 @@ func SpeedNodesFromManifest(manifest nodecatalog.Manifest) []SpeedNode {
 	return out
 }
 
+// DefaultISPDownloadNodes returns the embedded China carrier speedtest.cn
+// endpoints (kind isp_download).
+func DefaultISPDownloadNodes() []SpeedNode {
+	manifest, err := nodecatalog.Embedded()
+	if err != nil {
+		return nil
+	}
+	return ISPDownloadNodesFromManifest(manifest)
+}
+
+// ISPDownloadNodesFromManifest maps China carrier download nodes from a
+// selected catalog. Node order follows manifest order.
+func ISPDownloadNodesFromManifest(manifest nodecatalog.Manifest) []SpeedNode {
+	nodes := manifest.Select(nodecatalog.Filter{Kind: nodecatalog.KindISPDownload})
+	out := make([]SpeedNode, 0, len(nodes))
+	for _, node := range nodes {
+		out = append(out, SpeedNode{
+			ID:           node.ID,
+			Name:         node.Name,
+			Region:       node.Region,
+			City:         node.City,
+			Carrier:      node.Carrier,
+			IPFamily:     node.IPFamily,
+			Protocol:     node.Protocol,
+			TestURL:      node.URL,
+			TrafficBytes: node.TrafficBytes,
+			Source:       node.Source,
+		})
+	}
+	return out
+}
+
+// ooklaCarrierServers lists speedtest.net server IDs per China carrier from
+// the spiritLHLS/speedtest.net-CN-ID dataset (MIT, refreshed daily upstream).
+// The first entry is preferred; the rest are fallbacks for one provider run.
+var ooklaCarrierServers = map[string][]int{
+	"telecom": {5396, 36663, 59387}, // Suzhou5G, Zhenjiang5G, Ningbo
+	"unicom":  {24447, 43752},       // Shanghai5G, Beijing
+	"mobile":  {16204},              // Suzhou
+}
+
+// OoklaCarrierServers returns the carrier -> server-ID mapping used by the
+// speedtest_isp provider (Ookla CLI -s selection).
+func OoklaCarrierServers() map[string][]int {
+	out := make(map[string][]int, len(ooklaCarrierServers))
+	for carrier, ids := range ooklaCarrierServers {
+		out[carrier] = append([]int(nil), ids...)
+	}
+	return out
+}
+
+// CarrierOrder returns the canonical China carrier order.
+func CarrierOrder() []string { return []string{"telecom", "unicom", "mobile"} }
+
 // TraceTargetsFromManifest maps route-capable nodes for one IP family.
 func TraceTargetsFromManifest(manifest nodecatalog.Manifest, ipFamily string) []TraceTarget {
 	nodes := manifest.Select(nodecatalog.Filter{Kind: nodecatalog.KindRoute})

@@ -475,6 +475,10 @@ func mailResultCard(r suite.SuiteReport, width int) string {
 	}.Render()
 }
 
+// mediaCardLimit caps rendered media rows so a full-platform run stays
+// readable inside the TUI card.
+const mediaCardLimit = 24
+
 func mediaResultCard(r suite.SuiteReport, width int) string {
 	t := theme.Active
 	if r.Media.Result == nil || len(r.Media.Result.Items) == 0 {
@@ -482,10 +486,18 @@ func mediaResultCard(r suite.SuiteReport, width int) string {
 	}
 	var lines []string
 	for _, item := range r.Media.Result.Items {
+		if len(lines) >= mediaCardLimit {
+			lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).
+				Render(fmt.Sprintf("... +%d more (see JSON/HTML report)", len(r.Media.Result.Items)-mediaCardLimit)))
+			break
+		}
 		name := firstStr(item.Title, item.ID)
 		nameStyled := lipgloss.NewStyle().Foreground(t.Fg).Width(28).Render(truncStr(name, 28))
-		ok := strings.EqualFold(item.Status, "yes") || strings.EqualFold(item.Status, "ok") || strings.EqualFold(item.Status, "unlock")
+		ok := strings.EqualFold(item.Status, "available")
 		status := tuiCellStatus(ok)
+		if item.RawStatus == "Restricted" {
+			status = lipgloss.NewStyle().Foreground(t.Warning).Render("~")
+		}
 		region := lipgloss.NewStyle().Foreground(t.Muted).Render(firstStr(item.Region, ""))
 		lines = append(lines, nameStyled+" "+status+"  "+region)
 	}
