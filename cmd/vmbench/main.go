@@ -754,6 +754,50 @@ func writeSysinfoConsole(w io.Writer, info sysinfo.SystemInfo, warnings []string
 	}
 	fmt.Fprintf(w, "  Go       : %s (%s/%s)\n", runtime.Version(), runtime.GOOS, runtime.GOARCH)
 
+	if platform := info.Platform; platformHasEvidence(platform) {
+		fmt.Fprintf(w, "\n%s\n  Platform Diagnostics\n%s\n", line, line)
+		if platform.UptimeSeconds > 0 {
+			fmt.Fprintf(w, "  Uptime   : %s\n", formatDuration(platform.UptimeSeconds))
+		}
+		if platform.Load1 > 0 || platform.Load5 > 0 || platform.Load15 > 0 {
+			fmt.Fprintf(w, "  Load     : %.2f %.2f %.2f\n", platform.Load1, platform.Load5, platform.Load15)
+		}
+		if platform.Timezone != "" {
+			fmt.Fprintf(w, "  Timezone : %s\n", platform.Timezone)
+		}
+		if platform.SwapTotalBytes > 0 {
+			fmt.Fprintf(w, "  Swap     : %s used of %s\n", formatBytes(platform.SwapUsedBytes), formatBytes(platform.SwapTotalBytes))
+		}
+		if platform.VirtioBalloon != "" {
+			fmt.Fprintf(w, "  Balloon  : %s\n", platform.VirtioBalloon)
+		}
+		if platform.KSM != "" {
+			if platform.KSMPagesShared > 0 {
+				fmt.Fprintf(w, "  KSM      : %s (%d pages shared)\n", platform.KSM, platform.KSMPagesShared)
+			} else {
+				fmt.Fprintf(w, "  KSM      : %s\n", platform.KSM)
+			}
+		}
+		if platform.TCPCongestion != "" || platform.TCPQDisc != "" {
+			fmt.Fprintf(w, "  TCP      : %s / %s\n", firstNonEmpty(platform.TCPCongestion, "-"), firstNonEmpty(platform.TCPQDisc, "-"))
+		}
+		if platform.TCPRmemMax > 0 {
+			fmt.Fprintf(w, "  TCP rmem : %s / %s / %s\n", formatBytesInt64(platform.TCPRmemMin), formatBytesInt64(platform.TCPRmemDefault), formatBytesInt64(platform.TCPRmemMax))
+		}
+		if platform.TCPWmemMax > 0 {
+			fmt.Fprintf(w, "  TCP wmem : %s / %s / %s\n", formatBytesInt64(platform.TCPWmemMin), formatBytesInt64(platform.TCPWmemDefault), formatBytesInt64(platform.TCPWmemMax))
+		}
+		if platform.NestedVirtualization != "" {
+			fmt.Fprintf(w, "  Nested virt : %s\n", platform.NestedVirtualization)
+		}
+		if platform.HugePagesTotal > 0 {
+			fmt.Fprintf(w, "  HugePages: %d total / %d free (%s each)\n", platform.HugePagesTotal, platform.HugePagesFree, formatBytesInt64(platform.HugePageSizeBytes))
+		}
+		if platform.BootDisk != "" {
+			fmt.Fprintf(w, "  Boot disk: %s\n", platform.BootDisk)
+		}
+	}
+
 	if len(info.Disks) > 0 {
 		fmt.Fprintf(w, "\n%s\n  Disks\n%s\n", line, line)
 		tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
@@ -914,6 +958,39 @@ func formatBytes(value uint64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %ciB", float64(value)/float64(div), "KMGTPE"[exp])
+}
+
+// formatBytesInt64 adapts signed byte counters for formatBytes.
+func formatBytesInt64(value int64) string {
+	if value <= 0 {
+		return "-"
+	}
+	return formatBytes(uint64(value))
+}
+
+// formatDuration renders an uptime in days/hours/minutes.
+func formatDuration(seconds uint64) string {
+	if seconds == 0 {
+		return "-"
+	}
+	days := seconds / 86400
+	hours := (seconds % 86400) / 3600
+	minutes := (seconds % 3600) / 60
+	switch {
+	case days > 0:
+		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
+	case hours > 0:
+		return fmt.Sprintf("%dh %dm", hours, minutes)
+	default:
+		return fmt.Sprintf("%dm", minutes)
+	}
+}
+
+// platformHasEvidence reports whether any platform diagnostic is populated.
+func platformHasEvidence(p sysinfo.PlatformDiagnostics) bool {
+	return p.UptimeSeconds > 0 || p.Load1 > 0 || p.Timezone != "" || p.SwapTotalBytes > 0 ||
+		p.VirtioBalloon != "" || p.KSM != "" || p.TCPCongestion != "" || p.TCPRmemMax > 0 ||
+		p.NestedVirtualization != "" || p.HugePagesTotal > 0 || p.BootDisk != ""
 }
 
 func parseHosts(s string) []string {

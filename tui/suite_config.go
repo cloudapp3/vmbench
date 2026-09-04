@@ -24,6 +24,8 @@ const (
 	fieldHardwareTools
 	fieldSpeedProviders
 	fieldRoutePresets
+	fieldMediaSets
+	fieldIPSources
 	fieldAdvanced
 	fieldStart
 )
@@ -43,6 +45,12 @@ type suiteConfigState struct {
 	routePresets    map[string]bool
 	routeCursor     int
 	routeIDs        []string
+	mediaSets       map[string]bool
+	mediaCursor     int
+	mediaIDs        []string
+	ipSources       map[string]bool
+	ipSourceCursor  int
+	ipSourceIDs     []string
 	runtimeCursor   int
 	iterations      int
 	ipVersion       string
@@ -77,6 +85,14 @@ func newSuiteConfigState() suiteConfigState {
 	for _, id := range suite.DefaultRoutePresets() {
 		route[id] = true
 	}
+	media := map[string]bool{}
+	for _, id := range suite.MediaSets() {
+		media[id] = id == suite.DefaultMediaSet()
+	}
+	ipSources := map[string]bool{}
+	for _, id := range suite.IPSourceIDs() {
+		ipSources[id] = id == suite.IPSourceBuiltin
+	}
 	hardwareIDs := catalog.HardwareToolIDs()
 	hardware := map[string]bool{}
 	for _, id := range catalog.DefaultHardwareTools() {
@@ -91,6 +107,10 @@ func newSuiteConfigState() suiteConfigState {
 		speedIDs:       speedIDs,
 		routePresets:   route,
 		routeIDs:       routeIDs,
+		mediaSets:      media,
+		mediaIDs:       suite.MediaSets(),
+		ipSources:      ipSources,
+		ipSourceIDs:    suite.IPSourceIDs(),
 		iterations:     3,
 		ipVersion:      "v4",
 		timeoutIndex:   1,
@@ -148,6 +168,24 @@ func (s *suiteConfigState) sectionToggle(i int) {
 	}
 }
 
+// toggleMediaSet flips one media set selection. Selecting "all" clears the
+// region picks; picking any region clears "all" so the value stays meaningful.
+func (s *suiteConfigState) toggleMediaSet(id string) {
+	s.mediaSets[id] = !s.mediaSets[id]
+	if !s.mediaSets[id] {
+		return
+	}
+	if id == suite.DefaultMediaSet() {
+		for _, other := range s.mediaIDs {
+			if other != id {
+				s.mediaSets[other] = false
+			}
+		}
+		return
+	}
+	s.mediaSets[suite.DefaultMediaSet()] = false
+}
+
 func (s *suiteConfigState) applyPreset() {
 	if s.preset == 0 {
 		return
@@ -178,6 +216,18 @@ func (s suiteConfigState) buildOptions(iperfHost string) suite.Options {
 			routes = append(routes, id)
 		}
 	}
+	var mediaSets []string
+	for _, id := range s.mediaIDs {
+		if s.mediaSets[id] {
+			mediaSets = append(mediaSets, id)
+		}
+	}
+	var ipSources []string
+	for _, id := range s.ipSourceIDs {
+		if s.ipSources[id] {
+			ipSources = append(ipSources, id)
+		}
+	}
 	var hardwareTools []string
 	for _, id := range s.hardwareIDs {
 		if s.hardwareTools[id] {
@@ -196,6 +246,8 @@ func (s suiteConfigState) buildOptions(iperfHost string) suite.Options {
 		RoutePresets:    routes,
 		HardwareTools:   hardwareTools,
 		IPVersion:       s.ipVersion,
+		MediaSet:        strings.Join(mediaSets, ","),
+		IPSources:       ipSources,
 		Timeout:         timeout,
 		CatalogSource:   strings.TrimSpace(s.catalogSource),
 		CatalogRevision: strings.TrimSpace(s.catalogRevision),
@@ -247,6 +299,14 @@ func updateSuiteConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if s.routeCursor > 0 {
 				s.routeCursor--
 			}
+		case fieldMediaSets:
+			if s.mediaCursor > 0 {
+				s.mediaCursor--
+			}
+		case fieldIPSources:
+			if s.ipSourceCursor > 0 {
+				s.ipSourceCursor--
+			}
 		case fieldRuntime:
 			if s.runtimeCursor > 0 {
 				s.runtimeCursor--
@@ -280,6 +340,14 @@ func updateSuiteConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if s.routeCursor < len(s.routeIDs)-1 {
 				s.routeCursor++
 			}
+		case fieldMediaSets:
+			if s.mediaCursor < len(s.mediaIDs)-1 {
+				s.mediaCursor++
+			}
+		case fieldIPSources:
+			if s.ipSourceCursor < len(s.ipSourceIDs)-1 {
+				s.ipSourceCursor++
+			}
 		case fieldRuntime:
 			if s.runtimeCursor < 2 {
 				s.runtimeCursor++
@@ -304,6 +372,12 @@ func updateSuiteConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case fieldRoutePresets:
 			id := s.routeIDs[s.routeCursor]
 			s.routePresets[id] = !s.routePresets[id]
+		case fieldMediaSets:
+			id := s.mediaIDs[s.mediaCursor]
+			s.toggleMediaSet(id)
+		case fieldIPSources:
+			id := s.ipSourceIDs[s.ipSourceCursor]
+			s.ipSources[id] = !s.ipSources[id]
 		case fieldRuntime:
 			s.cycleRuntimeValue()
 		case fieldHardwareTools:
@@ -441,6 +515,8 @@ func viewSuiteConfig(m Model) string {
 	hardwareCard := suiteFieldHardware(s, cardWidth, s.field == fieldHardwareTools)
 	speedCard := suiteFieldSpeed(s, cardWidth, s.field == fieldSpeedProviders)
 	routeCard := suiteFieldRoute(s, cardWidth, s.field == fieldRoutePresets)
+	mediaCard := suiteFieldMediaSets(s, cardWidth, s.field == fieldMediaSets)
+	ipSourceCard := suiteFieldIPSources(s, cardWidth, s.field == fieldIPSources)
 	advancedCard := suiteFieldAdvanced(s, cardWidth, s.field == fieldAdvanced)
 	startBtn := suiteStartButton(s, width-4, s.field == fieldStart)
 
@@ -454,11 +530,12 @@ func viewSuiteConfig(m Model) string {
 			lipgloss.JoinHorizontal(lipgloss.Top, presetCard, "  ", runtimeCard),
 			lipgloss.JoinHorizontal(lipgloss.Top, sectionsCard, "  ", hardwareCard),
 			lipgloss.JoinHorizontal(lipgloss.Top, speedCard, "  ", routeCard),
+			lipgloss.JoinHorizontal(lipgloss.Top, mediaCard, "  ", ipSourceCard),
 			advancedCard,
 		}
 		fields = strings.Join(rows, "\n")
 	} else {
-		fields = strings.Join([]string{presetCard, runtimeCard, sectionsCard, hardwareCard, speedCard, routeCard, advancedCard}, "\n")
+		fields = strings.Join([]string{presetCard, runtimeCard, sectionsCard, hardwareCard, speedCard, routeCard, mediaCard, ipSourceCard, advancedCard}, "\n")
 	}
 	parts := []string{title, desc, "", fields, "", startBtn, "", help}
 	if m.toast.Active() {
@@ -497,6 +574,10 @@ func viewSuiteConfigCompact(m Model, title string) string {
 		field = suiteFieldSpeed(s, fieldWidth, true)
 	case fieldRoutePresets:
 		field = suiteFieldRoute(s, fieldWidth, true)
+	case fieldMediaSets:
+		field = suiteFieldMediaSets(s, fieldWidth, true)
+	case fieldIPSources:
+		field = suiteFieldIPSources(s, fieldWidth, true)
 	case fieldAdvanced:
 		field = suiteFieldAdvanced(s, fieldWidth, true)
 	default:
@@ -689,6 +770,66 @@ func suiteFieldRoute(s suiteConfigState, width int, focus bool) string {
 		Title:   "China Route Presets",
 		Body:    body,
 		Accent:  t.Info,
+		Width:   width,
+		Focused: focus,
+	}.Render()
+}
+
+func suiteFieldMediaSets(s suiteConfigState, width int, focus bool) string {
+	t := theme.Active
+	var pills []string
+	for i, id := range s.mediaIDs {
+		on := s.mediaSets[id]
+		icon := "☐"
+		if on {
+			icon = "☑"
+		}
+		var st lipgloss.Style
+		switch {
+		case i == s.mediaCursor && focus:
+			st = lipgloss.NewStyle().Bold(true).Foreground(t.Bg).Background(t.Primary).Padding(0, 1)
+		case on:
+			st = lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Padding(0, 1)
+		default:
+			st = lipgloss.NewStyle().Foreground(t.Muted).Padding(0, 1)
+		}
+		pills = append(pills, st.Render(icon+" "+id))
+	}
+	body := strings.Join(pills, " ")
+	return comp.Card{
+		Title:   "Media Sets",
+		Body:    body,
+		Accent:  t.Primary,
+		Width:   width,
+		Focused: focus,
+	}.Render()
+}
+
+func suiteFieldIPSources(s suiteConfigState, width int, focus bool) string {
+	t := theme.Active
+	var pills []string
+	for i, id := range s.ipSourceIDs {
+		on := s.ipSources[id]
+		icon := "☐"
+		if on {
+			icon = "☑"
+		}
+		var st lipgloss.Style
+		switch {
+		case i == s.ipSourceCursor && focus:
+			st = lipgloss.NewStyle().Bold(true).Foreground(t.Bg).Background(t.Warning).Padding(0, 1)
+		case on:
+			st = lipgloss.NewStyle().Bold(true).Foreground(t.Warning).Padding(0, 1)
+		default:
+			st = lipgloss.NewStyle().Foreground(t.Muted).Padding(0, 1)
+		}
+		pills = append(pills, st.Render(icon+" "+id))
+	}
+	body := strings.Join(pills, " ")
+	return comp.Card{
+		Title:   "IP Quality Sources",
+		Body:    body,
+		Accent:  t.Warning,
 		Width:   width,
 		Focused: focus,
 	}.Render()

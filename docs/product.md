@@ -16,8 +16,8 @@ vmbench 是一款跨平台 VPS 测评工具，用 Go 编写，强调：
 ## 核心能力
 
 - **硬件测评**：CPU / 内存 / 磁盘
-- **网络身份**：虚拟化、公网 IPv4/IPv6、ASN/provider/location、保守 NAT 证据
-- **网络诊断**：版本化节点上的 route（含回程线路类型 163/9929/4837/CN2/CTGNET/CMIN2/CMI 判定）、ping、speed，以及网站/Telegram 可达性
+- **网络身份**：虚拟化、公网 IPv4/IPv6、ASN/provider/location、保守 NAT 证据、STUN NAT 类型（Full Cone/Restricted/Symmetric、hairpin、端口保持）、IP 的 BGP/RDAP 归属（注册网段/RIR/注册日期、上游/对等/IXP 与 Tier 1 标注）
+- **网络诊断**：版本化节点上的 route（含回程线路类型 163/9929/4837/CN2/CTGNET/CMIN2/CMI 判定与逐跳 ASN 标注）、ping、speed，以及网站/Telegram 可达性
 - **IP 质量**：IP reputation / DNSBL / 邮件端口 / ipapi.is 归属交叉验证，opt-in 的 securityCheck 外部 18 库视角
 - **流媒体检测**：UnlockTests 全平台 200+ 流媒体/AI 服务解锁状态（可按地区子集运行）
 - **速度测试**：Cloudflare / Speedtest.net / Speedtest.cn / iperf3，以及三网（电信/联通/移动）provider

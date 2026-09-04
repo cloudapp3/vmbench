@@ -94,7 +94,7 @@ Go TUI 支持交互式视图切换：
 
 Go SuiteConfig 初始选择 `quick` preset，并实际启用 `hardware,network_info,speed,ip_quality`；speed provider 默认只选 Cloudflare。用户切换 preset 后，section 集合同步更新。
 
-TUI 不维护另一套隐式默认值，而是构造与 CLI/MCP 相同的规范化 Suite 配置。可配置字段覆盖：preset/sections、iterations、timeout、IP version、hardware tools、speed providers、iperf hosts、route selection、catalog source 和 catalog revision。catalog source 支持 `embedded` / `auto` / 显式 path；revision pin 不匹配时停在运行前错误状态。
+TUI 不维护另一套隐式默认值，而是构造与 CLI/MCP 相同的规范化 Suite 配置。可配置字段覆盖：preset/sections、iterations、timeout、IP version、hardware tools、speed providers（含 `china_isp` / `speedtest_isp` 三网 provider）、iperf hosts、route selection、media sets（默认 `all`，与地区选择互斥：选 `all` 清空地区、选任一地区取消 `all`）、IP quality sources（默认 `builtin`，`securitycheck` 为 opt-in 多选）、catalog source 和 catalog revision。catalog source 支持 `embedded` / `auto` / 显式 path；revision pin 不匹配时停在运行前错误状态。
 
 Go TUI 在终端低于 40 行时使用紧凑 Suite 布局：Config 只展开当前聚焦字段，Running 与 Results 对每个 section 使用单行状态摘要；在 `80x24` 下页面宽高均受终端边界约束，字段导航、启动和取消仍可操作。更高终端继续显示完整卡片与详细结果。
 

@@ -109,7 +109,19 @@ func ClassifyTraceResults(ctx context.Context, results []TraceProbeResult) {
 			if len(asns) > 0 {
 				results[index].ObservedASNs = append([]string(nil), asns...)
 			}
+			annotateHopASNs(&results[index])
 		}
+	}
+}
+
+// annotateHopASNs labels each responding hop with a China carrier backbone
+// ASN where the address matches a known carrier prefix.
+func annotateHopASNs(result *TraceProbeResult) {
+	for i := range result.Hops {
+		if result.Hops[i].Timeout || result.Hops[i].IP == "" {
+			continue
+		}
+		result.Hops[i].ASN = HopASN(result.Hops[i].IP)
 	}
 }
 

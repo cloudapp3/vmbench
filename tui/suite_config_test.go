@@ -2,6 +2,7 @@ package tui
 
 import (
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -84,5 +85,63 @@ func TestNewSuiteSectionsIncludesNetworkEvidence(t *testing.T) {
 	sections := newSuiteSections(suite.SectionSelector{NetworkInfo: true, Reachability: true})
 	if len(sections) != 2 || sections[0].id != suite.SectionNetworkInfo || sections[1].id != suite.SectionReachability {
 		t.Fatalf("newSuiteSections() = %+v", sections)
+	}
+}
+
+func TestNewSuiteConfigStateDefaultsForNewFields(t *testing.T) {
+	state := newSuiteConfigState()
+	if !state.mediaSets[suite.DefaultMediaSet()] {
+		t.Errorf("default media set %s should be selected", suite.DefaultMediaSet())
+	}
+	if !state.ipSources[suite.IPSourceBuiltin] {
+		t.Error("builtin IP source should be selected by default")
+	}
+	if state.ipSources[suite.IPSourceSecurityCheck] {
+		t.Error("securitycheck should be opt-in only")
+	}
+	for _, id := range []string{suite.SpeedProviderChinaISP, suite.SpeedProviderSpeedtestISP} {
+		if !slices.Contains(state.speedIDs, id) {
+			t.Errorf("speed provider %s missing from TUI list", id)
+		}
+	}
+}
+
+func TestToggleMediaSetMutualExclusion(t *testing.T) {
+	state := newSuiteConfigState()
+	state.toggleMediaSet("jp")
+	if state.mediaSets[suite.DefaultMediaSet()] {
+		t.Error("selecting a region must clear the all-platform set")
+	}
+	if !state.mediaSets["jp"] {
+		t.Fatal("jp should stay selected")
+	}
+	state.toggleMediaSet("kr")
+	if !state.mediaSets["jp"] || !state.mediaSets["kr"] {
+		t.Error("region sets must combine")
+	}
+	state.toggleMediaSet(suite.DefaultMediaSet())
+	for _, id := range state.mediaIDs {
+		if id != suite.DefaultMediaSet() && state.mediaSets[id] {
+			t.Errorf("selecting all must clear %s", id)
+		}
+	}
+}
+
+func TestBuildOptionsCarriesMediaSetAndIPSources(t *testing.T) {
+	state := newSuiteConfigState()
+	state.sections = suite.SectionSelector{Media: true, IPQuality: true}
+	state.toggleMediaSet("jp")
+	state.toggleMediaSet("kr")
+	state.ipSources[suite.IPSourceSecurityCheck] = true
+
+	norm, err := suite.NormalizeOptions(state.buildOptions(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if norm.MediaSet != "jp,kr" {
+		t.Fatalf("normalized MediaSet = %q, want jp,kr", norm.MediaSet)
+	}
+	if strings.Join(norm.IPSources, ",") != "builtin,securitycheck" {
+		t.Fatalf("normalized IPSources = %v", norm.IPSources)
 	}
 }

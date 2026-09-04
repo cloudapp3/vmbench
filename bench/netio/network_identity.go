@@ -74,6 +74,10 @@ type NetworkIdentityResult struct {
 	PublicIPv4           *PublicIPIdentity               `json:"public_ipv4,omitempty"`
 	PublicIPv6           *PublicIPIdentity               `json:"public_ipv6,omitempty"`
 	NAT                  []NATHeuristic                  `json:"nat,omitempty"`
+	STUNNAT              *NATProbeEvidence               `json:"stun_nat,omitempty"`
+	IPBGP                *IPBGPEvidence                  `json:"ip_bgp,omitempty"`
+	CIDRNeighbors        *CIDRNeighborsEvidence          `json:"cidr_neighbors,omitempty"`
+	IPv6Subnet           *IPv6SubnetInfo                 `json:"ipv6_subnet,omitempty"`
 	Providers            []NetworkIdentityProviderResult `json:"providers"`
 }
 
@@ -89,6 +93,10 @@ type networkIdentityDependencies struct {
 	localAddresses func() ([]LocalGlobalAddress, []error)
 	publicIP       func(context.Context, string) (string, error)
 	metadata       func(context.Context, string) (publicIPMetadata, error)
+	stunNAT        func(context.Context, string) *NATProbeEvidence
+	ipBGP          func(context.Context, string) *IPBGPEvidence
+	cidrNeighbors  func(context.Context, string) *CIDRNeighborsEvidence
+	ipv6Subnet     func(context.Context, string) *IPv6SubnetInfo
 }
 
 type identityFamilyResult struct {
@@ -104,6 +112,10 @@ func ProbeNetworkIdentity(ctx context.Context, ipVersion string) (*NetworkIdenti
 		localAddresses: collectLocalGlobalAddresses,
 		publicIP:       queryPublicIP,
 		metadata:       queryPublicIPMetadata,
+		stunNAT:        ProbeNATType,
+		ipBGP:          ProbeIPBGP,
+		cidrNeighbors:  ProbeCIDRNeighbors,
+		ipv6Subnet:     ProbeIPv6Subnet,
 	})
 }
 
@@ -173,6 +185,29 @@ func probeNetworkIdentity(ctx context.Context, ipVersion string, deps networkIde
 		result.NAT = append(result.NAT, buildNATHeuristic(family, familyResult.identity, localAddresses, localStatus))
 	}
 
+	// STUN NAT classification is supplementary evidence: failures surface as
+	// a structured status and never fail the identity probe.
+	if deps.stunNAT != nil {
+		result.STUNNAT = deps.stunNAT(ctx, ipVersion)
+	}
+
+	// RDAP/BGP ownership and upstream view for the primary public address;
+	// also supplementary and error-tolerant.
+	if deps.ipBGP != nil {
+		if identity := primaryPublicIdentity(result); identity != nil {
+			result.IPBGP = deps.ipBGP(ctx, identity.IP)
+		}
+	}
+
+	// Active-neighbor estimates for the local /24 and announced CIDR, plus
+	// the on-link IPv6 prefix length; both supplementary.
+	if deps.cidrNeighbors != nil && result.PublicIPv4 != nil {
+		result.CIDRNeighbors = deps.cidrNeighbors(ctx, result.PublicIPv4.IP)
+	}
+	if deps.ipv6Subnet != nil && result.PublicIPv6 != nil {
+		result.IPv6Subnet = deps.ipv6Subnet(ctx, result.PublicIPv6.IP)
+	}
+
 	if err := ctx.Err(); err != nil {
 		return result, fmt.Errorf("network identity: %w", err)
 	}
@@ -180,6 +215,18 @@ func probeNetworkIdentity(ctx context.Context, ipVersion string, deps networkIde
 		return result, errors.New("network identity: no requested public IP could be observed")
 	}
 	return result, nil
+}
+
+// primaryPublicIdentity prefers the observed IPv4 identity and falls back to
+// IPv6, mirroring the v4-first convention of the other network probes.
+func primaryPublicIdentity(result *NetworkIdentityResult) *PublicIPIdentity {
+	if result == nil {
+		return nil
+	}
+	if result.PublicIPv4 != nil {
+		return result.PublicIPv4
+	}
+	return result.PublicIPv6
 }
 
 func probeIdentityFamily(ctx context.Context, family string, deps networkIdentityDependencies) identityFamilyResult {

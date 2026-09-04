@@ -68,13 +68,14 @@ type VirtualizationInfo struct {
 
 // SystemInfo aggregates all detected host information.
 type SystemInfo struct {
-	CPU            CPUInfo            `json:"cpu"`
-	Memory         MemoryInfo         `json:"memory"`
-	OS             OSInfo             `json:"os"`
-	GPU            *GPUInfo           `json:"gpu,omitempty"`
-	Disks          []DiskInfo         `json:"disks,omitempty"`
-	Network        NetworkInfo        `json:"network"`
-	Virtualization VirtualizationInfo `json:"virtualization"`
+	CPU            CPUInfo             `json:"cpu"`
+	Memory         MemoryInfo          `json:"memory"`
+	OS             OSInfo              `json:"os"`
+	GPU            *GPUInfo            `json:"gpu,omitempty"`
+	Disks          []DiskInfo          `json:"disks,omitempty"`
+	Network        NetworkInfo         `json:"network"`
+	Virtualization VirtualizationInfo  `json:"virtualization"`
+	Platform       PlatformDiagnostics `json:"platform,omitempty"`
 }
 
 // Collect gathers the best-effort system information for the current host.
@@ -108,6 +109,8 @@ func Collect(ctx context.Context) (SystemInfo, []string) {
 	virtualization, virtualizationWarnings := collectVirtualizationInfo(ctx)
 	warnings = append(warnings, virtualizationWarnings...)
 
+	platform := collectPlatformDiagnostics(ctx)
+
 	return SystemInfo{
 		CPU:            cpuInfo,
 		Memory:         memoryInfo,
@@ -116,6 +119,7 @@ func Collect(ctx context.Context) (SystemInfo, []string) {
 		Disks:          disks,
 		Network:        network,
 		Virtualization: virtualization,
+		Platform:       platform,
 	}, compactWarnings(warnings)
 }
 

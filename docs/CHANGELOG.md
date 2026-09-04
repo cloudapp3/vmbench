@@ -1,5 +1,21 @@
 # VMBench Changelog
 
+## Unreleased
+
+### 第三批：TUI 配置补齐 + IPv6 子网 / CIDR 活跃邻居
+
+- TUI SuiteConfig 新增 `Media Sets`（默认 `all`，与地区互斥切换）与 `IP Quality Sources`（默认 `builtin`，`securitycheck` opt-in）两个多选字段；`china_isp` / `speedtest_isp` 三网 provider 已随动态 provider 列表可选。字段进入宽/紧凑两种布局并通过 80x24 约束，CLI/TUI/MCP 的 Suite 配置契约保持一致。
+- `network_info` 新增 `ipv6_subnet`：通过 basics（Apache-2.0）的 RA / ip 命令 / 配置文件三级 fallback 探测本机公网 IPv6 的 on-link 前缀长度（实测 /112），只报原始值不做分配建议。
+- `network_info` 新增 `cidr_neighbors`：按 ecs 同源方法（basics baseinfo 解析 bgp.tools 前缀 PNG 像素比例）估算本机 /24 子网与宣告 CIDR 的活跃邻居数/总数；bgp.tools 对部分网络返回 403 或非 PNG 响应时结构化降级为 error 证据。
+- 新增直接依赖 `oneclickvirt/basics`（Apache-2.0，仅 `network/baseinfo` 与 `network/ipv6` 子包）。
+
+### 对齐 ecs 的第二批能力（NAT 类型 / BGP 归属 / 逐跳 ASN / 平台诊断）
+
+- `network_info` 新增 STUN NAT 类型完整检测：接入 Apache-2.0 的 [gostun](https://github.com/oneclickvirt/gostun)，输出 Full Cone / Restricted Cone / Port Restricted Cone / Symmetric 分类、mapping/filtering 行为、端口保持与 hairpin 回连能力、逐服务器证据（`stun_nat` 字段）；UDP 受限环境记录结构化错误，原有保守 NAT 启发式证据保留。
+- `network_info` 新增 IP 的 BGP/RDAP 归属视图（`ip_bgp` 字段）：通过 backtrace/bgptools 输出宣告 ASN、注册网段/范围、RIR/注册日期/geofeed，以及上游/对等/IXP 关系（RIPEstat + PeeringDB），Tier 1 上游以公开 transit-free 名单标注数量；查询失败结构化降级。
+- `route` 结果逐跳新增 `asn` 标注：IPv4 按运营商骨干网段精确匹配（含 223.118.32.0/21 CMIN2 特例），IPv6 使用内嵌的 AS prefix 快照（数据来自 oneclickvirt/backtrace v0.0.21，Apache-2.0，见 `bench/netio/asnprefixes/README.md`）；HTML hop 表新增 ASN 列。
+- `sysinfo` 新增 Platform Diagnostics（自研 /proc+/sys 读取，无新依赖）：uptime、load 1/5/15、时区（/etc/localtime）、swap 用量、virtio 气球驱动、KSM（含 pages_shared）、TCP 拥塞控制/队列规则与 rmem/wmem 三元组、嵌套虚拟化 CPU flags（vmx/svm/masked）、HugePages、启动盘；Linux 实测、其他平台留空不报错，`vmbench sysinfo` 控制台与 Suite JSON 的 `system.platform` 同步输出。
+
 ## v0.3.0（2026-09-04）
 
 ### 对齐 ecs 的四大能力（流媒体 / IP 质量 / 回程线路 / 三网测速）

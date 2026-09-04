@@ -12,6 +12,9 @@
 | 系统信息 | gopsutil |
 | 流媒体解锁 | oneclickvirt/UnlockTests（Apache-2.0，`executor.RunStructured` 结构化输出） |
 | 回程线路分类 | oneclickvirt/backtrace（Apache-2.0，`bk.RunRouteReport` + 内置 AS prefix 数据） |
+| BGP/RDAP 归属 | oneclickvirt/backtrace/bgptools（Apache-2.0，RIPEstat + PeeringDB 关系查询） |
+| NAT 类型 | oneclickvirt/gostun（Apache-2.0，STUN RFC3489/5389 行为探测） |
+| 平台深度信息 | 自研 /proc+/sys 读取（uptime/load/swap/balloon/KSM/TCP 调优/嵌套虚拟化/HugePages），无新依赖 |
 | 报告 | Console / JSON / HTML |
 | MCP Server | 标准库 JSON-RPC over stdio，暴露给大模型客户端 |
 
@@ -67,7 +70,7 @@ cmd/vmbench/mcp.go
 - 不新增第三方依赖，避免扩大 release 体积和供应链风险。
 - stdout 只写 JSON-RPC response；stderr 用于 server 诊断。
 - tool input schema 使用 enum 限定 section、preset、hardware tool 和 speed provider。
-- CLI、TUI、MCP 复用同一 Suite 参数归一化/校验契约；各入口按场景暴露字段子集，TUI 覆盖 iterations、timeout、hardware tools、speed providers、iperf hosts、IP version、sections、route selection、`catalog_source`、`catalog_revision`，CLI/MCP 另可传 filter 等自动化参数。
+- CLI、TUI、MCP 复用同一 Suite 参数归一化/校验契约；各入口按场景暴露字段子集，TUI 覆盖 iterations、timeout、hardware tools、speed providers（含三网 provider）、iperf hosts、IP version、sections、route selection、media sets、IP quality sources、`catalog_source`、`catalog_revision`，CLI/MCP 另可传 filter 等自动化参数。
 - Go TUI 在低于 40 行时为 SuiteConfig、SuiteRunning、SuiteResults 切换紧凑布局；`80x24` 下使用当前字段卡或逐 section 单行摘要，并保持完整卡片布局用于更高终端。
 - catalog source 只接受 `embedded`、`auto` 或显式路径；revision pin 在探测前校验。
 - MCP 默认 `iterations=1`，`vmbench_run` 默认 `scope=hardware`，`vmbench_suite` 默认只跑 `hardware`。

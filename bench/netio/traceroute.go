@@ -59,6 +59,7 @@ func DefaultTraceTargets() []TraceTarget {
 type Hop struct {
 	TTL     int     `json:"ttl"`
 	IP      string  `json:"ip,omitempty"`
+	ASN     string  `json:"asn,omitempty"`
 	RTTMs   float64 `json:"rtt_ms,omitempty"`
 	Timeout bool    `json:"timeout,omitempty"`
 }

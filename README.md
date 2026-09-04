@@ -139,8 +139,8 @@ Sections:
 | Section | Purpose |
 |---------|---------|
 | `hardware` | CPU / memory / disk benchmark report |
-| `network_info` | Virtualization plus public IPv4/IPv6, ASN/provider/location, and conservative NAT evidence |
-| `route` | Versioned China carrier/CERNET/CSTNET IPv4/IPv6 route diagnostics with destination-reached evidence and return-route line classification (163 / 9929 / 4837 / CN2GIA / CN2GT / CTGNET / CMIN2 / CMI) via the Apache-2.0 backtrace library |
+| `network_info` | Virtualization plus public IPv4/IPv6, ASN/provider/location, conservative NAT evidence, STUN NAT classification (Full Cone / Restricted / Symmetric, hairpin, port preservation) via gostun, the BGP/RDAP ownership view (registered prefix, RIR/registration date, upstream/peer/IXP relationships with Tier 1 hints), the on-link IPv6 prefix length, and bgp.tools active-neighbor estimates for the local /24 and announced CIDR |
+| `route` | Versioned China carrier/CERNET/CSTNET IPv4/IPv6 route diagnostics with destination-reached evidence, per-hop carrier ASN labels, and return-route line classification (163 / 9929 / 4837 / CN2GIA / CN2GT / CTGNET / CMIN2 / CMI) via the Apache-2.0 backtrace library |
 | `ping` | Versioned China carrier/CERNET/CSTNET IPv4/IPv6 TCP latency / jitter / loss and connection state |
 | `speed` | Cloudflare / speedtest provider download/upload measurements, optional China carrier (三网) providers |
 | `ip_quality` | IP reputation and risk diagnosis: ip-api.com metadata, ipapi.is ownership cross-check, DNSBL, mail ports, and an opt-in securityCheck external source (18 databases) |
@@ -407,7 +407,9 @@ vmbench/
 | charmbracelet/bubbles | v1.0+ | TUI components (keys) |
 | shirou/gopsutil | v4.25 | System info collection |
 | oneclickvirt/UnlockTests | v0.0.51 | Streaming / AI platform unlock probes (Apache-2.0) |
-| oneclickvirt/backtrace | v0.0.21 | China carrier return-route line classification (Apache-2.0) |
+| oneclickvirt/backtrace | v0.0.21 | China carrier return-route line classification + BGP/RDAP relationships (Apache-2.0) |
+| oneclickvirt/gostun | v0.0.10 | STUN NAT type classification (Apache-2.0) |
+| oneclickvirt/basics | v0.0.34 | IPv6 on-link prefix discovery + bgp.tools active-neighbor estimate (Apache-2.0) |
 
 ### Runtime (external tools, auto-detected)
 | Tool | Platforms | Required? |
