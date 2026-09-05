@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/tui"
 	"github.com/cloudapp3/vmbench/tui/theme"
 )
@@ -20,6 +21,7 @@ func runTUI(args []string) int {
 	)
 	fs.StringVar(&compareA, "compare-a", "", "compare report A path")
 	fs.StringVar(&compareB, "compare-b", "", "compare report B path")
+	registerLangFlag(fs)
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -40,6 +42,7 @@ func runTUI(args []string) int {
 	}
 
 	cfg.Theme = theme.Active.Name
+	cfg.Lang = i18n.Lang()
 	_ = tui.SaveConfig(cfg)
 	return 0
 }

@@ -19,18 +19,36 @@ import (
 	"github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/catalog"
 	"github.com/cloudapp3/vmbench/history"
+	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/nodecatalog"
 	gbreport "github.com/cloudapp3/vmbench/report"
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/suitecompare"
 	"github.com/cloudapp3/vmbench/sysinfo"
+	"github.com/cloudapp3/vmbench/tui"
 )
+
+// langFlag registers the shared --lang flag and applies it during parsing,
+// so all subsequent output (usage included) follows the selected language.
+func registerLangFlag(fs *flag.FlagSet) {
+	fs.Var(new(langValue), "lang", "interface language (en, zh-CN)")
+}
+
+type langValue struct{}
+
+func (l *langValue) String() string { return "" }
+
+func (l *langValue) Set(v string) error {
+	i18n.ApplyLang(v)
+	return nil
+}
 
 func main() {
 	os.Exit(run(os.Args[1:]))
 }
 
 func run(args []string) int {
+	i18n.Init("", tui.LoadConfig().Lang)
 	if len(args) == 0 {
 		return runTUI(nil)
 	}
@@ -89,6 +107,7 @@ func printUsage(w io.Writer) {
 func runBench(args []string) int {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	registerLangFlag(fs)
 
 	var (
 		iterations      int
@@ -252,6 +271,7 @@ func runBench(args []string) int {
 func runSuite(args []string) int {
 	fs := flag.NewFlagSet("suite", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	registerLangFlag(fs)
 
 	var (
 		iterations      int
@@ -676,6 +696,7 @@ func linuxHardwarePackages(tools []string) []string {
 func runList(args []string) int {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	registerLangFlag(fs)
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: vmbench list\n\nList available workloads.")
 	}
@@ -699,6 +720,7 @@ func runList(args []string) int {
 func runSysinfo(args []string) int {
 	fs := flag.NewFlagSet("sysinfo", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	registerLangFlag(fs)
 
 	var asJSON bool
 	fs.BoolVar(&asJSON, "json", false, "output as JSON")
@@ -827,6 +849,7 @@ func writeSysinfoConsole(w io.Writer, info sysinfo.SystemInfo, warnings []string
 func runCompare(args []string) int {
 	fs := flag.NewFlagSet("compare", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	registerLangFlag(fs)
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: vmbench compare <report1.json> <report2.json>\n\nCompare two benchmark reports side by side.")
 	}

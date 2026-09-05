@@ -82,6 +82,7 @@ func (values nodeLoadFlags) load() (nodecatalog.Loaded, error) {
 func runNodesList(args []string) int {
 	fs := flag.NewFlagSet("nodes list", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	registerLangFlag(fs)
 	var loadFlags nodeLoadFlags
 	var asJSON bool
 	var kind, family, region, city, carrier string
@@ -159,6 +160,7 @@ func runNodesList(args []string) int {
 func runNodesVerify(args []string) int {
 	fs := flag.NewFlagSet("nodes verify", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	registerLangFlag(fs)
 	var loadFlags nodeLoadFlags
 	var signatureRef, publicKeyFile, publicKeyValue string
 	var asJSON bool
@@ -231,6 +233,7 @@ func runNodesVerify(args []string) int {
 func runNodesUpdate(args []string) int {
 	fs := flag.NewFlagSet("nodes update", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	registerLangFlag(fs)
 	var manifestURL, signatureRef, publicKeyFile, publicKeyValue, destination string
 	var timeout time.Duration
 	var asJSON bool
@@ -298,6 +301,7 @@ func runNodesUpdate(args []string) int {
 func runNodesHealth(args []string) int {
 	fs := flag.NewFlagSet("nodes health", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	registerLangFlag(fs)
 	var loadFlags nodeLoadFlags
 	var asJSON bool
 	var kind, family, region, city, carrier string

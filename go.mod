@@ -3,15 +3,18 @@ module github.com/cloudapp3/vmbench
 go 1.26.6
 
 require (
+	github.com/BurntSushi/toml v1.6.0
 	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/klauspost/cpuid/v2 v2.2.9
+	github.com/nicksnyder/go-i18n/v2 v2.6.1
 	github.com/oneclickvirt/UnlockTests v0.0.51
 	github.com/oneclickvirt/backtrace v0.0.21
 	github.com/oneclickvirt/basics v0.0.34
 	github.com/oneclickvirt/gostun v0.0.10
 	github.com/shirou/gopsutil/v4 v4.25.6
+	golang.org/x/text v0.41.0
 )
 
 require (
@@ -67,5 +70,4 @@ require (
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
 )

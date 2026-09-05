@@ -185,6 +185,7 @@ func runHistoryDelete(args []string) int {
 func runHistoryCompare(args []string) int {
 	fs := flag.NewFlagSet("history compare", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	registerLangFlag(fs)
 	last := 2
 	fs.IntVar(&last, "last", 2, "compare the latest N reports")
 	fs.Usage = func() {

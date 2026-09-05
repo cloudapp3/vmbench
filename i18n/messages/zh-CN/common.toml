@@ -1,0 +1,45 @@
+# 简体中文。键集必须与 en 目录完全一致(由测试保证)。
+
+[common.yes]
+other = "是"
+
+[common.no]
+other = "否"
+
+[common.unknown]
+other = "未知"
+
+[common.none]
+other = "无"
+
+# 状态枚举 token 在 JSON/持久化数据中保持英文,此处仅作显示层翻译。
+
+[status.ok]
+other = "成功"
+
+[status.fail]
+other = "失败"
+
+[status.partial]
+other = "部分完成"
+
+[status.skipped]
+other = "已跳过"
+
+[status.skip]
+other = "跳过"
+
+[status.waiting]
+other = "等待中"
+
+[status.running]
+other = "运行中"
+
+[status.done]
+other = "完成"
+
+[status.legacy]
+other = "旧版"
+
+[status.custom]
+other = "自定义"

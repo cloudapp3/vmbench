@@ -8,6 +8,7 @@ import (
 
 type PersistedConfig struct {
 	Theme      string `json:"theme,omitempty"`
+	Lang       string `json:"lang,omitempty"`
 	LastMode   string `json:"last_mode,omitempty"`
 	LastEngine string `json:"last_engine,omitempty"`
 }

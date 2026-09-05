@@ -1,0 +1,48 @@
+# Base locale (English). Keys are dot-namespaced by surface: common.*, status.*.
+# Every key here must exist in every other locale directory (enforced by test).
+
+[common.yes]
+other = "yes"
+
+[common.no]
+other = "no"
+
+[common.unknown]
+other = "unknown"
+
+[common.none]
+other = "none"
+
+# Status enum tokens shared by JSON reports, compare logic, and the TUI.
+# The token values ("ok", "fail", ...) must stay English in data; these are
+# display labels only.
+
+[status.ok]
+other = "ok"
+
+[status.fail]
+other = "fail"
+
+[status.partial]
+other = "partial"
+
+[status.skipped]
+other = "skipped"
+
+[status.skip]
+other = "skip"
+
+[status.waiting]
+other = "waiting"
+
+[status.running]
+other = "running"
+
+[status.done]
+other = "done"
+
+[status.legacy]
+other = "legacy"
+
+[status.custom]
+other = "custom"
