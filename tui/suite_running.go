@@ -283,7 +283,7 @@ func viewSuiteRunningCompact(m Model, header, progressLine string) string {
 }
 
 func suiteSectionCompactLine(m Model, s suiteSection, width int) string {
-	const labelWidth = 20
+	labelWidth := comp.ColWidth(s.label, 20)
 	label := lipgloss.NewStyle().Bold(true).Foreground(sectionAccent(s.id)).Width(labelWidth).
 		Render(truncStr(s.label, labelWidth))
 	return label + suiteSectionStatus(m, s, width-labelWidth)

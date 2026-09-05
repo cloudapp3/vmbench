@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
 )
@@ -215,15 +216,5 @@ func formatBytesSmall(value uint64) string {
 }
 
 func truncStr(s string, max int) string {
-	if max <= 0 {
-		return ""
-	}
-	if lipgloss.Width(s) <= max {
-		return s
-	}
-	rs := []rune(s)
-	if len(rs) <= max {
-		return s
-	}
-	return string(rs[:max-1]) + "…"
+	return i18n.TruncateCells(s, max)
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/tui/theme"
 )
 
@@ -44,18 +45,8 @@ func KVGrid(width int, rows []KV) string {
 	return strings.Join(lines, "\n")
 }
 
-func truncate(s string, maxRunes int) string {
-	if maxRunes <= 0 {
-		return ""
-	}
-	if lipgloss.Width(s) <= maxRunes {
-		return s
-	}
-	rs := []rune(s)
-	if len(rs) <= maxRunes {
-		return s
-	}
-	return string(rs[:maxRunes-1]) + "…"
+func truncate(s string, maxCells int) string {
+	return i18n.TruncateCells(s, maxCells)
 }
 
 func formatBytes(value uint64) string {

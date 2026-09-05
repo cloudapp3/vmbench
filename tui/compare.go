@@ -83,11 +83,11 @@ func viewCompare(m Model) string {
 	mapB := workloadMap(append(dB.Results.Workloads, dB.Extensions.Workloads...))
 
 	cols := []comp.TableColumn{
-		{Title: "Workload", Width: 22},
-		{Title: "Metric", Width: 11},
-		{Title: "A", Width: 12, Align: lipgloss.Right},
-		{Title: "B", Width: 12, Align: lipgloss.Right},
-		{Title: "Δ", Width: 14, Align: lipgloss.Right},
+		{Title: "Workload", Width: comp.ColWidth("Workload", 22)},
+		{Title: "Metric", Width: comp.ColWidth("Metric", 11)},
+		{Title: "A", Width: comp.ColWidth("A", 12), Align: lipgloss.Right},
+		{Title: "B", Width: comp.ColWidth("B", 12), Align: lipgloss.Right},
+		{Title: "Δ", Width: comp.ColWidth("Δ", 14), Align: lipgloss.Right},
 	}
 	var rows []comp.TableRow
 	for _, name := range sortedWorkloadNames(mapA, mapB) {

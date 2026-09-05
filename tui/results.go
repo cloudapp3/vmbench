@@ -261,19 +261,19 @@ func groupResults(ws []gbreport.WorkloadEntry) []resultGroup {
 
 func viewResultsFlat(m Model, width int) string {
 	cols := []comp.TableColumn{
-		{Title: "Workload", Width: 22},
-		{Title: "Category", Width: 12},
-		{Title: "Time", Width: 10, Align: lipgloss.Right},
-		{Title: "Throughput", Width: 18, Align: lipgloss.Right},
-		{Title: "Latency", Width: 10, Align: lipgloss.Right},
-		{Title: "Status", Width: 8},
+		{Title: "Workload", Width: comp.ColWidth("Workload", 22)},
+		{Title: "Category", Width: comp.ColWidth("Category", 12)},
+		{Title: "Time", Width: comp.ColWidth("Time", 10), Align: lipgloss.Right},
+		{Title: "Throughput", Width: comp.ColWidth("Throughput", 18), Align: lipgloss.Right},
+		{Title: "Latency", Width: comp.ColWidth("Latency", 10), Align: lipgloss.Right},
+		{Title: "Status", Width: comp.ColWidth("Status", 8)},
 	}
 	if width < 100 {
 		cols = []comp.TableColumn{
-			{Title: "Workload", Width: 20},
-			{Title: "Time", Width: 10, Align: lipgloss.Right},
-			{Title: "Throughput", Width: 18, Align: lipgloss.Right},
-			{Title: "Status", Width: 8},
+			{Title: "Workload", Width: comp.ColWidth("Workload", 20)},
+			{Title: "Time", Width: comp.ColWidth("Time", 10), Align: lipgloss.Right},
+			{Title: "Throughput", Width: comp.ColWidth("Throughput", 18), Align: lipgloss.Right},
+			{Title: "Status", Width: comp.ColWidth("Status", 8)},
 		}
 	}
 
@@ -308,10 +308,10 @@ func viewResultsFlat(m Model, width int) string {
 
 func viewWorkloadRows(entries []gbreport.WorkloadEntry, cursor int, width int) string {
 	cols := []comp.TableColumn{
-		{Title: "Workload", Width: 22},
-		{Title: "Time", Width: 10, Align: lipgloss.Right},
-		{Title: "Throughput", Width: 18, Align: lipgloss.Right},
-		{Title: "Status", Width: 8},
+		{Title: "Workload", Width: comp.ColWidth("Workload", 22)},
+		{Title: "Time", Width: comp.ColWidth("Time", 10), Align: lipgloss.Right},
+		{Title: "Throughput", Width: comp.ColWidth("Throughput", 18), Align: lipgloss.Right},
+		{Title: "Status", Width: comp.ColWidth("Status", 8)},
 	}
 	var rows []comp.TableRow
 	for i, w := range entries {

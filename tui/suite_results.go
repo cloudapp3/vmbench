@@ -122,17 +122,18 @@ func viewSuiteResultsCompact(
 }
 
 func suiteResultCompactLine(section suite.SectionSummary, width int) string {
-	const labelWidth = 20
-	label := lipgloss.NewStyle().Bold(true).Foreground(sectionAccent(section.ID)).Width(labelWidth).
-		Render(truncStr(suiteSectionLabel(section.ID), labelWidth))
+	label := suiteSectionLabel(section.ID)
+	labelWidth := comp.ColWidth(label, 20)
+	styledLabel := lipgloss.NewStyle().Bold(true).Foreground(sectionAccent(section.ID)).Width(labelWidth).
+		Render(truncStr(label, labelWidth))
 	statusText := truncStr(firstStr(section.Status, "unknown"), 10)
 	status := comp.StatusPill(comp.StatusFromString(section.Status), statusText)
 	remaining := width - labelWidth - lipgloss.Width(status) - 2
 	if section.Message == "" || remaining <= 0 {
-		return label + status
+		return styledLabel + status
 	}
 	detail := lipgloss.NewStyle().Foreground(theme.Active.Muted).Render("  " + truncStr(section.Message, remaining))
-	return label + status + detail
+	return styledLabel + status + detail
 }
 
 func suiteSectionLabel(id suite.SectionID) string {

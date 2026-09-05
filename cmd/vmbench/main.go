@@ -609,7 +609,7 @@ func progressPrinter(enabled bool) vmbench.EventHandler {
 	return func(ev vmbench.Event) {
 		switch ev.Kind {
 		case vmbench.EventSuiteStart:
-			fmt.Fprintf(os.Stderr, "  %-28s ", ev.Workload)
+			fmt.Fprintf(os.Stderr, "  %s ", i18n.PadCells(ev.Workload, 28))
 		case vmbench.EventSuiteDone:
 			fmt.Fprintf(os.Stderr, "done  %s\n", ev.Metric)
 		case vmbench.EventSuiteFail:
@@ -636,13 +636,14 @@ func suiteProgressPrinterTo(w io.Writer, enabled bool) suite.EventHandler {
 	}
 	return func(event suite.Event) {
 		section := strings.TrimSpace(string(event.Section))
+		status := firstNonEmpty(event.Status, "unknown")
 		switch event.Kind {
 		case suite.EventSectionStart:
-			fmt.Fprintf(w, "  [suite] %-16s running\n", section)
+			fmt.Fprintf(w, "  [suite] %s running\n", i18n.PadCells(section, 16))
 		case suite.EventSectionDone, suite.EventSectionFail:
-			fmt.Fprintf(w, "  [suite] %-16s %-7s %s\n", section, firstNonEmpty(event.Status, "unknown"), strings.TrimSpace(event.Message))
+			fmt.Fprintf(w, "  [suite] %s %s %s\n", i18n.PadCells(section, 16), i18n.PadCells(status, 7), strings.TrimSpace(event.Message))
 		case suite.EventSuiteDone:
-			fmt.Fprintf(w, "  [suite] complete         %-7s %s\n", firstNonEmpty(event.Status, "unknown"), strings.TrimSpace(event.Message))
+			fmt.Fprintf(w, "  [suite] %s %s %s\n", i18n.PadCells("complete", 16), i18n.PadCells(status, 7), strings.TrimSpace(event.Message))
 		}
 	}
 }

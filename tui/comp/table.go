@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/tui/theme"
 )
 
@@ -12,6 +13,15 @@ type TableColumn struct {
 	Title string
 	Width int
 	Align lipgloss.Position
+}
+
+// ColWidth sizes a column for a (possibly translated) title: at least min
+// cells, grown when the title itself needs more room.
+func ColWidth(title string, min int) int {
+	if w := i18n.StringWidth(title) + 2; w > min {
+		return w
+	}
+	return min
 }
 
 type TableRow struct {
