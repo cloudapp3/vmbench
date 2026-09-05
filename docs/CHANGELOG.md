@@ -1,5 +1,13 @@
 # VMBench Changelog
 
+## v0.4.1（2026-09-05）
+
+### 修复
+
+- 测速下载请求补齐浏览器 User-Agent（复用 reachability 探测同一常量），部分按 UA 拦截裸客户端的 speedtest 节点不再整体失败；HTTP 200 但响应体为空时输出结构化错误 `endpoint returned no data`，不再产出 0 MiB/s 的假吞吐结果进入 compare。
+- `cidr_neighbors`：宣告 CIDR 与本地 /24 完全相同时跳过第二次 bgp.tools 查询（此前同数据请求两次，且 HTML 报告会把同一条目按 subnet/announced 渲染两遍）；console/HTML 既有去重显示与 `ok/partial/error` 状态判定不变。
+- 修复 1 vCPU 主机上 sysbench 多核 workload 被命名为 "CPU Single-Core (sysbench)"、导致同一次 run 出现重复 workload 名（结果按名索引互相覆盖）的问题；单/多核命名改为显式标记，不再按 `threads==1` 推断。
+
 ## v0.4.0（2026-09-05）
 
 ### 第三批：TUI 配置补齐 + IPv6 子网 / CIDR 活跃邻居
