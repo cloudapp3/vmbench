@@ -76,11 +76,14 @@ func ProbeCIDRNeighbors(ctx context.Context, ipv4 string) *CIDRNeighborsEvidence
 	}
 	go run(subnetBase, 24, false)
 	announcedBase, announcedLen := withCIDRPrefix(ctx, evidence.IPv4)
-	if announcedLen > 0 && announcedLen <= 24 {
+	// The announced CIDR is only an extra query when it differs from the
+	// local /24; identical prefixes would just duplicate the same fetch.
+	sameAsSubnet := announcedLen == 24 && announcedBase == subnetBase
+	if announcedLen > 0 && announcedLen <= 24 && !sameAsSubnet {
 		go run(announcedBase, announcedLen, true)
 	}
 	awaited := 1
-	if announcedLen > 0 && announcedLen <= 24 {
+	if announcedLen > 0 && announcedLen <= 24 && !sameAsSubnet {
 		awaited = 2
 	}
 	failures := make([]string, 0, 2)
