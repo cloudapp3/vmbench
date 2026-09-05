@@ -36,6 +36,8 @@ func ProbeDownload(ctx context.Context, node SpeedNode) (*DownloadProbeResult, e
 	// Keep traffic_bytes enforceable as a wire-test budget. Disabling automatic
 	// compression also prevents a small encoded response from expanding past it.
 	req.Header.Set("Accept-Encoding", "identity")
+	// Some speedtest endpoints gate on a browser-like User-Agent.
+	req.Header.Set("User-Agent", ua)
 
 	start := time.Now()
 	resp, err := http.DefaultClient.Do(req)
@@ -62,6 +64,11 @@ func ProbeDownload(ctx context.Context, node SpeedNode) (*DownloadProbeResult, e
 	}
 	if copyErr != nil {
 		return nil, fmt.Errorf("download %s: %w", node.Name, copyErr)
+	}
+	// An empty 200 body is a failed measurement, not a zero-throughput result:
+	// Ookla-style download endpoints answer bare GETs with no payload.
+	if n == 0 {
+		return nil, fmt.Errorf("download %s: endpoint returned no data", node.Name)
 	}
 	return &DownloadProbeResult{Node: node, Bytes: n, Elapsed: elapsed}, nil
 }
