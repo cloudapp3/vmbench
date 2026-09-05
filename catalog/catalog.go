@@ -195,7 +195,7 @@ func ExternalHardwareDefinitionsForTools(diskPath string, hardwareTools []string
 				return &sysbenchWorkload{threads: 1, maxPrime: 20000}
 			}},
 			Definition{Name: "CPU Multi-Core (sysbench)", Category: "CPU", Description: "sysbench CPU prime, all threads", Factory: func(string) bench.Workload {
-				return &sysbenchWorkload{threads: runtime.NumCPU(), maxPrime: 20000}
+				return &sysbenchWorkload{threads: runtime.NumCPU(), maxPrime: 20000, multi: true}
 			}},
 			Definition{Name: "Memory Read Bandwidth (sysbench)", Category: bench.CategoryMemory, Description: "sysbench sequential memory read bandwidth", Factory: func(string) bench.Workload {
 				return &sysbenchMemoryWorkload{threads: 1, operation: "read", accessMode: "seq", blockSize: "1M", totalSize: "10G", durationSeconds: 3}
@@ -646,15 +646,16 @@ func firstPositiveFloat(values ...float64) float64 {
 type sysbenchWorkload struct {
 	threads  int
 	maxPrime int
+	multi    bool
 	events   float64
 	command  string
 }
 
 func (w *sysbenchWorkload) Name() string {
-	if w.threads == 1 {
-		return "CPU Single-Core (sysbench)"
+	if w.multi {
+		return "CPU Multi-Core (sysbench)"
 	}
-	return "CPU Multi-Core (sysbench)"
+	return "CPU Single-Core (sysbench)"
 }
 func (w *sysbenchWorkload) Category() string { return "CPU" }
 func (w *sysbenchWorkload) Description() string {
