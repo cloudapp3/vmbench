@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/i18n"
 	gbreport "github.com/cloudapp3/vmbench/report"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
@@ -110,7 +111,7 @@ func saveReportCmd(report *vmbench.Report) tea.Cmd {
 
 func viewResults(m Model) string {
 	if m.report == nil {
-		return lipgloss.NewStyle().Foreground(theme.Active.Muted).Render("  No results available.")
+		return lipgloss.NewStyle().Foreground(theme.Active.Muted).Render("  " + i18n.T("tui.results.noResults"))
 	}
 
 	t := theme.Active
@@ -119,18 +120,18 @@ func viewResults(m Model) string {
 
 	total, okCount, failCount := resultStats(doc.Results.Workloads, doc.Extensions.Workloads)
 
-	headerTitle := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render("◈ Benchmark Results")
+	headerTitle := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render(i18n.T("tui.results.title"))
 	stats := lipgloss.NewStyle().Foreground(t.Muted).Render(
-		fmt.Sprintf("  workloads %d  •  ", total),
+		i18n.Tf("tui.results.statsPrefix", map[string]any{"Count": total}),
 	) +
-		lipgloss.NewStyle().Foreground(t.Success).Bold(true).Render(fmt.Sprintf("✓ %d ok", okCount)) +
+		lipgloss.NewStyle().Foreground(t.Success).Bold(true).Render(i18n.Tf("tui.results.okCount", map[string]any{"Count": okCount})) +
 		lipgloss.NewStyle().Foreground(t.Muted).Render("  •  ") +
-		lipgloss.NewStyle().Foreground(t.Danger).Bold(true).Render(fmt.Sprintf("✗ %d fail", failCount))
+		lipgloss.NewStyle().Foreground(t.Danger).Bold(true).Render(i18n.Tf("tui.results.failCount", map[string]any{"Count": failCount}))
 
 	tabs := comp.Tabs(width, []comp.Tab{
-		{Label: "Cards"},
-		{Label: "Grouped"},
-		{Label: "Flat"},
+		{Label: i18n.T("tui.results.tabCards")},
+		{Label: i18n.T("tui.results.tabGrouped")},
+		{Label: i18n.T("tui.results.tabFlat")},
 	}, m.resultsTab)
 
 	var body string
@@ -146,7 +147,7 @@ func viewResults(m Model) string {
 	parts := []string{headerTitle, stats, "", tabs, "", body}
 
 	if len(doc.Extensions.Workloads) > 0 {
-		extHeader := lipgloss.NewStyle().Bold(true).Foreground(t.Secondary).Render("◇ Extensions")
+		extHeader := lipgloss.NewStyle().Bold(true).Foreground(t.Secondary).Render(i18n.T("tui.results.extensions"))
 		parts = append(parts, "", extHeader, viewWorkloadRows(doc.Extensions.Workloads, -1, width))
 	}
 
@@ -190,7 +191,7 @@ func resultCard(g resultGroup, width int) string {
 		if w.Result == nil {
 			metric = lipgloss.NewStyle().Foreground(t.Muted).Render("—")
 		} else if w.Result.Error != "" {
-			metric = lipgloss.NewStyle().Foreground(t.Danger).Render("error")
+			metric = lipgloss.NewStyle().Foreground(t.Danger).Render(i18n.T("tui.results.error"))
 		} else {
 			thr := tuiThroughput(w.Result)
 			if thr != "-" {
@@ -206,7 +207,7 @@ func resultCard(g resultGroup, width int) string {
 
 	card := comp.Card{
 		Title:    g.name,
-		Subtitle: fmt.Sprintf("%d workloads", len(g.workloads)),
+		Subtitle: i18n.Tf("tui.results.workloadCount", map[string]any{"Count": len(g.workloads)}),
 		Body:     strings.Join(lines, "\n"),
 		Accent:   theme.Active.CategoryColor(g.category),
 		Width:    width,
@@ -261,19 +262,19 @@ func groupResults(ws []gbreport.WorkloadEntry) []resultGroup {
 
 func viewResultsFlat(m Model, width int) string {
 	cols := []comp.TableColumn{
-		{Title: "Workload", Width: comp.ColWidth("Workload", 22)},
-		{Title: "Category", Width: comp.ColWidth("Category", 12)},
-		{Title: "Time", Width: comp.ColWidth("Time", 10), Align: lipgloss.Right},
-		{Title: "Throughput", Width: comp.ColWidth("Throughput", 18), Align: lipgloss.Right},
-		{Title: "Latency", Width: comp.ColWidth("Latency", 10), Align: lipgloss.Right},
-		{Title: "Status", Width: comp.ColWidth("Status", 8)},
+		{Title: i18n.T("tui.col.workload"), Width: comp.ColWidth(i18n.T("tui.col.workload"), 22)},
+		{Title: i18n.T("tui.col.category"), Width: comp.ColWidth(i18n.T("tui.col.category"), 12)},
+		{Title: i18n.T("tui.col.time"), Width: comp.ColWidth(i18n.T("tui.col.time"), 10), Align: lipgloss.Right},
+		{Title: i18n.T("tui.col.throughput"), Width: comp.ColWidth(i18n.T("tui.col.throughput"), 18), Align: lipgloss.Right},
+		{Title: i18n.T("tui.col.latency"), Width: comp.ColWidth(i18n.T("tui.col.latency"), 10), Align: lipgloss.Right},
+		{Title: i18n.T("tui.col.status"), Width: comp.ColWidth(i18n.T("tui.col.status"), 8)},
 	}
 	if width < 100 {
 		cols = []comp.TableColumn{
-			{Title: "Workload", Width: comp.ColWidth("Workload", 20)},
-			{Title: "Time", Width: comp.ColWidth("Time", 10), Align: lipgloss.Right},
-			{Title: "Throughput", Width: comp.ColWidth("Throughput", 18), Align: lipgloss.Right},
-			{Title: "Status", Width: comp.ColWidth("Status", 8)},
+			{Title: i18n.T("tui.col.workload"), Width: comp.ColWidth(i18n.T("tui.col.workload"), 20)},
+			{Title: i18n.T("tui.col.time"), Width: comp.ColWidth(i18n.T("tui.col.time"), 10), Align: lipgloss.Right},
+			{Title: i18n.T("tui.col.throughput"), Width: comp.ColWidth(i18n.T("tui.col.throughput"), 18), Align: lipgloss.Right},
+			{Title: i18n.T("tui.col.status"), Width: comp.ColWidth(i18n.T("tui.col.status"), 8)},
 		}
 	}
 
@@ -308,10 +309,10 @@ func viewResultsFlat(m Model, width int) string {
 
 func viewWorkloadRows(entries []gbreport.WorkloadEntry, cursor int, width int) string {
 	cols := []comp.TableColumn{
-		{Title: "Workload", Width: comp.ColWidth("Workload", 22)},
-		{Title: "Time", Width: comp.ColWidth("Time", 10), Align: lipgloss.Right},
-		{Title: "Throughput", Width: comp.ColWidth("Throughput", 18), Align: lipgloss.Right},
-		{Title: "Status", Width: comp.ColWidth("Status", 8)},
+		{Title: i18n.T("tui.col.workload"), Width: comp.ColWidth(i18n.T("tui.col.workload"), 22)},
+		{Title: i18n.T("tui.col.time"), Width: comp.ColWidth(i18n.T("tui.col.time"), 10), Align: lipgloss.Right},
+		{Title: i18n.T("tui.col.throughput"), Width: comp.ColWidth(i18n.T("tui.col.throughput"), 18), Align: lipgloss.Right},
+		{Title: i18n.T("tui.col.status"), Width: comp.ColWidth(i18n.T("tui.col.status"), 8)},
 	}
 	var rows []comp.TableRow
 	for i, w := range entries {
@@ -428,7 +429,7 @@ func tuiStatusText(result *gbreport.ResultEntry) string {
 		return lipgloss.NewStyle().Foreground(t.Muted).Render("—")
 	}
 	if strings.TrimSpace(result.Error) != "" {
-		return lipgloss.NewStyle().Foreground(t.Danger).Bold(true).Render("✗ fail")
+		return lipgloss.NewStyle().Foreground(t.Danger).Bold(true).Render(i18n.T("tui.results.failLabel"))
 	}
-	return lipgloss.NewStyle().Foreground(t.Success).Bold(true).Render("✓ ok")
+	return lipgloss.NewStyle().Foreground(t.Success).Bold(true).Render(i18n.T("tui.results.okLabel"))
 }

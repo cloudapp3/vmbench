@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/i18n"
 	gbreport "github.com/cloudapp3/vmbench/report"
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/sysinfo"
@@ -46,6 +47,7 @@ func main() {
 		}
 	}
 	theme.InitThemeFromEnv("")
+	i18n.Init("", "")
 
 	info, _ := sysinfo.Collect(context.Background())
 

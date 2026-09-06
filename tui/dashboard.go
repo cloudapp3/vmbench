@@ -13,17 +13,18 @@ import (
 )
 
 func updateDashboard(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	items := menuItems()
 	switch msg.String() {
 	case "up", "k":
 		if m.cursor > 0 {
 			m.cursor--
 		}
 	case "down", "j":
-		if m.cursor < len(menuItems)-1 {
+		if m.cursor < len(items)-1 {
 			m.cursor++
 		}
 	case "enter":
-		item := menuItems[m.cursor]
+		item := items[m.cursor]
 		switch item.mode {
 		case "single", "multi", "all":
 			m.page = pageRunning
@@ -59,7 +60,7 @@ func viewDashboard(m Model) string {
 	if bp >= comp.BreakpointCompact {
 		sections = append(sections, comp.Banner(m.width))
 		tagline := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(
-			"  cross-platform VPS benchmark · measured raw metrics",
+			i18n.T("tui.dashboard.tagline"),
 		)
 		sections = append(sections, tagline)
 		sections = append(sections, "")
@@ -94,13 +95,13 @@ func dashboardMenu(m Model, width int) string {
 	header := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(t.Primary).
-		Render("Menu")
+		Render(i18n.T("tui.dashboard.menu"))
 
 	var lines []string
 	lines = append(lines, header)
 	lines = append(lines, "")
 
-	for i, item := range menuItems {
+	for i, item := range menuItems() {
 		var line string
 		if i == m.cursor {
 			band := lipgloss.NewStyle().Foreground(t.Primary).Render("▎")
@@ -125,9 +126,9 @@ func dashboardMenu(m Model, width int) string {
 	}
 
 	lines = append(lines, "")
-	themeLine := lipgloss.NewStyle().Foreground(t.Muted).Render("  theme: ") +
+	themeLine := lipgloss.NewStyle().Foreground(t.Muted).Render("  "+i18n.T("tui.dashboard.theme")+": ") +
 		lipgloss.NewStyle().Foreground(t.Secondary).Bold(true).Render(theme.Active.Name) +
-		lipgloss.NewStyle().Foreground(t.Muted).Render("  press [t] to cycle")
+		lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.Tf("tui.dashboard.themeCycle", nil))
 	lines = append(lines, themeLine)
 
 	return strings.Join(lines, "\n")
@@ -150,21 +151,21 @@ func dashboardSysCard(m Model, width int) string {
 
 	rows := []comp.KV{
 		{Key: "CPU", Value: cpuLine},
-		{Key: "", Value: fmt.Sprintf("%d cores / %d threads", cpu.PhysicalCores, cpu.LogicalCores)},
-		{Key: "Memory", Value: fmt.Sprintf("%.1f GB %s", float64(mem.TotalBytes)/(1024*1024*1024), strings.TrimSpace(mem.Type))},
-		{Key: "OS", Value: truncStr(osInfo.Name, width-12)},
-		{Key: "Kernel", Value: truncStr(osInfo.Kernel, width-12)},
+		{Key: "", Value: i18n.Tf("tui.sys.coresThreads", map[string]any{"Cores": cpu.PhysicalCores, "Threads": cpu.LogicalCores})},
+		{Key: i18n.T("tui.sys.memory"), Value: fmt.Sprintf("%.1f GB %s", float64(mem.TotalBytes)/(1024*1024*1024), strings.TrimSpace(mem.Type))},
+		{Key: i18n.T("tui.sys.os"), Value: truncStr(osInfo.Name, width-12)},
+		{Key: i18n.T("tui.sys.kernel"), Value: truncStr(osInfo.Kernel, width-12)},
 	}
 
 	body := comp.KVGrid(width-4, rows)
 
 	footer := ""
 	if cpu.BaseFreqMHz > 0 {
-		footer = fmt.Sprintf("freq %.0f / %.0f MHz", cpu.BaseFreqMHz, cpu.MaxFreqMHz)
+		footer = i18n.Tf("tui.sys.freq", map[string]any{"Base": fmt.Sprintf("%.0f", cpu.BaseFreqMHz), "Max": fmt.Sprintf("%.0f", cpu.MaxFreqMHz)})
 	}
 
 	card := comp.Card{
-		Title:    "System",
+		Title:    i18n.T("tui.sys.cardTitle"),
 		Subtitle: fmt.Sprintf("%s/%s", osInfo.Hostname, cpu.Arch),
 		Body:     body,
 		Footer:   footer,
@@ -180,24 +181,24 @@ func dashboardSysExpanded(m Model, width int) string {
 	var lines []string
 	if len(cpu.Features) > 0 {
 		feats := strings.Join(cpu.Features, ", ")
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render("Features  ")+lipgloss.NewStyle().Foreground(t.Fg).Render(truncStr(feats, width-12)))
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.PadCells(i18n.T("tui.sys.features"), 9)+"  ")+lipgloss.NewStyle().Foreground(t.Fg).Render(truncStr(feats, width-12)))
 	}
 	if cpu.MicroArch != "" {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render("Arch      ")+lipgloss.NewStyle().Foreground(t.Fg).Render(cpu.MicroArch))
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.PadCells(i18n.T("tui.sys.arch"), 9)+"  ")+lipgloss.NewStyle().Foreground(t.Fg).Render(cpu.MicroArch))
 	}
 	if len(cpu.CacheSizes) > 0 {
 		var parts []string
 		for k, v := range cpu.CacheSizes {
 			parts = append(parts, fmt.Sprintf("%s %s", k, formatBytesSmall(uint64(v))))
 		}
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render("Cache     ")+lipgloss.NewStyle().Foreground(t.Fg).Render(strings.Join(parts, "  ")))
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.PadCells(i18n.T("tui.sys.cache"), 9)+"  ")+lipgloss.NewStyle().Foreground(t.Fg).Render(strings.Join(parts, "  ")))
 	}
 	if len(lines) == 0 {
 		return ""
 	}
 
 	card := comp.Card{
-		Title:  "Details",
+		Title:  i18n.T("tui.sys.detailsTitle"),
 		Body:   strings.Join(lines, "\n"),
 		Accent: t.CategorySystem,
 		Width:  width,

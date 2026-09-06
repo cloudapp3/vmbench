@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/cloudapp3/vmbench/catalog"
+	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/nodecatalog"
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/tui/comp"
@@ -38,7 +38,7 @@ type suiteConfigState struct {
 	presetIDs       []string
 	sections        suite.SectionSelector
 	sectionCursor   int
-	sectionKeys     []string
+	sectionIDs      []suite.SectionID
 	speedProviders  map[string]bool
 	speedCursor     int
 	speedIDs        []string
@@ -99,10 +99,13 @@ func newSuiteConfigState() suiteConfigState {
 		hardware[id] = true
 	}
 	return suiteConfigState{
-		preset:         1,
-		presetIDs:      presetIDs,
-		sections:       sections,
-		sectionKeys:    []string{"Hardware", "NetworkInfo", "Route", "Ping", "Speed", "IPQuality", "Reachability", "Mail", "Media"},
+		preset:    1,
+		presetIDs: presetIDs,
+		sections:  sections,
+		sectionIDs: []suite.SectionID{
+			suite.SectionHardware, suite.SectionNetworkInfo, suite.SectionRoute, suite.SectionPing,
+			suite.SectionSpeed, suite.SectionIPQuality, suite.SectionReachability, suite.SectionMail, suite.SectionMedia,
+		},
 		speedProviders: speed,
 		speedIDs:       speedIDs,
 		routePresets:   route,
@@ -122,48 +125,48 @@ func newSuiteConfigState() suiteConfigState {
 }
 
 func (s *suiteConfigState) sectionGet(i int) bool {
-	switch s.sectionKeys[i] {
-	case "Hardware":
+	switch s.sectionIDs[i] {
+	case suite.SectionHardware:
 		return s.sections.Hardware
-	case "NetworkInfo":
+	case suite.SectionNetworkInfo:
 		return s.sections.NetworkInfo
-	case "Route":
+	case suite.SectionRoute:
 		return s.sections.Route
-	case "Ping":
+	case suite.SectionPing:
 		return s.sections.Ping
-	case "Speed":
+	case suite.SectionSpeed:
 		return s.sections.Speed
-	case "IPQuality":
+	case suite.SectionIPQuality:
 		return s.sections.IPQuality
-	case "Reachability":
+	case suite.SectionReachability:
 		return s.sections.Reachability
-	case "Mail":
+	case suite.SectionMail:
 		return s.sections.Mail
-	case "Media":
+	case suite.SectionMedia:
 		return s.sections.Media
 	}
 	return false
 }
 
 func (s *suiteConfigState) sectionToggle(i int) {
-	switch s.sectionKeys[i] {
-	case "Hardware":
+	switch s.sectionIDs[i] {
+	case suite.SectionHardware:
 		s.sections.Hardware = !s.sections.Hardware
-	case "NetworkInfo":
+	case suite.SectionNetworkInfo:
 		s.sections.NetworkInfo = !s.sections.NetworkInfo
-	case "Route":
+	case suite.SectionRoute:
 		s.sections.Route = !s.sections.Route
-	case "Ping":
+	case suite.SectionPing:
 		s.sections.Ping = !s.sections.Ping
-	case "Speed":
+	case suite.SectionSpeed:
 		s.sections.Speed = !s.sections.Speed
-	case "IPQuality":
+	case suite.SectionIPQuality:
 		s.sections.IPQuality = !s.sections.IPQuality
-	case "Reachability":
+	case suite.SectionReachability:
 		s.sections.Reachability = !s.sections.Reachability
-	case "Mail":
+	case suite.SectionMail:
 		s.sections.Mail = !s.sections.Mail
-	case "Media":
+	case suite.SectionMedia:
 		s.sections.Media = !s.sections.Media
 	}
 }
@@ -329,7 +332,7 @@ func updateSuiteConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				s.applyPreset()
 			}
 		case fieldSections:
-			if s.sectionCursor < len(s.sectionKeys)-1 {
+			if s.sectionCursor < len(s.sectionIDs)-1 {
 				s.sectionCursor++
 			}
 		case fieldSpeedProviders:
@@ -494,13 +497,11 @@ func viewSuiteConfig(m Model) string {
 	s := m.suiteConfig
 	width := m.width
 
-	title := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render("◈ Suite Configuration")
+	title := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render(i18n.T("tui.suiteConfig.title"))
 	if m.height < 40 {
 		return viewSuiteConfigCompact(m, title)
 	}
-	desc := lipgloss.NewStyle().Foreground(t.Muted).Render(
-		"VPS evidence suite — host, identity, route, latency, speed, reachability, IP, mail, media",
-	)
+	desc := lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.T("tui.suiteConfig.description"))
 
 	cardWidth := width - 4
 	if cardWidth < 32 {
@@ -520,9 +521,7 @@ func viewSuiteConfig(m Model) string {
 	advancedCard := suiteFieldAdvanced(s, cardWidth, s.field == fieldAdvanced)
 	startBtn := suiteStartButton(s, width-4, s.field == fieldStart)
 
-	help := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(
-		"  ↑↓ field   ←→ choose   space toggle   enter start   esc back",
-	)
+	help := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(i18n.T("tui.suiteConfig.helpFull"))
 
 	var fields string
 	if width >= 100 {
@@ -552,8 +551,9 @@ func viewSuiteConfigCompact(m Model, title string) string {
 	if spec, ok := suite.LookupPreset(preset); ok {
 		preset = spec.Name
 	}
-	summary := fmt.Sprintf("%s  |  %d sections  |  IP %s  |  %d iterations",
-		preset, len(s.sections.Names()), s.ipVersion, s.iterations)
+	summary := i18n.Tf("tui.suiteConfig.summary", map[string]any{
+		"Preset": preset, "Sections": len(s.sections.Names()), "IP": s.ipVersion, "Iterations": s.iterations,
+	})
 	summary = lipgloss.NewStyle().Foreground(t.Muted).Render(truncStr(summary, width-4))
 
 	fieldWidth := width - 4
@@ -582,8 +582,8 @@ func viewSuiteConfigCompact(m Model, title string) string {
 		field = suiteFieldAdvanced(s, fieldWidth, true)
 	default:
 		field = comp.Card{
-			Title:   "Ready",
-			Body:    fmt.Sprintf("%d sections selected  ·  press enter to run", len(s.sections.Names())),
+			Title:   i18n.T("tui.suiteConfig.ready"),
+			Body:    i18n.Tf("tui.suiteConfig.readyBody", map[string]any{"Count": len(s.sections.Names())}),
 			Accent:  t.Success,
 			Width:   fieldWidth,
 			Focused: true,
@@ -591,9 +591,7 @@ func viewSuiteConfigCompact(m Model, title string) string {
 	}
 
 	startBtn := suiteStartButton(s, width-4, s.field == fieldStart)
-	help := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(
-		"↑↓ field  ←→ choose  space toggle  enter next/start  esc back",
-	)
+	help := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(i18n.T("tui.suiteConfig.helpCompact"))
 	parts := []string{title, summary, "", field, "", startBtn, help}
 	if m.toast.Active() {
 		parts = append(parts, "", m.toast.Render(width-4))
@@ -608,9 +606,9 @@ func suiteFieldPreset(s suiteConfigState, width int, focus bool) string {
 	for i, id := range s.presetIDs {
 		label := id
 		if id == "custom" {
-			label = "Custom"
+			label = i18n.T("tui.suiteConfig.customPreset")
 		} else if spec, ok := suite.LookupPreset(id); ok {
-			label = spec.Name
+			label = spec.LocalizedName()
 		}
 		var st lipgloss.Style
 		switch {
@@ -630,7 +628,7 @@ func suiteFieldPreset(s suiteConfigState, width int, focus bool) string {
 		accent = t.BorderFocus
 	}
 	return comp.Card{
-		Title:   "Preset",
+		Title:   i18n.T("tui.suiteConfig.preset"),
 		Body:    body,
 		Accent:  accent,
 		Width:   width,
@@ -641,7 +639,7 @@ func suiteFieldPreset(s suiteConfigState, width int, focus bool) string {
 func suiteFieldSections(s suiteConfigState, width int, focus bool) string {
 	t := theme.Active
 	var pills []string
-	for i, name := range s.sectionKeys {
+	for i, id := range s.sectionIDs {
 		on := s.sectionGet(i)
 		icon := "☐"
 		if on {
@@ -656,14 +654,14 @@ func suiteFieldSections(s suiteConfigState, width int, focus bool) string {
 		default:
 			st = lipgloss.NewStyle().Foreground(t.Muted).Padding(0, 1)
 		}
-		pills = append(pills, st.Render(icon+" "+name))
+		pills = append(pills, st.Render(icon+" "+i18n.SectionLabel(string(id))))
 	}
 	body := strings.Join(pills, " ")
 	if !s.sections.AnyEnabled() {
-		body += "\n" + lipgloss.NewStyle().Foreground(t.Danger).Italic(true).Render("at least one section required")
+		body += "\n" + lipgloss.NewStyle().Foreground(t.Danger).Italic(true).Render(i18n.T("tui.suiteConfig.needOneSection"))
 	}
 	return comp.Card{
-		Title:   "Sections",
+		Title:   i18n.T("tui.suiteConfig.sections"),
 		Body:    body,
 		Accent:  t.Accent,
 		Width:   width,
@@ -678,9 +676,9 @@ func suiteFieldRuntime(s suiteConfigState, width int, focus bool) string {
 		timeout = s.timeouts[s.timeoutIndex]
 	}
 	values := []string{
-		fmt.Sprintf("Iterations %d", s.iterations),
-		"IP " + s.ipVersion,
-		"Timeout " + timeout.String(),
+		i18n.Tf("tui.suiteConfig.iterations", map[string]any{"Count": s.iterations}),
+		i18n.Tf("tui.suiteConfig.ipVersion", map[string]any{"Version": s.ipVersion}),
+		i18n.Tf("tui.suiteConfig.timeout", map[string]any{"Timeout": timeout.String()}),
 	}
 	pills := make([]string, 0, len(values))
 	for i, value := range values {
@@ -692,7 +690,7 @@ func suiteFieldRuntime(s suiteConfigState, width int, focus bool) string {
 		}
 		pills = append(pills, style.Render(value))
 	}
-	return comp.Card{Title: "Runtime", Body: strings.Join(pills, " "), Accent: t.Primary, Width: width, Focused: focus}.Render()
+	return comp.Card{Title: i18n.T("tui.suiteConfig.runtime"), Body: strings.Join(pills, " "), Accent: t.Primary, Width: width, Focused: focus}.Render()
 }
 
 func suiteFieldHardware(s suiteConfigState, width int, focus bool) string {
@@ -712,7 +710,7 @@ func suiteFieldHardware(s suiteConfigState, width int, focus bool) string {
 		}
 		pills = append(pills, style.Render(icon+" "+id))
 	}
-	return comp.Card{Title: "Hardware Tools", Body: strings.Join(pills, " "), Accent: t.Warning, Width: width, Focused: focus}.Render()
+	return comp.Card{Title: i18n.T("tui.suiteConfig.hardwareTools"), Body: strings.Join(pills, " "), Accent: t.Warning, Width: width, Focused: focus}.Render()
 }
 
 func suiteFieldSpeed(s suiteConfigState, width int, focus bool) string {
@@ -737,7 +735,7 @@ func suiteFieldSpeed(s suiteConfigState, width int, focus bool) string {
 	}
 	body := strings.Join(pills, " ")
 	return comp.Card{
-		Title:   "Speed Providers",
+		Title:   i18n.T("tui.suiteConfig.speedProviders"),
 		Body:    body,
 		Accent:  t.Secondary,
 		Width:   width,
@@ -767,7 +765,7 @@ func suiteFieldRoute(s suiteConfigState, width int, focus bool) string {
 	}
 	body := strings.Join(pills, " ")
 	return comp.Card{
-		Title:   "China Route Presets",
+		Title:   i18n.T("tui.suiteConfig.routePresets"),
 		Body:    body,
 		Accent:  t.Info,
 		Width:   width,
@@ -797,7 +795,7 @@ func suiteFieldMediaSets(s suiteConfigState, width int, focus bool) string {
 	}
 	body := strings.Join(pills, " ")
 	return comp.Card{
-		Title:   "Media Sets",
+		Title:   i18n.T("tui.suiteConfig.mediaSets"),
 		Body:    body,
 		Accent:  t.Primary,
 		Width:   width,
@@ -827,7 +825,7 @@ func suiteFieldIPSources(s suiteConfigState, width int, focus bool) string {
 	}
 	body := strings.Join(pills, " ")
 	return comp.Card{
-		Title:   "IP Quality Sources",
+		Title:   i18n.T("tui.suiteConfig.ipSources"),
 		Body:    body,
 		Accent:  t.Warning,
 		Width:   width,
@@ -838,9 +836,9 @@ func suiteFieldIPSources(s suiteConfigState, width int, focus bool) string {
 func suiteFieldAdvanced(s suiteConfigState, width int, focus bool) string {
 	t := theme.Active
 	values := []string{
-		"iperf: " + firstStr(strings.TrimSpace(s.iperfHost), "-"),
-		"catalog: " + firstStr(strings.TrimSpace(s.catalogSource), nodecatalog.SourceEmbedded),
-		"revision: " + firstStr(strings.TrimSpace(s.catalogRevision), "latest selected"),
+		i18n.Tf("tui.suiteConfig.iperf", map[string]any{"Value": firstStr(strings.TrimSpace(s.iperfHost), "-")}),
+		i18n.Tf("tui.suiteConfig.catalog", map[string]any{"Value": firstStr(strings.TrimSpace(s.catalogSource), nodecatalog.SourceEmbedded)}),
+		i18n.Tf("tui.suiteConfig.revision", map[string]any{"Value": firstStr(strings.TrimSpace(s.catalogRevision), i18n.T("tui.suiteConfig.latestSelected"))}),
 	}
 	lines := make([]string, 0, len(values))
 	for i, value := range values {
@@ -853,18 +851,18 @@ func suiteFieldAdvanced(s suiteConfigState, width int, focus bool) string {
 		}
 		lines = append(lines, style.Render(value))
 	}
-	return comp.Card{Title: "Network Provenance", Body: strings.Join(lines, "\n"), Accent: t.Info, Width: width, Focused: focus}.Render()
+	return comp.Card{Title: i18n.T("tui.suiteConfig.provenance"), Body: strings.Join(lines, "\n"), Accent: t.Info, Width: width, Focused: focus}.Render()
 }
 
 func suiteStartButton(s suiteConfigState, width int, focus bool) string {
 	t := theme.Active
 	enabled := s.sections.AnyEnabled()
-	label := "▶ Start Suite"
+	label := i18n.T("tui.suiteConfig.start")
 	var btn lipgloss.Style
 	switch {
 	case !enabled:
 		btn = lipgloss.NewStyle().Foreground(t.Muted).Background(t.Subtle).Padding(0, 4).Bold(true)
-		label = "▶ Start (disabled)"
+		label = i18n.T("tui.suiteConfig.startDisabled")
 	case focus:
 		btn = lipgloss.NewStyle().Foreground(t.Bg).Background(t.Success).Padding(0, 4).Bold(true)
 	default:

@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
@@ -27,25 +28,24 @@ type suiteSection struct {
 func newSuiteSections(sel suite.SectionSelector) []suiteSection {
 	order := []struct {
 		id      suite.SectionID
-		label   string
 		enabled bool
 	}{
-		{suite.SectionHardware, "Hardware", sel.Hardware},
-		{suite.SectionNetworkInfo, "Network Info", sel.NetworkInfo},
-		{suite.SectionRoute, "Route", sel.Route},
-		{suite.SectionPing, "Ping", sel.Ping},
-		{suite.SectionSpeed, "Speed", sel.Speed},
-		{suite.SectionIPQuality, "IP Quality", sel.IPQuality},
-		{suite.SectionReachability, "Reachability", sel.Reachability},
-		{suite.SectionMail, "Mail Ports", sel.Mail},
-		{suite.SectionMedia, "Media Unlock", sel.Media},
+		{suite.SectionHardware, sel.Hardware},
+		{suite.SectionNetworkInfo, sel.NetworkInfo},
+		{suite.SectionRoute, sel.Route},
+		{suite.SectionPing, sel.Ping},
+		{suite.SectionSpeed, sel.Speed},
+		{suite.SectionIPQuality, sel.IPQuality},
+		{suite.SectionReachability, sel.Reachability},
+		{suite.SectionMail, sel.Mail},
+		{suite.SectionMedia, sel.Media},
 	}
 	out := make([]suiteSection, 0, len(order))
 	for _, o := range order {
 		if !o.enabled {
 			continue
 		}
-		out = append(out, suiteSection{id: o.id, label: o.label, status: "waiting"})
+		out = append(out, suiteSection{id: o.id, label: i18n.SectionLabel(string(o.id)), status: "waiting"})
 	}
 	return out
 }
@@ -112,7 +112,7 @@ func updateSuiteEvent(m Model, ev suite.Event) (tea.Model, tea.Cmd) {
 		addLog("▸ start  " + string(ev.Section))
 	case suite.EventSectionDone:
 		updateSection("done", ev.Message)
-		addLog("✓ done   " + string(ev.Section) + "  " + ev.Message)
+		addLog("✓ " + i18n.PadCells(i18n.StatusLabel("done"), 7) + "   " + string(ev.Section) + "  " + ev.Message)
 	case suite.EventSectionFail:
 		status := strings.ToLower(strings.TrimSpace(ev.Status))
 		marker := "✗"
@@ -127,11 +127,11 @@ func updateSuiteEvent(m Model, ev suite.Event) (tea.Model, tea.Cmd) {
 			status = "fail"
 		}
 		updateSection(status, ev.Message)
-		addLog(marker + " " + status + "   " + string(ev.Section) + "  " + ev.Message)
+		addLog(marker + " " + i18n.PadCells(i18n.StatusLabel(status), 7) + "   " + string(ev.Section) + "  " + ev.Message)
 	case suite.EventSectionSkip:
 		updateSection("skip", "")
 	case suite.EventSuiteDone:
-		addLog("● suite complete  " + ev.Message)
+		addLog("● " + i18n.T("tui.suiteRunning.complete") + "  " + ev.Message)
 	}
 	return m, waitForSuiteEvent(m.suiteEventCh)
 }
@@ -189,16 +189,16 @@ func viewSuiteRunning(m Model) string {
 
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(t.Primary)
 	header := lipgloss.JoinHorizontal(lipgloss.Bottom,
-		titleStyle.Render("◈ Running Suite"),
+		titleStyle.Render(i18n.T("tui.suiteRunning.title")),
 		"    ",
-		lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("elapsed %s", elapsed)),
+		lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.Tf("tui.running.elapsed", map[string]any{"Elapsed": elapsed.String()})),
 	)
 
 	barWidth := width - 30
 	if barWidth < 20 {
 		barWidth = 20
 	}
-	progressLine := comp.ProgressLine(barWidth, ratio, "Overall", t.Primary) +
+	progressLine := comp.ProgressLine(barWidth, ratio, i18n.T("tui.running.overall"), t.Primary) +
 		lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("  %d/%d  ✗%d", done, total, failed))
 	if m.height < 40 {
 		return viewSuiteRunningCompact(m, header, progressLine)
@@ -230,7 +230,7 @@ func viewSuiteRunning(m Model) string {
 		}
 		body := lipgloss.NewStyle().Foreground(t.Muted).Render(strings.Join(logLines, "\n"))
 		logCard := comp.Card{
-			Title:  "Event Log",
+			Title:  i18n.T("tui.running.eventLog"),
 			Body:   body,
 			Accent: t.Accent,
 			Width:  width - 2,
@@ -242,11 +242,11 @@ func viewSuiteRunning(m Model) string {
 
 	if m.confirm {
 		modal := comp.Modal{
-			Title: "Cancel suite?",
-			Body:  "Running section will be aborted.",
+			Title: i18n.T("tui.modal.cancelSuite"),
+			Body:  i18n.T("tui.modal.cancelSuiteBody"),
 			Actions: []comp.ModalAction{
-				{Key: "y", Label: "Cancel suite", Selected: true, Danger: true},
-				{Key: "n", Label: "Keep running"},
+				{Key: "y", Label: i18n.T("tui.modal.cancelSuite"), Selected: true, Danger: true},
+				{Key: "n", Label: i18n.T("tui.modal.keepRunning")},
 			},
 			Width: 50,
 		}
@@ -269,14 +269,14 @@ func viewSuiteRunningCompact(m Model, header, progressLine string) string {
 		if len(logLines) > 2 {
 			logLines = logLines[len(logLines)-2:]
 		}
-		parts = append(parts, "", lipgloss.NewStyle().Bold(true).Foreground(t.Accent).Render("Recent events"))
+		parts = append(parts, "", lipgloss.NewStyle().Bold(true).Foreground(t.Accent).Render(i18n.T("tui.suiteRunning.recentEvents")))
 		for _, line := range logLines {
 			parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(truncStr(line, lineWidth)))
 		}
 	}
 	if m.confirm {
-		prompt := lipgloss.NewStyle().Bold(true).Foreground(t.Danger).Render("Cancel suite?") +
-			lipgloss.NewStyle().Foreground(t.Muted).Render("  y cancel  ·  n keep running")
+		prompt := lipgloss.NewStyle().Bold(true).Foreground(t.Danger).Render(i18n.T("tui.modal.cancelSuite")) +
+			lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.T("tui.modal.cancelSuiteCompact"))
 		parts = append(parts, "", prompt)
 	}
 	return strings.Join(parts, "\n")
@@ -303,9 +303,9 @@ func suiteSectionStatus(m Model, s suiteSection, maxWidth int) string {
 	case "skip", "skipped":
 		return comp.StatusPill(comp.StatusSkip, "skipped")
 	case "running":
-		return m.spinner.View() + " " + lipgloss.NewStyle().Foreground(theme.Active.Warning).Render("running...")
+		return m.spinner.View() + " " + lipgloss.NewStyle().Foreground(theme.Active.Warning).Render(i18n.T("tui.suiteRunning.runningNow"))
 	default:
-		return comp.StatusPill(comp.StatusWaiting, "waiting")
+		return comp.StatusPill(comp.StatusWaiting, i18n.StatusLabel("waiting"))
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/cloudapp3/vmbench/bench/netio"
+	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/sysinfo"
 )
@@ -195,6 +196,78 @@ func TestSuitePagesFit80x24Terminal(t *testing.T) {
 	}
 }
 
+// TestSuitePagesFit80x24TerminalZhCN re-runs the fixture pages under zh-CN:
+// every label becomes double-width CJK, so the ≤80-cell bound is the gate
+// that catches truncation and padding regressions.
+func TestSuitePagesFit80x24TerminalZhCN(t *testing.T) {
+	if !i18n.SetLang("zh-CN") {
+		t.Fatal("zh-CN not supported")
+	}
+	t.Cleanup(func() { i18n.SetLang("en") })
+
+	const (
+		width  = 80
+		height = 24
+	)
+	info := sysinfo.SystemInfo{CPU: sysinfo.CPUInfo{
+		Model:         "AMD EPYC-Milan Processor",
+		PhysicalCores: 6,
+		LogicalCores:  6,
+	}}
+	report := compactSuiteReportFixture()
+
+	tests := []struct {
+		name     string
+		page     page
+		setup    func(*Model)
+		expected []string
+	}{
+		{
+			name: "config",
+			page: pageSuiteConfig,
+			setup: func(m *Model) {
+				m.suiteConfig.field = fieldAdvanced
+			},
+			expected: []string{"综合测试配置", "网络目录来源", "开始综合测试"},
+		},
+		{
+			name: "running",
+			page: pageSuiteRunning,
+			setup: func(m *Model) {
+				m.suiteSections = compactSuiteSectionsFixture()
+			},
+			expected: []string{"综合测试运行中", "硬件"},
+		},
+		{
+			name:     "results",
+			page:     pageSuiteResults,
+			setup:    func(m *Model) { m.suiteReport = &report },
+			expected: []string{"综合测试报告", "网络信息"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewModel("", "")
+			m.page = tt.page
+			m.width = width
+			m.height = height
+			m.sysInfo = info
+			if tt.setup != nil {
+				tt.setup(&m)
+			}
+
+			view := m.View()
+			assertRenderBounds(t, view, width, height)
+			for _, expected := range tt.expected {
+				if !strings.Contains(view, expected) {
+					t.Errorf("view does not contain %q:\n%s", expected, view)
+				}
+			}
+		})
+	}
+}
+
 func TestCompactSuiteConfigKeepsFieldNavigation(t *testing.T) {
 	m := NewModel("", "")
 	m.page = pageSuiteConfig
@@ -277,17 +350,10 @@ func assertRenderBounds(t *testing.T, view string, width, height int) {
 }
 
 func compactSuiteSectionsFixture() []suiteSection {
-	return []suiteSection{
-		{id: suite.SectionHardware, label: "Hardware", status: "done", message: "ok"},
-		{id: suite.SectionNetworkInfo, label: "Network Info", status: "done", message: "ok"},
-		{id: suite.SectionRoute, label: "Route", status: "done", message: "ok"},
-		{id: suite.SectionPing, label: "Ping", status: "running"},
-		{id: suite.SectionSpeed, label: "Speed", status: "waiting"},
-		{id: suite.SectionIPQuality, label: "IP Quality", status: "waiting"},
-		{id: suite.SectionReachability, label: "Reachability", status: "waiting"},
-		{id: suite.SectionMail, label: "Mail Ports", status: "skip"},
-		{id: suite.SectionMedia, label: "Media Unlock", status: "waiting"},
-	}
+	return newSuiteSections(suite.SectionSelector{
+		Hardware: true, NetworkInfo: true, Route: true, Ping: true, Speed: true,
+		IPQuality: true, Reachability: true, Mail: true, Media: true,
+	})
 }
 
 func compactSuiteReportFixture() suite.SuiteReport {

@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/sysinfo"
 	"github.com/cloudapp3/vmbench/tui/comp"
@@ -35,12 +36,16 @@ type menuItem struct {
 	engine string
 }
 
-var menuItems = []menuItem{
-	{label: "Run Hardware Benchmark", desc: "Tool-defined single/multi CPU, memory, and disk tests", mode: "single", engine: "external"},
-	{label: "Run Suite (VPS Composite)", desc: "ECS-style: hardware + net + IP + media", mode: "suite"},
-	{label: "Compare Reports", desc: "Compare two JSON reports", mode: "compare"},
-	{label: "System Info", desc: "Show system information", mode: "sysinfo"},
-	{label: "Quit", desc: "", mode: "quit"},
+// menuItems is a function, not a package var: package vars initialize
+// before main() runs, before the active language is selected.
+func menuItems() []menuItem {
+	return []menuItem{
+		{label: i18n.T("tui.menu.runHardware"), desc: i18n.T("tui.menu.runHardwareDesc"), mode: "single", engine: "external"},
+		{label: i18n.T("tui.menu.runSuite"), desc: i18n.T("tui.menu.runSuiteDesc"), mode: "suite"},
+		{label: i18n.T("tui.menu.compare"), desc: i18n.T("tui.menu.compareDesc"), mode: "compare"},
+		{label: i18n.T("tui.menu.sysinfo"), desc: i18n.T("tui.menu.sysinfoDesc"), mode: "sysinfo"},
+		{label: i18n.T("tui.menu.quit"), desc: "", mode: "quit"},
+	}
 }
 
 type benchmarkStartMsg struct {
@@ -201,9 +206,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var t comp.Toast
 		var c tea.Cmd
 		if msg.err != nil {
-			t, c = comp.ShowToast("save failed: "+msg.err.Error(), comp.ToastError, 4*time.Second)
+			t, c = comp.ShowToast(i18n.Tf("tui.toast.saveFailed", map[string]any{"Err": msg.err.Error()}), comp.ToastError, 4*time.Second)
 		} else {
-			t, c = comp.ShowToast("saved → "+msg.path, comp.ToastSuccess, 3*time.Second)
+			t, c = comp.ShowToast(i18n.Tf("tui.toast.saved", map[string]any{"Path": msg.path}), comp.ToastSuccess, 3*time.Second)
 		}
 		m.toast = t
 		return m, c
@@ -215,7 +220,7 @@ func (m Model) View() string {
 	if m.width < 60 || m.height < 18 {
 		return lipgloss.NewStyle().
 			Foreground(theme.Active.Warning).
-			Render(fmt.Sprintf("\n  Terminal too small (need ≥60x18, got %dx%d)\n  Resize or zoom out.", m.width, m.height))
+			Render(fmt.Sprintf("\n  %s\n  %s", i18n.Tf("tui.tooSmall", map[string]any{"Width": m.width, "Height": m.height}), i18n.T("tui.tooSmallHint")))
 	}
 
 	header := renderHeader(m)
@@ -256,11 +261,9 @@ func (m Model) View() string {
 
 func renderHeader(m Model) string {
 	cpu := m.sysInfo.CPU.Model
-	if len(cpu) > 30 {
-		cpu = cpu[:30] + "…"
-	}
+	cpu = i18n.TruncateCells(cpu, 30)
 	if cpu == "" {
-		cpu = "loading..."
+		cpu = i18n.T("tui.header.loading")
 	}
 	return comp.Header(comp.HeaderInfo{
 		Brand:     " VMBENCH ",
@@ -278,48 +281,48 @@ func renderFooter(m Model) string {
 	switch m.page {
 	case pageDashboard:
 		hints = []comp.Hint{
-			{Key: "↑↓", Desc: "nav"},
-			{Key: "↵", Desc: "select"},
-			{Key: "t", Desc: "theme"},
-			{Key: "q", Desc: "quit"},
+			{Key: "↑↓", Desc: i18n.T("tui.hint.nav")},
+			{Key: "↵", Desc: i18n.T("tui.hint.select")},
+			{Key: "t", Desc: i18n.T("tui.hint.theme")},
+			{Key: "q", Desc: i18n.T("tui.hint.quit")},
 		}
 	case pageRunning:
 		hints = []comp.Hint{
-			{Key: "esc", Desc: "cancel"},
-			{Key: "tab", Desc: "log"},
-			{Key: "q", Desc: "quit"},
+			{Key: "esc", Desc: i18n.T("tui.hint.cancel")},
+			{Key: "tab", Desc: i18n.T("tui.hint.log")},
+			{Key: "q", Desc: i18n.T("tui.hint.quit")},
 		}
 	case pageResults:
 		hints = []comp.Hint{
-			{Key: "tab", Desc: "view"},
-			{Key: "↑↓", Desc: "nav"},
-			{Key: "↵", Desc: "expand"},
-			{Key: "s", Desc: "save"},
-			{Key: "esc", Desc: "back"},
+			{Key: "tab", Desc: i18n.T("tui.hint.view")},
+			{Key: "↑↓", Desc: i18n.T("tui.hint.nav")},
+			{Key: "↵", Desc: i18n.T("tui.hint.expand")},
+			{Key: "s", Desc: i18n.T("tui.hint.save")},
+			{Key: "esc", Desc: i18n.T("tui.hint.back")},
 		}
 	case pageCompare:
 		hints = []comp.Hint{
-			{Key: "esc", Desc: "back"},
-			{Key: "q", Desc: "quit"},
+			{Key: "esc", Desc: i18n.T("tui.hint.back")},
+			{Key: "q", Desc: i18n.T("tui.hint.quit")},
 		}
 	case pageSuiteConfig:
 		hints = []comp.Hint{
-			{Key: "↑↓", Desc: "field"},
-			{Key: "←→", Desc: "choose"},
-			{Key: "spc", Desc: "toggle"},
-			{Key: "↵", Desc: "start"},
-			{Key: "esc", Desc: "back"},
+			{Key: "↑↓", Desc: i18n.T("tui.hint.field")},
+			{Key: "←→", Desc: i18n.T("tui.hint.choose")},
+			{Key: "spc", Desc: i18n.T("tui.hint.toggle")},
+			{Key: "↵", Desc: i18n.T("tui.hint.start")},
+			{Key: "esc", Desc: i18n.T("tui.hint.back")},
 		}
 	case pageSuiteRunning:
 		hints = []comp.Hint{
-			{Key: "esc", Desc: "cancel"},
-			{Key: "tab", Desc: "log"},
-			{Key: "q", Desc: "quit"},
+			{Key: "esc", Desc: i18n.T("tui.hint.cancel")},
+			{Key: "tab", Desc: i18n.T("tui.hint.log")},
+			{Key: "q", Desc: i18n.T("tui.hint.quit")},
 		}
 	case pageSuiteResults:
 		hints = []comp.Hint{
-			{Key: "esc", Desc: "back"},
-			{Key: "q", Desc: "quit"},
+			{Key: "esc", Desc: i18n.T("tui.hint.back")},
+			{Key: "q", Desc: i18n.T("tui.hint.quit")},
 		}
 	}
 	return comp.Footer(m.width, hints)

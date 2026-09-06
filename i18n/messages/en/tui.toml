@@ -1,0 +1,361 @@
+# TUI surface: menus, hints, modals, tables, suite config and results.
+
+[tui.menu.runHardware]
+other = "Run Hardware Benchmark"
+
+[tui.menu.runHardwareDesc]
+other = "Tool-defined single/multi CPU, memory, and disk tests"
+
+[tui.menu.runSuite]
+other = "Run Suite (VPS Composite)"
+
+[tui.menu.runSuiteDesc]
+other = "ECS-style: hardware + net + IP + media"
+
+[tui.menu.compare]
+other = "Compare Reports"
+
+[tui.menu.compareDesc]
+other = "Compare two JSON reports"
+
+[tui.menu.sysinfo]
+other = "System Info"
+
+[tui.menu.sysinfoDesc]
+other = "Show system information"
+
+[tui.menu.quit]
+other = "Quit"
+
+[tui.dashboard.tagline]
+other = "  cross-platform VPS benchmark · measured raw metrics"
+
+[tui.dashboard.menu]
+other = "Menu"
+
+[tui.dashboard.theme]
+other = "theme"
+
+[tui.dashboard.themeCycle]
+other = "  press [t] to cycle"
+
+[tui.header.loading]
+other = "loading..."
+
+[tui.tooSmall]
+other = "Terminal too small (need ≥60x18, got {{.Width}}x{{.Height}})"
+
+[tui.tooSmallHint]
+other = "Resize or zoom out."
+
+[tui.toast.saveFailed]
+other = "save failed: {{.Err}}"
+
+[tui.toast.saved]
+other = "saved → {{.Path}}"
+
+[tui.hint.nav]
+other = "nav"
+
+[tui.hint.select]
+other = "select"
+
+[tui.hint.theme]
+other = "theme"
+
+[tui.hint.quit]
+other = "quit"
+
+[tui.hint.cancel]
+other = "cancel"
+
+[tui.hint.log]
+other = "log"
+
+[tui.hint.view]
+other = "view"
+
+[tui.hint.expand]
+other = "expand"
+
+[tui.hint.save]
+other = "save"
+
+[tui.hint.back]
+other = "back"
+
+[tui.hint.field]
+other = "field"
+
+[tui.hint.choose]
+other = "choose"
+
+[tui.hint.toggle]
+other = "toggle"
+
+[tui.hint.start]
+other = "start"
+
+[tui.running.title]
+other = "▸ Running: {{.Phase}} ({{.Engine}} engine)"
+
+[tui.running.elapsed]
+other = "elapsed {{.Elapsed}}"
+
+[tui.running.overall]
+other = "Overall"
+
+[tui.running.eventLog]
+other = "Event Log"
+
+[tui.phase.Hardware]
+other = "Hardware"
+
+[tui.phase.Multi-Core]
+other = "Multi-Core"
+
+[tui.modal.cancelBenchmark]
+other = "Cancel benchmark?"
+
+[tui.modal.cancelBenchmarkBody]
+other = "Workloads in progress will be aborted."
+
+[tui.modal.cancelRun]
+other = "Cancel run"
+
+[tui.modal.keepRunning]
+other = "Keep running"
+
+[tui.modal.cancelSuite]
+other = "Cancel suite?"
+
+[tui.modal.cancelSuiteBody]
+other = "Running section will be aborted."
+
+[tui.modal.cancelSuiteCompact]
+other = "  y cancel  ·  n keep running"
+
+[tui.results.noResults]
+other = "No results available."
+
+[tui.results.title]
+other = "◈ Benchmark Results"
+
+[tui.results.statsPrefix]
+other = "  workloads {{.Count}}  •  "
+
+[tui.results.okCount]
+other = "✓ {{.Count}} ok"
+
+[tui.results.failCount]
+other = "✗ {{.Count}} fail"
+
+[tui.results.tabCards]
+other = "Cards"
+
+[tui.results.tabGrouped]
+other = "Grouped"
+
+[tui.results.tabFlat]
+other = "Flat"
+
+[tui.results.extensions]
+other = "◇ Extensions"
+
+[tui.results.error]
+other = "error"
+
+[tui.results.okLabel]
+other = "✓ ok"
+
+[tui.results.failLabel]
+other = "✗ fail"
+
+[tui.results.workloadCount]
+other = "{{.Count}} workloads"
+
+[tui.col.workload]
+other = "Workload"
+
+[tui.col.category]
+other = "Category"
+
+[tui.col.time]
+other = "Time"
+
+[tui.col.throughput]
+other = "Throughput"
+
+[tui.col.latency]
+other = "Latency"
+
+[tui.col.status]
+other = "Status"
+
+[tui.col.metric]
+other = "Metric"
+
+[tui.compare.title]
+other = "⇄ Compare Reports"
+
+[tui.compare.usageBody]
+other = "Usage:\n  vmbench tui --compare-a <a.json> --compare-b <b.json>\n\nOr use the CLI:\n  vmbench compare <a.json> <b.json>"
+
+[tui.compare.howTo]
+other = "How to compare"
+
+[tui.compare.error]
+other = "Error: {{.Err}}"
+
+[tui.compare.workloadDelta]
+other = "◇ Workload Delta"
+
+[tui.compare.path]
+other = "Path"
+
+[tui.compare.cores]
+other = "Cores"
+
+[tui.compare.reportCard]
+other = "Report {{.Label}}"
+
+[tui.sys.cardTitle]
+other = "System"
+
+[tui.sys.coresThreads]
+other = "{{.Cores}} cores / {{.Threads}} threads"
+
+[tui.sys.memory]
+other = "Memory"
+
+[tui.sys.os]
+other = "OS"
+
+[tui.sys.kernel]
+other = "Kernel"
+
+[tui.sys.freq]
+other = "freq {{.Base}} / {{.Max}} MHz"
+
+[tui.sys.detailsTitle]
+other = "Details"
+
+[tui.sys.features]
+other = "Features"
+
+[tui.sys.arch]
+other = "Arch"
+
+[tui.sys.cache]
+other = "Cache"
+
+[tui.suiteRunning.title]
+other = "◈ Running Suite"
+
+[tui.suiteRunning.recentEvents]
+other = "Recent events"
+
+[tui.suiteRunning.runningNow]
+other = "running..."
+
+[tui.suiteRunning.complete]
+other = "suite complete"
+
+[tui.suiteConfig.title]
+other = "◈ Suite Configuration"
+
+[tui.suiteConfig.description]
+other = "VPS evidence suite — host, identity, route, latency, speed, reachability, IP, mail, media"
+
+[tui.suiteConfig.helpFull]
+other = "  ↑↓ field   ←→ choose   space toggle   enter start   esc back"
+
+[tui.suiteConfig.helpCompact]
+other = "↑↓ field  ←→ choose  space toggle  enter next/start  esc back"
+
+[tui.suiteConfig.summary]
+other = "{{.Preset}}  |  {{.Sections}} sections  |  IP {{.IP}}  |  {{.Iterations}} iterations"
+
+[tui.suiteConfig.ready]
+other = "Ready"
+
+[tui.suiteConfig.readyBody]
+other = "{{.Count}} sections selected  ·  press enter to run"
+
+[tui.suiteConfig.customPreset]
+other = "Custom"
+
+[tui.suiteConfig.preset]
+other = "Preset"
+
+[tui.suiteConfig.sections]
+other = "Sections"
+
+[tui.suiteConfig.needOneSection]
+other = "at least one section required"
+
+[tui.suiteConfig.runtime]
+other = "Runtime"
+
+[tui.suiteConfig.iterations]
+other = "Iterations {{.Count}}"
+
+[tui.suiteConfig.ipVersion]
+other = "IP {{.Version}}"
+
+[tui.suiteConfig.timeout]
+other = "Timeout {{.Timeout}}"
+
+[tui.suiteConfig.hardwareTools]
+other = "Hardware Tools"
+
+[tui.suiteConfig.speedProviders]
+other = "Speed Providers"
+
+[tui.suiteConfig.routePresets]
+other = "China Route Presets"
+
+[tui.suiteConfig.mediaSets]
+other = "Media Sets"
+
+[tui.suiteConfig.ipSources]
+other = "IP Quality Sources"
+
+[tui.suiteConfig.provenance]
+other = "Network Provenance"
+
+[tui.suiteConfig.iperf]
+other = "iperf: {{.Value}}"
+
+[tui.suiteConfig.catalog]
+other = "catalog: {{.Value}}"
+
+[tui.suiteConfig.revision]
+other = "revision: {{.Value}}"
+
+[tui.suiteConfig.latestSelected]
+other = "latest selected"
+
+[tui.suiteConfig.start]
+other = "▶ Start Suite"
+
+[tui.suiteConfig.startDisabled]
+other = "▶ Start (disabled)"
+
+[tui.suiteResults.title]
+other = "◈ Suite Report"
+
+[tui.suiteResults.noSections]
+other = "No enabled sections."
+
+[tui.suiteResults.noIdentityEvidence]
+other = "no identity evidence"
+
+[tui.suiteResults.noProviders]
+other = "no providers"
+
+[tui.suiteResults.noData]
+other = "no data"
+
+[tui.suiteResults.moreItems]
+other = "... +{{.Count}} more (see JSON/HTML report)"

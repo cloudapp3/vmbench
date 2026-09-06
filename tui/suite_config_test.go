@@ -30,8 +30,8 @@ func TestNewSuiteConfigStateUsesQuickDefaults(t *testing.T) {
 	if state.speedProviders[suite.SpeedProviderIperf3] {
 		t.Fatal("iperf3 should not be selected without a host")
 	}
-	if !slices.Contains(state.sectionKeys, "NetworkInfo") || !slices.Contains(state.sectionKeys, "Reachability") {
-		t.Fatalf("section keys = %v, want network evidence sections", state.sectionKeys)
+	if !slices.Contains(state.sectionIDs, suite.SectionNetworkInfo) || !slices.Contains(state.sectionIDs, suite.SectionReachability) {
+		t.Fatalf("section ids = %v, want network evidence sections", state.sectionIDs)
 	}
 	for _, id := range []string{"cd", "cernet", "cstnet"} {
 		if !slices.Contains(state.routeIDs, id) {

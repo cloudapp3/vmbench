@@ -1,0 +1,361 @@
+# TUI 界面: 菜单、按键提示、弹窗、表格、suite 配置与结果。
+
+[tui.menu.runHardware]
+other = "运行硬件基准测试"
+
+[tui.menu.runHardwareDesc]
+other = "外部工具驱动的 CPU/内存/磁盘测试"
+
+[tui.menu.runSuite]
+other = "运行综合测试 (VPS Suite)"
+
+[tui.menu.runSuiteDesc]
+other = "ECS 风格: 硬件 + 网络 + IP + 流媒体"
+
+[tui.menu.compare]
+other = "对比报告"
+
+[tui.menu.compareDesc]
+other = "对比两份 JSON 报告"
+
+[tui.menu.sysinfo]
+other = "系统信息"
+
+[tui.menu.sysinfoDesc]
+other = "显示系统信息"
+
+[tui.menu.quit]
+other = "退出"
+
+[tui.dashboard.tagline]
+other = "  跨平台 VPS 基准测试 · 原始指标实测"
+
+[tui.dashboard.menu]
+other = "菜单"
+
+[tui.dashboard.theme]
+other = "主题"
+
+[tui.dashboard.themeCycle]
+other = "  按 [t] 切换"
+
+[tui.header.loading]
+other = "加载中..."
+
+[tui.tooSmall]
+other = "终端尺寸过小 (需要 ≥60x18,当前 {{.Width}}x{{.Height}})"
+
+[tui.tooSmallHint]
+other = "请调整终端大小。"
+
+[tui.toast.saveFailed]
+other = "保存失败: {{.Err}}"
+
+[tui.toast.saved]
+other = "已保存 → {{.Path}}"
+
+[tui.hint.nav]
+other = "移动"
+
+[tui.hint.select]
+other = "选择"
+
+[tui.hint.theme]
+other = "主题"
+
+[tui.hint.quit]
+other = "退出"
+
+[tui.hint.cancel]
+other = "取消"
+
+[tui.hint.log]
+other = "日志"
+
+[tui.hint.view]
+other = "视图"
+
+[tui.hint.expand]
+other = "展开"
+
+[tui.hint.save]
+other = "保存"
+
+[tui.hint.back]
+other = "返回"
+
+[tui.hint.field]
+other = "字段"
+
+[tui.hint.choose]
+other = "选择"
+
+[tui.hint.toggle]
+other = "勾选"
+
+[tui.hint.start]
+other = "开始"
+
+[tui.running.title]
+other = "▸ 正在运行: {{.Phase}} ({{.Engine}} 引擎)"
+
+[tui.running.elapsed]
+other = "已用时 {{.Elapsed}}"
+
+[tui.running.overall]
+other = "总体"
+
+[tui.running.eventLog]
+other = "事件日志"
+
+[tui.phase.Hardware]
+other = "硬件"
+
+[tui.phase.Multi-Core]
+other = "多核"
+
+[tui.modal.cancelBenchmark]
+other = "取消基准测试?"
+
+[tui.modal.cancelBenchmarkBody]
+other = "进行中的工作负载将被中止。"
+
+[tui.modal.cancelRun]
+other = "取消运行"
+
+[tui.modal.keepRunning]
+other = "继续运行"
+
+[tui.modal.cancelSuite]
+other = "取消综合测试?"
+
+[tui.modal.cancelSuiteBody]
+other = "进行中的 section 将被中止。"
+
+[tui.modal.cancelSuiteCompact]
+other = "  y 取消  ·  n 继续"
+
+[tui.results.noResults]
+other = "暂无结果。"
+
+[tui.results.title]
+other = "◈ 基准测试结果"
+
+[tui.results.statsPrefix]
+other = "  工作负载 {{.Count}}  •  "
+
+[tui.results.okCount]
+other = "✓ {{.Count}} 成功"
+
+[tui.results.failCount]
+other = "✗ {{.Count}} 失败"
+
+[tui.results.tabCards]
+other = "卡片"
+
+[tui.results.tabGrouped]
+other = "分组"
+
+[tui.results.tabFlat]
+other = "平铺"
+
+[tui.results.extensions]
+other = "◇ 扩展工作负载"
+
+[tui.results.error]
+other = "错误"
+
+[tui.results.okLabel]
+other = "✓ 成功"
+
+[tui.results.failLabel]
+other = "✗ 失败"
+
+[tui.results.workloadCount]
+other = "{{.Count}} 个工作负载"
+
+[tui.col.workload]
+other = "工作负载"
+
+[tui.col.category]
+other = "分类"
+
+[tui.col.time]
+other = "耗时"
+
+[tui.col.throughput]
+other = "吞吐"
+
+[tui.col.latency]
+other = "延迟"
+
+[tui.col.status]
+other = "状态"
+
+[tui.col.metric]
+other = "指标"
+
+[tui.compare.title]
+other = "⇄ 对比报告"
+
+[tui.compare.usageBody]
+other = "用法:\n  vmbench tui --compare-a <a.json> --compare-b <b.json>\n\n或使用 CLI:\n  vmbench compare <a.json> <b.json>"
+
+[tui.compare.howTo]
+other = "如何对比"
+
+[tui.compare.error]
+other = "错误: {{.Err}}"
+
+[tui.compare.workloadDelta]
+other = "◇ 工作负载差异"
+
+[tui.compare.path]
+other = "路径"
+
+[tui.compare.cores]
+other = "核心"
+
+[tui.compare.reportCard]
+other = "报告 {{.Label}}"
+
+[tui.sys.cardTitle]
+other = "系统"
+
+[tui.sys.coresThreads]
+other = "{{.Cores}} 核 / {{.Threads}} 线程"
+
+[tui.sys.memory]
+other = "内存"
+
+[tui.sys.os]
+other = "系统"
+
+[tui.sys.kernel]
+other = "内核"
+
+[tui.sys.freq]
+other = "频率 {{.Base}} / {{.Max}} MHz"
+
+[tui.sys.detailsTitle]
+other = "详情"
+
+[tui.sys.features]
+other = "特性"
+
+[tui.sys.arch]
+other = "架构"
+
+[tui.sys.cache]
+other = "缓存"
+
+[tui.suiteRunning.title]
+other = "◈ 综合测试运行中"
+
+[tui.suiteRunning.recentEvents]
+other = "最近事件"
+
+[tui.suiteRunning.runningNow]
+other = "运行中..."
+
+[tui.suiteRunning.complete]
+other = "综合测试完成"
+
+[tui.suiteConfig.title]
+other = "◈ 综合测试配置"
+
+[tui.suiteConfig.description]
+other = "VPS 证据套件 — 主机、身份、回程、延迟、测速、可达性、IP、邮件、流媒体"
+
+[tui.suiteConfig.helpFull]
+other = "  ↑↓ 字段   ←→ 选择   空格 勾选   回车 开始   esc 返回"
+
+[tui.suiteConfig.helpCompact]
+other = "↑↓ 字段  ←→ 选择  空格 勾选  回车 下一步/开始  esc 返回"
+
+[tui.suiteConfig.summary]
+other = "{{.Preset}}  |  {{.Sections}} 个 section  |  IP {{.IP}}  |  {{.Iterations}} 次迭代"
+
+[tui.suiteConfig.ready]
+other = "就绪"
+
+[tui.suiteConfig.readyBody]
+other = "已选 {{.Count}} 个 section  ·  按回车运行"
+
+[tui.suiteConfig.customPreset]
+other = "自定义"
+
+[tui.suiteConfig.preset]
+other = "预设"
+
+[tui.suiteConfig.sections]
+other = "Section 选择"
+
+[tui.suiteConfig.needOneSection]
+other = "至少需要选择一个 section"
+
+[tui.suiteConfig.runtime]
+other = "运行参数"
+
+[tui.suiteConfig.iterations]
+other = "迭代 {{.Count}}"
+
+[tui.suiteConfig.ipVersion]
+other = "IP {{.Version}}"
+
+[tui.suiteConfig.timeout]
+other = "超时 {{.Timeout}}"
+
+[tui.suiteConfig.hardwareTools]
+other = "硬件测试工具"
+
+[tui.suiteConfig.speedProviders]
+other = "测速提供方"
+
+[tui.suiteConfig.routePresets]
+other = "国内回程预设"
+
+[tui.suiteConfig.mediaSets]
+other = "流媒体集合"
+
+[tui.suiteConfig.ipSources]
+other = "IP 质量来源"
+
+[tui.suiteConfig.provenance]
+other = "网络目录来源"
+
+[tui.suiteConfig.iperf]
+other = "iperf: {{.Value}}"
+
+[tui.suiteConfig.catalog]
+other = "目录: {{.Value}}"
+
+[tui.suiteConfig.revision]
+other = "版本: {{.Value}}"
+
+[tui.suiteConfig.latestSelected]
+other = "使用最新版"
+
+[tui.suiteConfig.start]
+other = "▶ 开始综合测试"
+
+[tui.suiteConfig.startDisabled]
+other = "▶ 开始 (未就绪)"
+
+[tui.suiteResults.title]
+other = "◈ 综合测试报告"
+
+[tui.suiteResults.noSections]
+other = "没有启用的 section。"
+
+[tui.suiteResults.noIdentityEvidence]
+other = "无身份证据"
+
+[tui.suiteResults.noProviders]
+other = "无提供方"
+
+[tui.suiteResults.noData]
+other = "无数据"
+
+[tui.suiteResults.moreItems]
+other = "... 另有 {{.Count}} 项 (见 JSON/HTML 报告)"

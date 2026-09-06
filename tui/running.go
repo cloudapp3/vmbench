@@ -11,6 +11,7 @@ import (
 
 	"github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/catalog"
+	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
 )
@@ -101,7 +102,7 @@ func updateWorkloadEvent(m Model, ev vmbench.Event) (tea.Model, tea.Cmd) {
 				break
 			}
 		}
-		addLog("✓ done   " + ev.Workload + "  " + ev.Metric)
+		addLog("✓ " + i18n.PadCells(i18n.StatusLabel("done"), 7) + " " + ev.Workload + "  " + ev.Metric)
 		return m, waitForEvent(m.eventCh)
 
 	case vmbench.EventSuiteFail:
@@ -118,7 +119,7 @@ func updateWorkloadEvent(m Model, ev vmbench.Event) (tea.Model, tea.Cmd) {
 		if ev.Err != nil {
 			errMsg = ev.Err.Error()
 		}
-		addLog("✗ fail   " + ev.Workload + "  " + errMsg)
+		addLog("✗ " + i18n.PadCells(i18n.StatusLabel("fail"), 7) + " " + ev.Workload + "  " + errMsg)
 		return m, waitForEvent(m.eventCh)
 
 	case vmbench.EventSuiteSkip:
@@ -128,11 +129,11 @@ func updateWorkloadEvent(m Model, ev vmbench.Event) (tea.Model, tea.Cmd) {
 				break
 			}
 		}
-		addLog("⊘ skip   " + ev.Workload)
+		addLog("⊘ " + i18n.PadCells(i18n.StatusLabel("skip"), 7) + " " + ev.Workload)
 		return m, waitForEvent(m.eventCh)
 
 	case vmbench.EventBenchDone:
-		addLog("● benchmark complete")
+		addLog("● " + i18n.T("cli.progress.benchmarkComplete"))
 		return m, waitForEvent(m.eventCh)
 	}
 	return m, waitForEvent(m.eventCh)
@@ -204,10 +205,13 @@ func viewRunning(m Model) string {
 		elapsed = time.Since(m.startedAt).Truncate(time.Second)
 	}
 	headerTitle := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render(
-		fmt.Sprintf("▸ Running: %s (%s engine)", m.phase, strings.ToUpper(firstStr(m.engine, "external"))),
+		i18n.Tf("tui.running.title", map[string]any{
+			"Phase":  i18n.Tfallback("tui.phase."+m.phase, m.phase),
+			"Engine": strings.ToUpper(firstStr(m.engine, "external")),
+		}),
 	)
 	timeStr := lipgloss.NewStyle().Foreground(t.Muted).Render(
-		fmt.Sprintf("elapsed %s", elapsed),
+		i18n.Tf("tui.running.elapsed", map[string]any{"Elapsed": elapsed.String()}),
 	)
 	headLine := lipgloss.JoinHorizontal(lipgloss.Bottom, headerTitle, "    ", timeStr)
 
@@ -215,7 +219,7 @@ func viewRunning(m Model) string {
 	if barWidth < 20 {
 		barWidth = 20
 	}
-	progressLine := comp.ProgressLine(barWidth, ratio, "Overall", t.Primary) +
+	progressLine := comp.ProgressLine(barWidth, ratio, i18n.T("tui.running.overall"), t.Primary) +
 		lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("  %d/%d  ✗%d", done, total, failed))
 
 	groups := groupWorkloads(m.workloads)
@@ -245,7 +249,7 @@ func viewRunning(m Model) string {
 		}
 		body := lipgloss.NewStyle().Foreground(t.Muted).Render(strings.Join(logLines, "\n"))
 		logCard := comp.Card{
-			Title:  "Event Log",
+			Title:  i18n.T("tui.running.eventLog"),
 			Body:   body,
 			Accent: t.Accent,
 			Width:  width - 2,
@@ -257,11 +261,11 @@ func viewRunning(m Model) string {
 
 	if m.confirm {
 		modal := comp.Modal{
-			Title: "Cancel benchmark?",
-			Body:  "Workloads in progress will be aborted.",
+			Title: i18n.T("tui.modal.cancelBenchmark"),
+			Body:  i18n.T("tui.modal.cancelBenchmarkBody"),
 			Actions: []comp.ModalAction{
-				{Key: "y", Label: "Cancel run", Selected: true, Danger: true},
-				{Key: "n", Label: "Keep running"},
+				{Key: "y", Label: i18n.T("tui.modal.cancelRun"), Selected: true, Danger: true},
+				{Key: "n", Label: i18n.T("tui.modal.keepRunning")},
 			},
 			Width: 50,
 		}
@@ -310,17 +314,14 @@ func runningCard(m Model, g workloadGroup, width int) string {
 		case "done":
 			status = comp.StatusPill(comp.StatusDone, w.metric)
 		case "running":
-			status = m.spinner.View() + " " + lipgloss.NewStyle().Foreground(t.Warning).Render("running")
+			status = m.spinner.View() + " " + lipgloss.NewStyle().Foreground(t.Warning).Render(i18n.StatusLabel("running"))
 		case "fail":
-			msg := w.metric
-			if len(msg) > 30 {
-				msg = msg[:29] + "…"
-			}
+			msg := i18n.TruncateCells(w.metric, 30)
 			status = comp.StatusPill(comp.StatusFail, msg)
 		case "skip":
-			status = comp.StatusPill(comp.StatusSkip, "skipped")
+			status = comp.StatusPill(comp.StatusSkip, i18n.StatusLabel("skipped"))
 		default:
-			status = comp.StatusPill(comp.StatusWaiting, "waiting")
+			status = comp.StatusPill(comp.StatusWaiting, i18n.StatusLabel("waiting"))
 		}
 		nameW := width - 35
 		if nameW < 14 {

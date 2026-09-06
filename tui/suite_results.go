@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/cloudapp3/vmbench/bench/netio"
+	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
@@ -41,7 +42,7 @@ func viewSuiteResults(m Model) string {
 	width := m.width
 	r := *m.suiteReport
 
-	headerTitle := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render("◈ Suite Report")
+	headerTitle := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render(i18n.T("tui.suiteResults.title"))
 
 	statusColor := t.Success
 	statusIcon := "✓"
@@ -113,7 +114,7 @@ func viewSuiteResultsCompact(
 		parts = append(parts, suiteResultCompactLine(section, lineWidth))
 	}
 	if len(parts) == 3 {
-		parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render("No enabled sections."))
+		parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.T("tui.suiteResults.noSections")))
 	}
 	if m.toast.Active() {
 		parts = append(parts, "", m.toast.Render(lineWidth))
@@ -136,29 +137,10 @@ func suiteResultCompactLine(section suite.SectionSummary, width int) string {
 	return styledLabel + status + detail
 }
 
+// suiteSectionLabel is the single render-time section label source; the
+// machine ID itself never changes.
 func suiteSectionLabel(id suite.SectionID) string {
-	switch id {
-	case suite.SectionHardware:
-		return "Hardware"
-	case suite.SectionNetworkInfo:
-		return "Network Info"
-	case suite.SectionRoute:
-		return "Route"
-	case suite.SectionPing:
-		return "Ping"
-	case suite.SectionSpeed:
-		return "Speed"
-	case suite.SectionIPQuality:
-		return "IP Quality"
-	case suite.SectionReachability:
-		return "Reachability"
-	case suite.SectionMail:
-		return "Mail Ports"
-	case suite.SectionMedia:
-		return "Media Unlock"
-	default:
-		return string(id)
-	}
+	return i18n.SectionLabel(string(id))
 }
 
 func cardWidth(width int) int {
@@ -198,7 +180,7 @@ func hardwareResultCard(r suite.SuiteReport, width int) string {
 		lines = append(lines, name+" "+metric)
 	}
 	return comp.Card{
-		Title:    "Hardware",
+		Title:    suiteSectionLabel(suite.SectionHardware),
 		Subtitle: r.Hardware.Status,
 		Body:     strings.Join(lines, "\n"),
 		Accent:   sectionAccent(suite.SectionHardware),
@@ -240,9 +222,9 @@ func networkInfoResultCard(r suite.SuiteReport, width int) string {
 		)
 	}
 	if len(lines) == 0 {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render("no identity evidence"))
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.T("tui.suiteResults.noIdentityEvidence")))
 	}
-	return comp.Card{Title: "Network Info", Subtitle: r.NetworkInfo.Status, Body: strings.Join(lines, "\n"), Accent: sectionAccent(suite.SectionNetworkInfo), Width: cardWidth(width)}.Render()
+	return comp.Card{Title: suiteSectionLabel(suite.SectionNetworkInfo), Subtitle: r.NetworkInfo.Status, Body: strings.Join(lines, "\n"), Accent: sectionAccent(suite.SectionNetworkInfo), Width: cardWidth(width)}.Render()
 }
 
 func speedResultCard(r suite.SuiteReport, width int) string {
@@ -267,10 +249,10 @@ func speedResultCard(r suite.SuiteReport, width int) string {
 		lines = append(lines, nameStyled+" "+valStyled)
 	}
 	if len(lines) == 0 {
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render("no providers"))
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.T("tui.suiteResults.noProviders")))
 	}
 	return comp.Card{
-		Title:    "Speed",
+		Title:    suiteSectionLabel(suite.SectionSpeed),
 		Subtitle: r.Speed.Status,
 		Body:     strings.Join(lines, "\n"),
 		Accent:   sectionAccent(suite.SectionSpeed),
@@ -309,7 +291,7 @@ func pingResultCard(r suite.SuiteReport, width int) string {
 		lines = append(lines, nameStyled+" "+metric)
 	}
 	return comp.Card{
-		Title:    "Ping",
+		Title:    suiteSectionLabel(suite.SectionPing),
 		Subtitle: r.Ping.Status,
 		Body:     strings.Join(lines, "\n"),
 		Accent:   sectionAccent(suite.SectionPing),
@@ -331,7 +313,7 @@ func routeResultCard(r suite.SuiteReport, width int) string {
 		lines = append(lines, nameStyled+" "+hops+"  "+status)
 	}
 	return comp.Card{
-		Title:    "Route",
+		Title:    suiteSectionLabel(suite.SectionRoute),
 		Subtitle: r.Route.Status,
 		Body:     strings.Join(lines, "\n"),
 		Accent:   sectionAccent(suite.SectionRoute),
@@ -428,7 +410,7 @@ func ipQualityResultCard(r suite.SuiteReport, width int) string {
 		)
 	}
 	return comp.Card{
-		Title:    "IP Quality",
+		Title:    suiteSectionLabel(suite.SectionIPQuality),
 		Subtitle: r.IPQuality.Status,
 		Body:     strings.Join(lines, "\n"),
 		Accent:   sectionAccent(suite.SectionIPQuality),
@@ -452,7 +434,7 @@ func reachabilityResultCard(r suite.SuiteReport, width int) string {
 		}
 		lines = append(lines, name+" "+status+"  "+lipgloss.NewStyle().Foreground(t.Muted).Render(detail))
 	}
-	return comp.Card{Title: "Reachability", Subtitle: r.Reachability.Status, Body: strings.Join(lines, "\n"), Accent: sectionAccent(suite.SectionReachability), Width: cardWidth(width)}.Render()
+	return comp.Card{Title: suiteSectionLabel(suite.SectionReachability), Subtitle: r.Reachability.Status, Body: strings.Join(lines, "\n"), Accent: sectionAccent(suite.SectionReachability), Width: cardWidth(width)}.Render()
 }
 
 func mailResultCard(r suite.SuiteReport, width int) string {
@@ -468,7 +450,7 @@ func mailResultCard(r suite.SuiteReport, width int) string {
 		lines = append(lines, nameStyled+" "+status+"  "+lipgloss.NewStyle().Foreground(t.Muted).Render(p.Status))
 	}
 	return comp.Card{
-		Title:    "Mail Ports",
+		Title:    suiteSectionLabel(suite.SectionMail),
 		Subtitle: r.Mail.Status,
 		Body:     strings.Join(lines, "\n"),
 		Accent:   sectionAccent(suite.SectionMail),
@@ -489,7 +471,7 @@ func mediaResultCard(r suite.SuiteReport, width int) string {
 	for _, item := range r.Media.Result.Items {
 		if len(lines) >= mediaCardLimit {
 			lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).
-				Render(fmt.Sprintf("... +%d more (see JSON/HTML report)", len(r.Media.Result.Items)-mediaCardLimit)))
+				Render(i18n.Tf("tui.suiteResults.moreItems", map[string]any{"Count": len(r.Media.Result.Items) - mediaCardLimit})))
 			break
 		}
 		name := firstStr(item.Title, item.ID)
@@ -503,7 +485,7 @@ func mediaResultCard(r suite.SuiteReport, width int) string {
 		lines = append(lines, nameStyled+" "+status+"  "+region)
 	}
 	return comp.Card{
-		Title:    "Media Unlock",
+		Title:    suiteSectionLabel(suite.SectionMedia),
 		Subtitle: r.Media.Status,
 		Body:     strings.Join(lines, "\n"),
 		Accent:   sectionAccent(suite.SectionMedia),

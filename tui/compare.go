@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/cloudapp3/vmbench/i18n"
 	gbreport "github.com/cloudapp3/vmbench/report"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
@@ -41,12 +42,10 @@ func viewCompare(m Model) string {
 	t := theme.Active
 
 	if m.compareA == "" || m.compareB == "" {
-		title := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render("⇄ Compare Reports")
-		body := lipgloss.NewStyle().Foreground(t.Fg).Render(
-			"Usage:\n  vmbench tui --compare-a <a.json> --compare-b <b.json>\n\nOr use the CLI:\n  vmbench compare <a.json> <b.json>",
-		)
+		title := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render(i18n.T("tui.compare.title"))
+		body := lipgloss.NewStyle().Foreground(t.Fg).Render(i18n.T("tui.compare.usageBody"))
 		card := comp.Card{
-			Title:  "How to compare",
+			Title:  i18n.T("tui.compare.howTo"),
 			Body:   body,
 			Accent: t.Accent,
 			Width:  m.width - 4,
@@ -56,13 +55,13 @@ func viewCompare(m Model) string {
 
 	docs, err := loadCompareDocs(m.compareA, m.compareB)
 	if err != nil {
-		return lipgloss.NewStyle().Foreground(t.Danger).Render(fmt.Sprintf("  Error: %v", err))
+		return lipgloss.NewStyle().Foreground(t.Danger).Render("  " + i18n.Tf("tui.compare.error", map[string]any{"Err": err.Error()}))
 	}
 
 	dA, dB := docs[0], docs[1]
 	width := m.width
 
-	headerTitle := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render("⇄ Compare Reports")
+	headerTitle := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render(i18n.T("tui.compare.title"))
 
 	cardW := (width - 6) / 2
 	if cardW < 30 {
@@ -83,8 +82,8 @@ func viewCompare(m Model) string {
 	mapB := workloadMap(append(dB.Results.Workloads, dB.Extensions.Workloads...))
 
 	cols := []comp.TableColumn{
-		{Title: "Workload", Width: comp.ColWidth("Workload", 22)},
-		{Title: "Metric", Width: comp.ColWidth("Metric", 11)},
+		{Title: i18n.T("tui.col.workload"), Width: comp.ColWidth(i18n.T("tui.col.workload"), 22)},
+		{Title: i18n.T("tui.col.metric"), Width: comp.ColWidth(i18n.T("tui.col.metric"), 11)},
 		{Title: "A", Width: comp.ColWidth("A", 12), Align: lipgloss.Right},
 		{Title: "B", Width: comp.ColWidth("B", 12), Align: lipgloss.Right},
 		{Title: "Δ", Width: comp.ColWidth("Δ", 14), Align: lipgloss.Right},
@@ -103,7 +102,7 @@ func viewCompare(m Model) string {
 		rows = appendDeltaRows(rows, name, rA, rB)
 	}
 
-	tableTitle := lipgloss.NewStyle().Bold(true).Foreground(t.Secondary).Render("◇ Workload Delta")
+	tableTitle := lipgloss.NewStyle().Bold(true).Foreground(t.Secondary).Render(i18n.T("tui.compare.workloadDelta"))
 	table := comp.RenderTable(cols, rows)
 
 	return strings.Join([]string{
@@ -119,16 +118,16 @@ func viewCompare(m Model) string {
 func compareSysCard(label, path string, doc gbreport.Document, width int, accent lipgloss.AdaptiveColor) string {
 	t := theme.Active
 	rows := []comp.KV{
-		{Key: "Path", Value: truncStr(path, width-12)},
+		{Key: i18n.T("tui.compare.path"), Value: truncStr(path, width-12)},
 		{Key: "CPU", Value: truncStr(doc.System.CPU.Model, width-12)},
-		{Key: "Cores", Value: fmt.Sprintf("%d/%d", doc.System.CPU.PhysicalCores, doc.System.CPU.LogicalCores)},
-		{Key: "Memory", Value: fmt.Sprintf("%.1f GB", float64(doc.System.Memory.TotalBytes)/(1024*1024*1024))},
-		{Key: "OS", Value: truncStr(doc.System.OS.Name, width-12)},
+		{Key: i18n.T("tui.compare.cores"), Value: fmt.Sprintf("%d/%d", doc.System.CPU.PhysicalCores, doc.System.CPU.LogicalCores)},
+		{Key: i18n.T("tui.sys.memory"), Value: fmt.Sprintf("%.1f GB", float64(doc.System.Memory.TotalBytes)/(1024*1024*1024))},
+		{Key: i18n.T("tui.sys.os"), Value: truncStr(doc.System.OS.Name, width-12)},
 	}
 	body := comp.KVGrid(width-4, rows)
 	_ = t
 	return comp.Card{
-		Title:    "Report " + label,
+		Title:    i18n.Tf("tui.compare.reportCard", map[string]any{"Label": label}),
 		Subtitle: doc.Timestamp.Format("2006-01-02 15:04"),
 		Body:     body,
 		Accent:   accent,
