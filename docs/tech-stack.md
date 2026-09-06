@@ -9,6 +9,7 @@
 | 语言 | Go 1.26.6 |
 | CLI | 标准库 `flag` |
 | TUI | Bubble Tea / Lip Gloss |
+| 界面国际化 | nicksnyder/go-i18n v2 + 内嵌 TOML 目录（`i18n/messages/<locale>/`，渲染层翻译，数据层 token 恒为英文） |
 | 系统信息 | gopsutil |
 | 流媒体解锁 | oneclickvirt/UnlockTests（Apache-2.0，`executor.RunStructured` 结构化输出） |
 | 回程线路分类 | oneclickvirt/backtrace（Apache-2.0，`bk.RunRouteReport` + 内置 AS prefix 数据） |

@@ -7,7 +7,9 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"text/tabwriter"
+
+	"github.com/cloudapp3/vmbench/i18n"
+	"github.com/cloudapp3/vmbench/textgrid"
 )
 
 // WriteCompare writes a side-by-side comparison of two or more reports.
@@ -20,49 +22,50 @@ func WriteCompare(w io.Writer, docs []Document) error {
 	}
 
 	line := strings.Repeat("═", 62)
-	fmt.Fprintf(w, "%s\n  VMBench Compare\n%s\n\n", line, line)
+	fmt.Fprintf(w, "%s\n  %s\n%s\n\n", line, i18n.T("report.compare.title"), line)
 
-	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
-	fmt.Fprintln(tw, "Property\t"+joinHeaders(docs))
-	printSysRow(tw, "CPU", docs, func(d Document) string {
+	headers := append([]string{i18n.T("report.compare.property")}, reportHeaders(docs)...)
+	var sysRows [][]string
+	sysRows = appendSysRow(sysRows, i18n.T("report.label.cpu"), docs, func(d Document) string {
 		return fmt.Sprintf("%s (%dC/%dT)", d.System.CPU.Model, d.System.CPU.PhysicalCores, d.System.CPU.LogicalCores)
 	})
-	printSysRow(tw, "Memory", docs, func(d Document) string {
+	sysRows = appendSysRow(sysRows, i18n.T("report.label.memory"), docs, func(d Document) string {
 		return fmt.Sprintf("%.1f GB %s", float64(d.System.Memory.TotalBytes)/(1024*1024*1024), d.System.Memory.Type)
 	})
-	printSysRow(tw, "OS", docs, func(d Document) string {
+	sysRows = appendSysRow(sysRows, i18n.T("report.label.os"), docs, func(d Document) string {
 		return fmt.Sprintf("%s (%s)", d.System.OS.Name, d.System.OS.Kernel)
 	})
-	tw.Flush()
+	fmt.Fprint(w, textgrid.Render(headers, sysRows, 2))
 	if warnings := comparabilityWarnings(docs); len(warnings) > 0 {
-		fmt.Fprintln(w, "\nComparability warnings:")
+		fmt.Fprintf(w, "\n%s:\n", i18n.T("report.compare.warnings"))
 		for _, warning := range warnings {
 			fmt.Fprintf(w, "  - %s\n", warning)
 		}
 	}
 
-	fmt.Fprintf(w, "\n%s\n  Workload Details\n%s\n", line, line)
-	tw = tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
-	fmt.Fprintln(tw, "Workload\tMetric\t"+joinHeaders(docs)+"\tDelta")
+	fmt.Fprintf(w, "\n%s\n  %s\n%s\n", line, i18n.T("report.compare.workloadDetails"), line)
+	headers = append([]string{i18n.T("report.col.workload"), i18n.T("report.col.metric")}, reportHeaders(docs)...)
+	headers = append(headers, i18n.T("report.compare.delta"))
 
+	var rows [][]string
 	workloadMap := buildWorkloadMap(docs)
 	for _, name := range sortedKeys(workloadMap) {
 		entries := workloadMap[name]
-		printMetricRow(tw, name, "time", docs, entries, func(r *ResultEntry) float64 {
+		rows = appendMetricRow(rows, name, "time", docs, entries, func(r *ResultEntry) float64 {
 			if r == nil {
 				return 0
 			}
 			return r.MedianMS
 		}, "ms", true)
-		printThroughputRow(tw, docs, entries)
-		printMetricRow(tw, "", "latency", docs, entries, func(r *ResultEntry) float64 {
+		rows = appendThroughputRow(rows, docs, entries)
+		rows = appendMetricRow(rows, "", "latency", docs, entries, func(r *ResultEntry) float64 {
 			if r == nil {
 				return 0
 			}
 			return r.AvgNSPerAccess
 		}, "ns/op", true)
 	}
-	tw.Flush()
+	fmt.Fprint(w, textgrid.Render(headers, rows, 2))
 
 	_, _ = fmt.Fprintln(w)
 	return nil
@@ -111,8 +114,8 @@ func displayScope(scope string) string {
 	return "unknown/legacy"
 }
 
-func printMetricRow(
-	tw *tabwriter.Writer,
+func appendMetricRow(
+	rows [][]string,
 	name string,
 	metric string,
 	docs []Document,
@@ -120,7 +123,7 @@ func printMetricRow(
 	value func(*ResultEntry) float64,
 	unit string,
 	lowerIsBetter bool,
-) {
+) [][]string {
 	values := make([]float64, len(docs))
 	any := false
 	for i := range docs {
@@ -132,21 +135,21 @@ func printMetricRow(
 		}
 	}
 	if !any {
-		return
+		return rows
 	}
-	row := fmt.Sprintf("%s\t%s\t", name, metric)
+	row := []string{name, metric}
 	for _, v := range values {
 		if v > 0 {
-			row += formatMeasured(v, unit) + "\t"
+			row = append(row, formatMeasured(v, unit))
 		} else {
-			row += "-\t"
+			row = append(row, "-")
 		}
 	}
-	row += formatDelta(values[0], values[len(values)-1], lowerIsBetter)
-	fmt.Fprintln(tw, row)
+	row = append(row, formatDelta(values[0], values[len(values)-1], lowerIsBetter))
+	return append(rows, row)
 }
 
-func printThroughputRow(tw *tabwriter.Writer, docs []Document, entries map[int]WorkloadEntry) {
+func appendThroughputRow(rows [][]string, docs []Document, entries map[int]WorkloadEntry) [][]string {
 	values := make([]float64, len(docs))
 	units := make([]string, len(docs))
 	commonUnit := ""
@@ -169,26 +172,26 @@ func printThroughputRow(tw *tabwriter.Writer, docs []Document, entries map[int]W
 		}
 	}
 	if !any {
-		return
+		return rows
 	}
-	row := "\tthroughput\t"
+	row := []string{"", "throughput"}
 	for i, value := range values {
-		row += formatMeasured(value, units[i]) + "\t"
+		row = append(row, formatMeasured(value, units[i]))
 	}
 	if compatible {
-		row += formatDelta(values[0], values[len(values)-1], throughputLowerIsBetter(commonUnit))
+		row = append(row, formatDelta(values[0], values[len(values)-1], throughputLowerIsBetter(commonUnit)))
 	} else {
-		row += "incompatible units"
+		row = append(row, i18n.T("report.compare.incompatibleUnits"))
 	}
-	fmt.Fprintln(tw, row)
+	return append(rows, row)
 }
 
-func joinHeaders(docs []Document) string {
+func reportHeaders(docs []Document) []string {
 	parts := make([]string, len(docs))
 	for i := range docs {
-		parts[i] = fmt.Sprintf("Report %d (%s)", i+1, shortCPU(docs[i]))
+		parts[i] = fmt.Sprintf("%s %d (%s)", i18n.T("report.compare.reportN"), i+1, shortCPU(docs[i]))
 	}
-	return strings.Join(parts, "\t")
+	return parts
 }
 
 func shortCPU(d Document) string {
@@ -199,12 +202,12 @@ func shortCPU(d Document) string {
 	return model
 }
 
-func printSysRow(tw *tabwriter.Writer, label string, docs []Document, fn func(Document) string) {
-	row := fmt.Sprintf("%s\t", label)
+func appendSysRow(rows [][]string, label string, docs []Document, fn func(Document) string) [][]string {
+	row := []string{label}
 	for _, d := range docs {
-		row += fmt.Sprintf("%s\t", fn(d))
+		row = append(row, fn(d))
 	}
-	fmt.Fprintln(tw, row)
+	return append(rows, row)
 }
 
 func formatDelta(base, target float64, lowerIsBetter bool) string {

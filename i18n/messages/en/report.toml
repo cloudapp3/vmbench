@@ -1,0 +1,523 @@
+# Report surfaces: console writers, compare output, and HTML templates.
+
+[report.console.title]
+other = "VMBench {{.Version}}   —   System Benchmark"
+
+[report.console.measured]
+other = "Measured Workloads"
+
+[report.console.extensions]
+other = "Extensions"
+
+[report.console.warnings]
+other = "Warnings"
+
+[report.console.ok]
+other = "ok"
+
+[report.label.cpu]
+other = "CPU"
+
+[report.label.memory]
+other = "Memory"
+
+[report.label.os]
+other = "OS"
+
+[report.label.go]
+other = "Go"
+
+[report.col.workload]
+other = "Workload"
+
+[report.col.category]
+other = "Category"
+
+[report.col.time]
+other = "Time"
+
+[report.col.throughput]
+other = "Throughput"
+
+[report.col.latency]
+other = "Latency"
+
+[report.col.result]
+other = "Result"
+
+[report.col.metric]
+other = "Metric"
+
+[report.html.title]
+other = "VMBench Report"
+
+[report.compare.title]
+other = "VMBench Compare"
+
+[report.compare.property]
+other = "Property"
+
+[report.compare.reportN]
+other = "Report"
+
+[report.compare.delta]
+other = "Delta"
+
+[report.compare.warnings]
+other = "Comparability warnings"
+
+[report.compare.workloadDetails]
+other = "Workload Details"
+
+[report.compare.incompatibleUnits]
+other = "incompatible units"
+
+[report.suite.title]
+other = "VMBench Suite"
+
+[report.suite.status]
+other = "Status"
+
+[report.suite.message]
+other = "Message"
+
+[report.suite.preset]
+other = "Preset"
+
+[report.suite.sections]
+other = "Sections"
+
+[report.suite.stateStatus]
+other = "status"
+
+[report.suite.stateMessage]
+other = "message"
+
+[report.suite.warnings]
+other = "Warnings"
+
+[report.suite.ipSummary]
+other = "ip: {{.IP}} | country: {{.Country}} | asn: {{.ASN}} | org: {{.Org}}"
+
+[report.suite.scoreSummary]
+other = "score: {{.Total}}/{{.Max}} | level: {{.Level}}"
+
+[report.suite.sources]
+other = "sources: {{.Sources}}"
+
+[report.suite.securitycheck]
+other = "securitycheck: {{.Status}}{{.Suffix}}"
+
+[report.suite.mediaSet]
+other = "set: {{.Set}}"
+
+[report.suite.col.target]
+other = "Target"
+
+[report.suite.col.city]
+other = "City"
+
+[report.suite.col.carrier]
+other = "Carrier"
+
+[report.suite.col.resolved]
+other = "Resolved"
+
+[report.suite.col.probe]
+other = "Probe"
+
+[report.suite.col.hops]
+other = "Hops"
+
+[report.suite.col.reached]
+other = "Reached"
+
+[report.suite.col.line]
+other = "Line"
+
+[report.suite.col.status]
+other = "Status"
+
+[report.suite.col.ip]
+other = "IP"
+
+[report.suite.col.connection]
+other = "Connection"
+
+[report.suite.col.avg]
+other = "Avg"
+
+[report.suite.col.jitter]
+other = "Jitter"
+
+[report.suite.col.loss]
+other = "Loss"
+
+[report.suite.col.group]
+other = "Group"
+
+[report.suite.col.ok]
+other = "Ok"
+
+[report.suite.col.fail]
+other = "Fail"
+
+[report.suite.col.dl]
+other = "DL"
+
+[report.suite.col.ul]
+other = "UL"
+
+[report.suite.col.latency]
+other = "Latency"
+
+[report.suite.col.message]
+other = "Message"
+
+[report.suite.col.provider]
+other = "Provider"
+
+[report.suite.col.kind]
+other = "Kind"
+
+[report.suite.col.node]
+other = "Node"
+
+[report.suite.col.field]
+other = "Field"
+
+[report.suite.col.value]
+other = "Value"
+
+[report.suite.col.port]
+other = "Port"
+
+[report.suite.col.method]
+other = "Method"
+
+[report.suite.col.item]
+other = "Item"
+
+[report.suite.col.region]
+other = "Region"
+
+[report.suite.col.metric]
+other = "Metric"
+
+[report.suite.col.throughput]
+other = "Throughput"
+
+[report.suite.col.localInterface]
+other = "Local interface"
+
+[report.suite.col.ipVersion]
+other = "IP version"
+
+[report.suite.col.address]
+other = "Address"
+
+[report.suite.col.private]
+other = "Private"
+
+[report.suite.col.publicIP]
+other = "Public IP"
+
+[report.suite.col.version]
+other = "Version"
+
+[report.suite.col.asn]
+other = "ASN"
+
+[report.suite.col.country]
+other = "Country"
+
+[report.suite.col.organization]
+other = "Organization"
+
+[report.suite.col.nat]
+other = "NAT"
+
+[report.suite.col.localIP]
+other = "Local IP"
+
+[report.suite.col.reason]
+other = "Reason"
+
+[report.suite.col.relationship]
+other = "Relationship"
+
+[report.suite.col.name]
+other = "Name"
+
+[report.suite.col.source]
+other = "Source"
+
+[report.suite.col.error]
+other = "Error"
+
+[report.suite.col.category]
+other = "Category"
+
+[report.suite.col.protocol]
+other = "Protocol"
+
+[report.suite.col.endpoint]
+other = "Endpoint"
+
+[report.suite.col.http]
+other = "HTTP"
+
+[report.suiteCompare.title]
+other = "VMBench Suite Compare"
+
+[report.suiteCompare.reportID]
+other = "Report ID"
+
+[report.suiteCompare.legacyUnknown]
+other = "legacy/unknown"
+
+[report.suiteCompare.catalog]
+other = "Catalog"
+
+[report.suiteCompare.rawMetrics]
+other = "Raw Metrics"
+
+[report.suiteCompare.section]
+other = "Section"
+
+[report.sh.title]
+other = "VMBench Suite Report"
+
+[report.sh.hero]
+other = "VMBench Suite"
+
+[report.sh.heroSub]
+other = "Raw measurements and structured diagnostics"
+
+[report.sh.reportID]
+other = "Report ID"
+
+[report.sh.schema]
+other = "Schema"
+
+[report.sh.app]
+other = "App"
+
+[report.sh.started]
+other = "Started"
+
+[report.sh.finished]
+other = "Finished"
+
+[report.sh.duration]
+other = "Duration"
+
+[report.sh.sysConfig]
+other = "System and Configuration"
+
+[report.sh.host]
+other = "Host"
+
+[report.sh.virtualization]
+other = "Virtualization"
+
+[report.sh.nodeCatalog]
+other = "Node Catalog"
+
+[report.sh.unknownOS]
+other = "unknown OS"
+
+[report.sh.unknownKernel]
+other = "unknown kernel"
+
+[report.sh.typeUnknown]
+other = "type unknown"
+
+[report.sh.role]
+other = "role"
+
+[report.sh.notUsed]
+other = "not used"
+
+[report.sh.sectionStatus]
+other = "Section Status"
+
+[report.sh.section]
+other = "Section"
+
+[report.sh.enabled]
+other = "Enabled"
+
+[report.sh.workloads]
+other = "Workloads"
+
+[report.sh.name]
+other = "Name"
+
+[report.sh.iterations]
+other = "Iterations"
+
+[report.sh.median]
+other = "Median"
+
+[report.sh.detail]
+other = "Detail"
+
+[report.sh.missingResult]
+other = "missing result"
+
+[report.sh.publicAddresses]
+other = "Public Addresses"
+
+[report.sh.localAddresses]
+other = "Local Addresses"
+
+[report.sh.natHeuristic]
+other = "NAT Heuristic"
+
+[report.sh.stunNAT]
+other = "STUN NAT Classification (gostun)"
+
+[report.sh.ipBgp]
+other = "IP BGP / RDAP Ownership"
+
+[report.sh.activeNeighbors]
+other = "Active Neighbors (bgp.tools)"
+
+[report.sh.ipv6Subnet]
+other = "IPv6 Subnet"
+
+[report.sh.evidenceProviders]
+other = "Evidence Providers"
+
+[report.sh.evidence]
+other = "Evidence"
+
+[report.sh.server]
+other = "Server"
+
+[report.sh.natType]
+other = "NAT type"
+
+[report.sh.timeout]
+other = "Timeout"
+
+[report.sh.average]
+other = "Average"
+
+[report.sh.sentReceived]
+other = "Sent/Received"
+
+[report.sh.available]
+other = "Available"
+
+[report.sh.download]
+other = "Download"
+
+[report.sh.upload]
+other = "Upload"
+
+[report.sh.elapsed]
+other = "Elapsed"
+
+[report.sh.aggregation]
+other = "Aggregation"
+
+[report.sh.singleProvider]
+other = "single provider"
+
+[report.sh.inconclusive]
+other = "Inconclusive"
+
+[report.sh.location]
+other = "Location"
+
+[report.sh.flags]
+other = "Flags"
+
+[report.sh.riskEvidence]
+other = "Risk Evidence"
+
+[report.sh.riskLevel]
+other = "Risk level"
+
+[report.sh.listed]
+other = "Listed"
+
+[report.sh.dnsblDetail]
+other = "DNSBL detail"
+
+[report.sh.riskDiagnostic]
+other = "Business risk diagnostic"
+
+[report.sh.ipapiCross]
+other = "ipapi.is Ownership Cross-check"
+
+[report.sh.securityCheck]
+other = "securityCheck (external, 18 databases)"
+
+[report.sh.evidenceSources]
+other = "Evidence Sources"
+
+[report.sh.ipqMailProbe]
+other = "IP Quality Mail Probe"
+
+[report.sh.colTitle]
+other = "Title"
+
+[report.sh.supported]
+other = "Supported"
+
+[report.sh.service]
+other = "Service"
+
+[report.sh.selectedNodeIDs]
+other = "Selected node IDs"
+
+[report.sh.stunPrefix]
+other = "STUN NAT:"
+
+[report.sh.stunDetail]
+other = "STUN 明细:"
+
+[report.sh.mapping]
+other = "映射"
+
+[report.sh.filtering]
+other = "过滤"
+
+[report.sh.hairpin]
+other = "回环"
+
+[report.sh.bgpPrefix]
+other = "IP BGP:"
+
+[report.sh.bgpDetail]
+other = "BGP 明细:"
+
+[report.sh.prefix]
+other = "前缀"
+
+[report.sh.registered]
+other = "注册于"
+
+[report.sh.tier1Upstreams]
+other = "Tier1 上游"
+
+[report.sh.activeNeighborsPrefix]
+other = "活跃邻居"
+
+[report.sh.neighborsSubnet]
+other = "{{.Prefix}} 子网内 {{.Active}}/{{.Total}}"
+
+[report.sh.neighborsAnnounced]
+other = "{{.Prefix}} 宣告内 {{.Active}}/{{.Total}}"
+
+[report.sh.unavailable]
+other = "不可用"
+
+[report.sh.neighborsDetail]
+other = "邻居明细:"
+
+[report.sh.ipv6SubnetPrefix]
+other = "IPv6 子网:"

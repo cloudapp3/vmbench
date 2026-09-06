@@ -1,5 +1,15 @@
 # VMBench Changelog
 
+## v0.5.0（2026-09-06）
+
+### 多语言界面（en / zh-CN）
+
+- 新增 `i18n` 包（[go-i18n v2](https://github.com/nicksnyder/go-i18n) + 内嵌 TOML 目录），语言目录自动发现：新增语言 = 在 `i18n/messages/` 下新增同名目录。语言选择优先级 `--lang` flag > `VMBENCH_LANG` 环境变量 > `~/.config/vmbench/config.json` 的 `lang` 字段 > 系统 locale（`LC_ALL`/`LC_MESSAGES`/`LANG`，`zh*` 自动归一到 `zh-CN`）> 英文；未知取值回退英文并提示一次。所有子命令（run/suite/tui/list/nodes/sysinfo/compare/history）支持 `--lang`。
+- 覆盖面：CLI 用法/参数帮助/校验错误/进度/预检提示、`sysinfo` 控制台标签、TUI 全部页面（菜单、按键提示、弹窗、表格、Suite 配置）、console 与 HTML 报告标签（含 `<html lang>`）。测试守卫：en/zh-CN 目录 key 集双向一致、双 locale 的 TUI 80x24 渲染边界。
+- 数据层不翻译：JSON 字段名、状态枚举 token（ok/fail/partial/...）、suite section ID、workload 名称（与 `--filter` 正则匹配耦合）、适配器错误信息与 suite section 计算消息保持英文，翻译只发生在渲染层。
+- CJK 宽度修复：TUI 截断改为按显示宽度（此前 6 个中文字符可穿透 10 列上限）；CLI 进度/表格填充改用 cell 对齐的 `PadCells`；tabwriter（按 rune 计数）在报告表格中替换为 `textgrid`（显示宽度对齐）。
+- 已知限制（一期）：TUI 语言在启动时固定（无运行时切换键）；MCP 工具描述保持英文；`NormalizeOptions` 等数据面错误保持英文。
+
 ## v0.4.1（2026-09-05）
 
 ### 修复

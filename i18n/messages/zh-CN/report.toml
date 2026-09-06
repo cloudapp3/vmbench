@@ -1,0 +1,524 @@
+# 报告输出面: console 写入器、对比输出与 HTML 模板。
+
+[report.console.title]
+other = "VMBench {{.Version}}   —   系统基准测试"
+
+[report.console.measured]
+other = "实测工作负载"
+
+[report.console.extensions]
+other = "扩展工作负载"
+
+[report.console.warnings]
+other = "警告"
+
+[report.console.ok]
+other = "正常"
+
+[report.label.cpu]
+other = "CPU"
+
+[report.label.memory]
+other = "内存"
+
+[report.label.os]
+other = "系统"
+
+[report.label.go]
+other = "Go"
+
+[report.col.workload]
+other = "工作负载"
+
+[report.col.category]
+other = "分类"
+
+[report.col.time]
+other = "耗时"
+
+[report.col.throughput]
+other = "吞吐"
+
+[report.col.latency]
+other = "延迟"
+
+[report.col.result]
+other = "结果"
+
+[report.col.metric]
+other = "指标"
+
+[report.html.title]
+other = "VMBench 报告"
+
+[report.compare.title]
+other = "VMBench 对比"
+
+[report.compare.property]
+other = "属性"
+
+[report.compare.reportN]
+other = "报告"
+
+[report.compare.delta]
+other = "差异"
+
+[report.compare.warnings]
+other = "可比性警告"
+
+[report.compare.workloadDetails]
+other = "工作负载明细"
+
+[report.compare.incompatibleUnits]
+other = "单位不兼容"
+
+[report.suite.title]
+other = "VMBench 综合测试"
+
+[report.suite.status]
+other = "状态"
+
+[report.suite.message]
+other = "消息"
+
+[report.suite.preset]
+other = "预设"
+
+[report.suite.sections]
+other = "Section"
+
+[report.suite.stateStatus]
+other = "状态"
+
+[report.suite.stateMessage]
+other = "消息"
+
+[report.suite.warnings]
+other = "警告"
+
+[report.suite.ipSummary]
+other = "IP: {{.IP}} | 国家: {{.Country}} | ASN: {{.ASN}} | 组织: {{.Org}}"
+
+[report.suite.scoreSummary]
+other = "评分: {{.Total}}/{{.Max}} | 等级: {{.Level}}"
+
+[report.suite.sources]
+other = "来源: {{.Sources}}"
+
+[report.suite.securitycheck]
+other = "securitycheck: {{.Status}}{{.Suffix}}"
+
+[report.suite.mediaSet]
+other = "集合: {{.Set}}"
+
+[report.suite.col.target]
+other = "目标"
+
+[report.suite.col.city]
+other = "城市"
+
+[report.suite.col.carrier]
+other = "运营商"
+
+[report.suite.col.resolved]
+other = "解析地址"
+
+[report.suite.col.probe]
+other = "探测"
+
+[report.suite.col.hops]
+other = "跳数"
+
+[report.suite.col.reached]
+other = "到达"
+
+[report.suite.col.line]
+other = "线路"
+
+[report.suite.col.status]
+other = "状态"
+
+[report.suite.col.ip]
+other = "IP"
+
+[report.suite.col.connection]
+other = "连接"
+
+[report.suite.col.avg]
+other = "平均"
+
+[report.suite.col.jitter]
+other = "抖动"
+
+[report.suite.col.loss]
+other = "丢包"
+
+[report.suite.col.group]
+other = "分组"
+
+[report.suite.col.ok]
+other = "成功"
+
+[report.suite.col.fail]
+other = "失败"
+
+[report.suite.col.dl]
+other = "下载"
+
+[report.suite.col.ul]
+other = "上传"
+
+[report.suite.col.latency]
+other = "延迟"
+
+[report.suite.col.message]
+other = "消息"
+
+[report.suite.col.provider]
+other = "提供方"
+
+[report.suite.col.kind]
+other = "类型"
+
+[report.suite.col.node]
+other = "节点"
+
+[report.suite.col.field]
+other = "字段"
+
+[report.suite.col.value]
+other = "值"
+
+[report.suite.col.port]
+other = "端口"
+
+[report.suite.col.method]
+other = "方式"
+
+[report.suite.col.item]
+other = "项目"
+
+[report.suite.col.region]
+other = "区域"
+
+[report.suite.col.metric]
+other = "指标"
+
+[report.suite.col.throughput]
+other = "吞吐"
+
+[report.suite.col.localInterface]
+other = "本地接口"
+
+[report.suite.col.ipVersion]
+other = "IP 版本"
+
+[report.suite.col.address]
+other = "地址"
+
+[report.suite.col.private]
+other = "内网"
+
+[report.suite.col.publicIP]
+other = "公网 IP"
+
+[report.suite.col.version]
+other = "版本"
+
+[report.suite.col.asn]
+other = "ASN"
+
+[report.suite.col.country]
+other = "国家"
+
+[report.suite.col.organization]
+other = "组织"
+
+[report.suite.col.nat]
+other = "NAT"
+
+[report.suite.col.localIP]
+other = "本地 IP"
+
+[report.suite.col.reason]
+other = "原因"
+
+[report.suite.col.relationship]
+other = "关系"
+
+[report.suite.col.name]
+other = "名称"
+
+[report.suite.col.source]
+other = "来源"
+
+[report.suite.col.error]
+other = "错误"
+
+[report.suite.col.category]
+other = "分类"
+
+[report.suite.col.protocol]
+other = "协议"
+
+[report.suite.col.endpoint]
+other = "端点"
+
+[report.suite.col.http]
+other = "HTTP"
+
+[report.suiteCompare.title]
+other = "VMBench 综合测试对比"
+
+[report.suiteCompare.reportID]
+other = "报告 ID"
+
+[report.suiteCompare.legacyUnknown]
+other = "旧版/未知"
+
+[report.suiteCompare.catalog]
+other = "节点目录"
+
+[report.suiteCompare.rawMetrics]
+other = "原始指标"
+
+[report.suiteCompare.section]
+other = "Section"
+
+[report.sh.title]
+other = "VMBench 综合测试报告"
+
+[report.sh.hero]
+other = "VMBench 综合测试"
+
+[report.sh.heroSub]
+other = "原始测量与结构化诊断"
+
+[report.sh.reportID]
+other = "报告 ID"
+
+[report.sh.schema]
+other = "Schema"
+
+[report.sh.app]
+other = "程序"
+
+[report.sh.started]
+other = "开始时间"
+
+[report.sh.finished]
+other = "结束时间"
+
+[report.sh.duration]
+other = "耗时"
+
+[report.sh.sysConfig]
+other = "系统与配置"
+
+[report.sh.host]
+other = "主机"
+
+[report.sh.virtualization]
+other = "虚拟化"
+
+[report.sh.nodeCatalog]
+other = "节点目录"
+
+[report.sh.unknownOS]
+other = "未知系统"
+
+[report.sh.unknownKernel]
+other = "未知内核"
+
+[report.sh.typeUnknown]
+other = "类型未知"
+
+[report.sh.role]
+other = "角色"
+
+[report.sh.notUsed]
+other = "未使用"
+
+[report.sh.sectionStatus]
+other = "Section 状态"
+
+[report.sh.section]
+other = "Section"
+
+[report.sh.enabled]
+other = "启用"
+
+[report.sh.workloads]
+other = "工作负载"
+
+[report.sh.name]
+other = "名称"
+
+[report.sh.iterations]
+other = "迭代"
+
+[report.sh.median]
+other = "中位数"
+
+[report.sh.detail]
+other = "详情"
+
+[report.sh.missingResult]
+other = "缺少结果"
+
+[report.sh.publicAddresses]
+other = "公网地址"
+
+[report.sh.localAddresses]
+other = "本地地址"
+
+[report.sh.natHeuristic]
+other = "NAT 启发判定"
+
+[report.sh.stunNAT]
+other = "STUN NAT 类型判定 (gostun)"
+
+[report.sh.ipBgp]
+other = "IP BGP / RDAP 归属"
+
+[report.sh.activeNeighbors]
+other = "活跃邻居 (bgp.tools)"
+
+[report.sh.ipv6Subnet]
+other = "IPv6 子网"
+
+[report.sh.evidenceProviders]
+other = "证据提供方"
+
+[report.sh.evidence]
+other = "证据"
+
+[report.sh.server]
+other = "服务器"
+
+[report.sh.natType]
+other = "NAT 类型"
+
+[report.sh.timeout]
+other = "超时"
+
+[report.sh.average]
+other = "平均"
+
+[report.sh.sentReceived]
+other = "发送/接收"
+
+[report.sh.available]
+other = "可用"
+
+[report.sh.download]
+other = "下载"
+
+[report.sh.upload]
+other = "上传"
+
+[report.sh.elapsed]
+other = "用时"
+
+[report.sh.aggregation]
+other = "聚合方式"
+
+[report.sh.singleProvider]
+other = "单一提供方"
+
+[report.sh.inconclusive]
+other = "无法判定"
+
+[report.sh.location]
+other = "位置"
+
+[report.sh.flags]
+other = "标记"
+
+[report.sh.riskEvidence]
+other = "风险证据"
+
+[report.sh.riskLevel]
+other = "风险等级"
+
+[report.sh.listed]
+other = "已列入"
+
+[report.sh.dnsblDetail]
+other = "DNSBL 明细"
+
+[report.sh.riskDiagnostic]
+other = "业务风险诊断"
+
+[report.sh.ipapiCross]
+other = "ipapi.is 归属交叉验证"
+
+[report.sh.securityCheck]
+other = "securityCheck (外部,18 库)"
+
+[report.sh.evidenceSources]
+other = "证据来源"
+
+[report.sh.ipqMailProbe]
+other = "IP 质量邮件探测"
+
+[report.sh.colTitle]
+other = "标题"
+
+[report.sh.supported]
+other = "支持"
+
+[report.sh.service]
+other = "服务"
+
+[report.sh.selectedNodeIDs]
+other = "已选节点 ID"
+
+[report.sh.stunPrefix]
+other = "STUN NAT:"
+
+[report.sh.stunDetail]
+other = "STUN 明细:"
+
+[report.sh.mapping]
+other = "映射"
+
+[report.sh.filtering]
+other = "过滤"
+
+[report.sh.hairpin]
+other = "回环"
+
+[report.sh.bgpPrefix]
+other = "IP BGP:"
+
+[report.sh.bgpDetail]
+other = "BGP 明细:"
+
+[report.sh.prefix]
+other = "前缀"
+
+[report.sh.registered]
+other = "注册于"
+
+[report.sh.tier1Upstreams]
+other = "Tier1 上游"
+
+[report.sh.activeNeighborsPrefix]
+other = "活跃邻居"
+
+[report.sh.neighborsSubnet]
+other = "{{.Prefix}} 子网内 {{.Active}}/{{.Total}}"
+
+[report.sh.neighborsAnnounced]
+other = "{{.Prefix}} 宣告内 {{.Active}}/{{.Total}}"
+
+[report.sh.unavailable]
+other = "不可用"
+
+[report.sh.neighborsDetail]
+other = "邻居明细:"
+
+[report.sh.ipv6SubnetPrefix]
+other = "IPv6 子网:"
+

@@ -62,6 +62,10 @@ vmbench 输出的是原始测量数据：
 
 Suite JSON 使用 schema v2 envelope：`report_kind`、`report_id`、app build、system、timestamps/duration、规范化 config、catalog provenance 和九个 section，同时保留旧 `version`/Unix time 字段给 v1 consumer。Route 结果包含 `resolved_target/destination_reached/status`，Ping 结果包含 `connection_state`。Suite HTML 展示硬件 workload、网络身份、完整 route hops、ping、speed provider、IP quality、网站/TG、mail、media 及其 detail/error，而不是只给 section 摘要。
 
+## 界面语言
+
+CLI / TUI / 报告标签支持英文与简体中文（`--lang`、`VMBENCH_LANG`、config.json `lang`、系统 locale 依次优先）。JSON 输出与状态 token 不随语言变化，保证 compare 与历史记录的可比性。
+
 ## 使用方式
 
 ```bash

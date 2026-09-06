@@ -5,7 +5,9 @@ import (
 	"io"
 	"os"
 	"strings"
-	"text/tabwriter"
+
+	"github.com/cloudapp3/vmbench/i18n"
+	"github.com/cloudapp3/vmbench/textgrid"
 )
 
 // WriteConsole writes a human-readable summary to w.
@@ -14,22 +16,22 @@ func WriteConsole(w io.Writer, doc Document) error {
 		w = os.Stdout
 	}
 	line := strings.Repeat("═", 62)
-	if _, err := fmt.Fprintf(w, "%s\n  VMBench %s   —   System Benchmark\n%s\n", line, doc.Version, line); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\n  %s\n%s\n", line, i18n.Tf("report.console.title", map[string]any{"Version": doc.Version}), line); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(w, "  CPU      : %s (%dC/%dT)\n", doc.System.CPU.Model, doc.System.CPU.PhysicalCores, doc.System.CPU.LogicalCores)
-	_, _ = fmt.Fprintf(w, "  Memory   : %.1f GB %s\n", float64(doc.System.Memory.TotalBytes)/(1024*1024*1024), doc.System.Memory.Type)
-	_, _ = fmt.Fprintf(w, "  OS       : %s (%s)\n", doc.System.OS.Name, doc.System.OS.Kernel)
-	_, _ = fmt.Fprintf(w, "  Go       : %s\n", doc.System.OS.GoVersion)
+	_, _ = fmt.Fprintf(w, "  %s: %s (%dC/%dT)\n", i18n.PadCells(i18n.T("report.label.cpu"), 9), doc.System.CPU.Model, doc.System.CPU.PhysicalCores, doc.System.CPU.LogicalCores)
+	_, _ = fmt.Fprintf(w, "  %s: %.1f GB %s\n", i18n.PadCells(i18n.T("report.label.memory"), 9), float64(doc.System.Memory.TotalBytes)/(1024*1024*1024), doc.System.Memory.Type)
+	_, _ = fmt.Fprintf(w, "  %s: %s (%s)\n", i18n.PadCells(i18n.T("report.label.os"), 9), doc.System.OS.Name, doc.System.OS.Kernel)
+	_, _ = fmt.Fprintf(w, "  %s: %s\n", i18n.PadCells(i18n.T("report.label.go"), 9), doc.System.OS.GoVersion)
 	_, _ = fmt.Fprintf(w, "%s\n\n", line)
 
-	writeWorkloadTable(w, "Measured Workloads", doc.Results.Workloads, line)
+	writeWorkloadTable(w, i18n.T("report.console.measured"), doc.Results.Workloads, line)
 	if len(doc.Extensions.Workloads) > 0 {
-		writeWorkloadTable(w, "Extensions", doc.Extensions.Workloads, line)
+		writeWorkloadTable(w, i18n.T("report.console.extensions"), doc.Extensions.Workloads, line)
 	}
 
 	if len(doc.Warnings) > 0 {
-		_, _ = fmt.Fprintln(w, "\nWarnings:")
+		_, _ = fmt.Fprintf(w, "\n%s:\n", i18n.T("report.console.warnings"))
 		for _, warning := range doc.Warnings {
 			_, _ = fmt.Fprintf(w, "  - %s\n", warning)
 		}
@@ -42,19 +44,26 @@ func writeWorkloadTable(w io.Writer, title string, entries []WorkloadEntry, line
 		return
 	}
 	_, _ = fmt.Fprintf(w, "%s\n  %s\n%s\n", line, title, line)
-	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "Workload\tCategory\tTime\tThroughput\tLatency\tResult")
+	headers := []string{
+		i18n.T("report.col.workload"),
+		i18n.T("report.col.category"),
+		i18n.T("report.col.time"),
+		i18n.T("report.col.throughput"),
+		i18n.T("report.col.latency"),
+		i18n.T("report.col.result"),
+	}
+	rows := make([][]string, 0, len(entries))
 	for _, item := range entries {
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		rows = append(rows, []string{
 			item.Name,
 			item.Category,
 			formatTime(item.Result),
 			formatThroughput(item.Result),
 			formatLatency(item.Result),
 			formatDetail(item.Result),
-		)
+		})
 	}
-	_ = tw.Flush()
+	_, _ = fmt.Fprint(w, textgrid.Render(headers, rows, 2))
 }
 
 func formatTime(result *ResultEntry) string {
@@ -98,5 +107,5 @@ func formatDetail(result *ResultEntry) string {
 	if strings.TrimSpace(result.Detail) != "" {
 		return strings.TrimSpace(result.Detail)
 	}
-	return "ok"
+	return i18n.T("report.console.ok")
 }

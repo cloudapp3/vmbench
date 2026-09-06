@@ -6,6 +6,8 @@ import (
 	"io"
 	"sort"
 	"strings"
+
+	"github.com/cloudapp3/vmbench/i18n"
 )
 
 var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
@@ -16,12 +18,14 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 	"formatRate":  formatHTMLThroughput,
 	"formatLat":   formatHTMLLatency,
 	"formatText":  formatHTMLDetail,
+	"t":           i18n.T,
+	"langTag":     i18n.LanguageTag,
 }).Parse(`<!doctype html>
-<html lang="en">
+<html lang="{{ langTag }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VMBench Report</title>
+<title>{{ t "report.html.title" }}</title>
 <style>
 :root {
   --primary: #3b82f6;
@@ -53,32 +57,32 @@ td.error { color: var(--danger); }
 <body>
 
 <div class="hero">
-  <h1>VMBench Report</h1>
+  <h1>{{ t "report.html.title" }}</h1>
   <div class="hero-sub">{{ .System.CPU.Model }}</div>
 </div>
 
 <div class="sys-cards">
   <div class="sys-card">
     <div class="icon">&#9881;</div>
-    <div class="label">CPU</div>
+    <div class="label">{{ t "report.label.cpu" }}</div>
     <div class="value">{{ .System.CPU.Model }}</div>
     <div class="detail">{{ .System.CPU.PhysicalCores }}C / {{ .System.CPU.LogicalCores }}T</div>
   </div>
   <div class="sys-card">
     <div class="icon">&#9776;</div>
-    <div class="label">Memory</div>
+    <div class="label">{{ t "report.label.memory" }}</div>
     <div class="value">{{ printf "%.1f" (divGB .System.Memory.TotalBytes) }} GB</div>
     <div class="detail">{{ .System.Memory.Type }}</div>
   </div>
   <div class="sys-card">
     <div class="icon">&#9783;</div>
-    <div class="label">OS</div>
+    <div class="label">{{ t "report.label.os" }}</div>
     <div class="value">{{ .System.OS.Name }}</div>
     <div class="detail">{{ .System.OS.Kernel }}</div>
   </div>
   <div class="sys-card">
     <div class="icon">&#9889;</div>
-    <div class="label">Go</div>
+    <div class="label">{{ t "report.label.go" }}</div>
     <div class="value">{{ .System.OS.GoVersion }}</div>
     <div class="detail">&nbsp;</div>
   </div>
@@ -87,7 +91,7 @@ td.error { color: var(--danger); }
 {{ range $cat := categories . }}
 <div class="section-title">{{ $cat }}</div>
 <table>
-<thead><tr><th>Workload</th><th>Time</th><th>Throughput</th><th>Latency</th><th>Result</th></tr></thead>
+<thead><tr><th>{{ t "report.col.workload" }}</th><th>{{ t "report.col.time" }}</th><th>{{ t "report.col.throughput" }}</th><th>{{ t "report.col.latency" }}</th><th>{{ t "report.col.result" }}</th></tr></thead>
 <tbody>
 {{ range workloadsIn $.Results.Workloads $cat }}
 <tr>
@@ -103,9 +107,9 @@ td.error { color: var(--danger); }
 {{ end }}
 
 {{ if .Extensions.Workloads }}
-<div class="section-title">Extensions</div>
+<div class="section-title">{{ t "report.console.extensions" }}</div>
 <table>
-<thead><tr><th>Workload</th><th>Category</th><th>Time</th><th>Throughput</th><th>Result</th></tr></thead>
+<thead><tr><th>{{ t "report.col.workload" }}</th><th>{{ t "report.col.category" }}</th><th>{{ t "report.col.time" }}</th><th>{{ t "report.col.throughput" }}</th><th>{{ t "report.col.result" }}</th></tr></thead>
 <tbody>
 {{ range .Extensions.Workloads }}
 <tr>
@@ -121,7 +125,7 @@ td.error { color: var(--danger); }
 {{ end }}
 
 {{ if .Warnings }}
-<div class="section-title">Warnings</div>
+<div class="section-title">{{ t "report.console.warnings" }}</div>
 <ul>
 {{ range .Warnings }}
 <li>{{ . }}</li>

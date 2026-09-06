@@ -12,8 +12,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
+
+	"github.com/cloudapp3/vmbench/i18n"
+	"github.com/cloudapp3/vmbench/textgrid"
 )
 
 // Header identifies one report column.
@@ -140,46 +142,47 @@ func WriteCompare(w io.Writer, reports [][]byte) error {
 	}
 
 	line := strings.Repeat("═", 72)
-	fmt.Fprintf(w, "%s\n  VMBench Suite Compare\n%s\n\n", line, line)
-	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
-	fmt.Fprintln(tw, "Property\t"+joinHeaders(result.Reports))
-	printHeaderRow(tw, "Report ID", result.Reports, func(header Header) string {
+	fmt.Fprintf(w, "%s\n  %s\n%s\n\n", line, i18n.T("report.suiteCompare.title"), line)
+	headers := append([]string{i18n.T("report.compare.property")}, suiteHeaders(result.Reports)...)
+	var sysRows [][]string
+	sysRows = appendHeaderRow(sysRows, i18n.T("report.suiteCompare.reportID"), result.Reports, func(header Header) string {
 		if header.ReportID == "" {
-			return "legacy/unknown"
+			return i18n.T("report.suiteCompare.legacyUnknown")
 		}
 		return header.ReportID
 	})
-	printHeaderRow(tw, "Catalog", result.Reports, func(header Header) string {
+	sysRows = appendHeaderRow(sysRows, i18n.T("report.suiteCompare.catalog"), result.Reports, func(header Header) string {
 		if strings.TrimSpace(header.CatalogRevision) == "" {
-			return "unknown"
+			return i18n.T("common.unknown")
 		}
 		return header.CatalogRevision
 	})
-	_ = tw.Flush()
+	fmt.Fprint(w, textgrid.Render(headers, sysRows, 2))
 
 	if len(result.Warnings) > 0 {
-		fmt.Fprintln(w, "\nComparability warnings:")
+		fmt.Fprintf(w, "\n%s:\n", i18n.T("report.compare.warnings"))
 		for _, warning := range result.Warnings {
 			fmt.Fprintf(w, "  - %s\n", warning)
 		}
 	}
 
-	fmt.Fprintf(w, "\n%s\n  Raw Metrics\n%s\n", line, line)
-	tw = tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
-	fmt.Fprintln(tw, "Section\tMetric\t"+joinHeaders(result.Reports)+"\tDelta")
+	fmt.Fprintf(w, "\n%s\n  %s\n%s\n", line, i18n.T("report.suiteCompare.rawMetrics"), line)
+	headers = append([]string{i18n.T("report.suiteCompare.section"), i18n.T("report.suite.col.metric")}, suiteHeaders(result.Reports)...)
+	headers = append(headers, i18n.T("report.compare.delta"))
+	var rows [][]string
 	for _, metric := range result.Metrics {
-		row := metric.Section + "\t" + metric.Name + "\t"
+		row := []string{i18n.SectionLabel(metric.Section), metric.Name}
 		for _, value := range metric.Values {
 			if !value.Available {
-				row += "-\t"
+				row = append(row, "-")
 				continue
 			}
-			row += formatMeasured(value.Value, value.Unit) + "\t"
+			row = append(row, formatMeasured(value.Value, value.Unit))
 		}
-		row += metric.Delta
-		fmt.Fprintln(tw, row)
+		row = append(row, metric.Delta)
+		rows = append(rows, row)
 	}
-	_ = tw.Flush()
+	fmt.Fprint(w, textgrid.Render(headers, rows, 2))
 	_, _ = fmt.Fprintln(w)
 	return nil
 }
@@ -900,20 +903,20 @@ func isEnvelopeKey(key string) bool {
 	}
 }
 
-func joinHeaders(headers []Header) string {
+func suiteHeaders(headers []Header) []string {
 	parts := make([]string, len(headers))
 	for i, header := range headers {
-		parts[i] = fmt.Sprintf("Report %d (%s)", i+1, header.Label)
+		parts[i] = fmt.Sprintf("%s %d (%s)", i18n.T("report.compare.reportN"), i+1, header.Label)
 	}
-	return strings.Join(parts, "\t")
+	return parts
 }
 
-func printHeaderRow(w *tabwriter.Writer, label string, headers []Header, value func(Header) string) {
-	row := label + "\t"
+func appendHeaderRow(rows [][]string, label string, headers []Header, value func(Header) string) [][]string {
+	row := []string{label}
 	for _, header := range headers {
-		row += value(header) + "\t"
+		row = append(row, value(header))
 	}
-	fmt.Fprintln(w, row)
+	return append(rows, row)
 }
 
 func formatDelta(base, target float64, direction direction) string {
