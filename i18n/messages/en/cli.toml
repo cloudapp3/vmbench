@@ -1,0 +1,598 @@
+# CLI surface: usage, flags, errors, notices, progress, tables, sysinfo labels.
+
+[cli.usage.tagline]
+other = "vmbench — cross-platform CPU and network benchmark suite"
+
+[cli.usage.header]
+other = "Usage:"
+
+[cli.usage.cmdRun]
+other = "run benchmark workloads"
+
+[cli.usage.cmdSuite]
+other = "run VPS composite suite"
+
+[cli.usage.cmdTui]
+other = "interactive TUI mode"
+
+[cli.usage.cmdMcp]
+other = "expose MCP tools over stdio"
+
+[cli.usage.cmdList]
+other = "list available workloads"
+
+[cli.usage.cmdNodes]
+other = "manage versioned network nodes"
+
+[cli.usage.cmdSysinfo]
+other = "show system information"
+
+[cli.usage.cmdCompare]
+other = "compare two reports"
+
+[cli.usage.cmdHistory]
+other = "manage local report history"
+
+[cli.usage.cmdVersion]
+other = "show version"
+
+[cli.usage.detailHint]
+other = "Run 'vmbench run --help', 'vmbench suite --help', or 'vmbench mcp serve --help' for detailed flags."
+
+[cli.usage.runDetail]
+other = "Run benchmark workloads and produce a measured report."
+
+[cli.usage.suiteDetail]
+other = "Run hardware/network_info/route/ping/speed/ip_quality/reachability/mail/media as a composite VPS test suite."
+
+[cli.usage.flags]
+other = "Flags:"
+
+[cli.usage.presets]
+other = "Presets:"
+
+[cli.usage.speedProviders]
+other = "Speed providers:"
+
+[cli.usage.hardwareTools]
+other = "Hardware tools:"
+
+[cli.usage.requires]
+other = "Requires"
+
+[cli.usage.defaultTool]
+other = "Default."
+
+[cli.usage.listDetail]
+other = "List available workloads."
+
+[cli.usage.sysinfoDetail]
+other = "Show system information for the current host."
+
+[cli.usage.compareDetail]
+other = "Compare two benchmark reports side by side."
+
+[cli.usage.nodesCommands]
+other = "Commands:"
+
+[cli.usage.nodesList]
+other = "list nodes from a selected catalog"
+
+[cli.usage.nodesVerify]
+other = "validate schema/revision and optionally a detached signature"
+
+[cli.usage.nodesUpdate]
+other = "download and cache a mandatory Ed25519-signed catalog"
+
+[cli.usage.nodesHealth]
+other = "run lightweight HEAD/DNS/TCP availability checks"
+
+[cli.usage.nodesCatalog]
+other = "Catalog selection:"
+
+[cli.flag.iterationsRun]
+other = "iterations per workload (1-9)"
+
+[cli.flag.filterRun]
+other = "run workloads matching regex"
+
+[cli.flag.lang]
+other = "interface language (en, zh-CN)"
+
+[cli.flag.diskPath]
+other = "disk benchmark temp directory"
+
+[cli.flag.timeoutRun]
+other = "per-workload timeout (default 5m)"
+
+[cli.flag.jsonRun]
+other = "write JSON report to file"
+
+[cli.flag.htmlRun]
+other = "write HTML report to file"
+
+[cli.flag.quietRun]
+other = "suppress progress output"
+
+[cli.flag.mode]
+other = "compatibility mode: single (legacy multi/all run the catalog once)"
+
+[cli.flag.scope]
+other = "workload scope: hardware, network, or all"
+
+[cli.flag.iperfHostRun]
+other = "iperf3 server for network test (comma-separated for multiple)"
+
+[cli.flag.hardwareTool]
+other = "hardware tools (comma-separated: sysbench,openssl,fio,dd,stream,mbw,geekbench,winsat; use all for every adapter)"
+
+[cli.flag.saveHistory]
+other = "save the report to local history"
+
+[cli.flag.historyTag]
+other = "optional tag used with --save-history"
+
+[cli.flag.nodeCatalog]
+other = "node catalog source: embedded, auto, or a JSON path"
+
+[cli.flag.nodeRevision]
+other = "require an exact node catalog revision"
+
+[cli.flag.nodeCache]
+other = "cache path override used with --node-catalog auto"
+
+[cli.flag.iterationsSuite]
+other = "iterations for hardware workloads"
+
+[cli.flag.filterSuite]
+other = "run hardware workloads matching regex"
+
+[cli.flag.timeoutSuite]
+other = "per-section timeout (default 5m; hardware applies it per workload)"
+
+[cli.flag.jsonSuite]
+other = "write suite JSON report to file"
+
+[cli.flag.htmlSuite]
+other = "write suite HTML report to file"
+
+[cli.flag.preset]
+other = "scenario preset: quick, website, proxy, mail"
+
+[cli.flag.routePresets]
+other = "comma-separated route presets (gz,bj,sh,cd,cernet,cstnet)"
+
+[cli.flag.speedProvider]
+other = "speed providers (comma-separated: cloudflare,speedtest_net,speedtest_cn,iperf3,china_isp,speedtest_isp)"
+
+[cli.flag.iperfHostSuite]
+other = "iperf3 server(s) for speed section (comma-separated)"
+
+[cli.flag.only]
+other = "run only selected sections (comma-separated: hardware,network_info,route,ping,speed,ip,reachability,mail,media)"
+
+[cli.flag.skip]
+other = "skip selected sections (comma-separated: hardware,network_info,route,ping,speed,ip,reachability,mail,media)"
+
+[cli.flag.ipVersion]
+other = "network IP version: v4, v6, or dual"
+
+[cli.flag.mediaSet]
+other = "media unlock set: all, globe, tw, hk, jp, kr, na, sa, eu, afr, sea, oce, ai, or comma combinations"
+
+[cli.flag.ipQualitySource]
+other = "IP quality evidence sources (comma-separated: builtin,securitycheck)"
+
+[cli.flag.noHardware]
+other = "skip hardware section"
+
+[cli.flag.noNetworkInfo]
+other = "skip network identity section"
+
+[cli.flag.noRoute]
+other = "skip route section"
+
+[cli.flag.noPing]
+other = "skip ping section"
+
+[cli.flag.noSpeed]
+other = "skip speed section"
+
+[cli.flag.noIP]
+other = "skip IP quality section"
+
+[cli.flag.noMail]
+other = "skip mail port section"
+
+[cli.flag.noMedia]
+other = "skip media section"
+
+[cli.flag.noReachability]
+other = "skip website and Telegram reachability section"
+
+[cli.flag.quietSuite]
+other = "suppress section progress output"
+
+[cli.flag.jsonSysinfo]
+other = "output as JSON"
+
+[cli.flag.nodeCatalogNodes]
+other = "catalog source: embedded, auto, or JSON path"
+
+[cli.flag.nodeCacheNodes]
+other = "override auto catalog cache path"
+
+[cli.flag.jsonOutput]
+other = "output JSON"
+
+[cli.flag.nodesKind]
+other = "filter kind: download, upload, route, ping, or route_ping"
+
+[cli.flag.nodesFamily]
+other = "filter IP family: v4, v6, dual, or any"
+
+[cli.flag.nodesRegion]
+other = "filter region"
+
+[cli.flag.nodesCity]
+other = "filter city"
+
+[cli.flag.nodesCarrier]
+other = "filter carrier"
+
+[cli.flag.nodesKindShort]
+other = "filter kind"
+
+[cli.flag.nodesFamilyShort]
+other = "filter IP family"
+
+[cli.flag.signature]
+other = "detached signature path or URL"
+
+[cli.flag.publicKey]
+other = "Ed25519 public key file"
+
+[cli.flag.publicKeyValue]
+other = "inline base64, hex, or PEM Ed25519 public key"
+
+[cli.flag.signatureTimeout]
+other = "signature download timeout"
+
+[cli.flag.updateURL]
+other = "node catalog manifest URL"
+
+[cli.flag.updateCache]
+other = "cache destination (default user cache)"
+
+[cli.flag.updateTimeout]
+other = "complete update timeout"
+
+[cli.flag.healthTimeout]
+other = "timeout per node"
+
+[cli.flag.healthConcurrency]
+other = "concurrent checks (1-32)"
+
+[cli.flag.historyLast]
+other = "compare the latest N reports"
+
+[cli.error.wrap]
+other = "error: {{.Err}}"
+
+[cli.error.unknownCommand]
+other = "unknown command: {{.Command}}"
+
+[cli.error.iterationsRange]
+other = "error: --iterations must be between 1 and 9"
+
+[cli.error.timeoutNegative]
+other = "error: --timeout must not be negative"
+
+[cli.error.badFilterRegex]
+other = "error: invalid --filter regex: {{.Err}}"
+
+[cli.error.badMode]
+other = "error: --mode must be one of: single, multi, all"
+
+[cli.error.badScope]
+other = "error: --scope must be one of: hardware, network, all"
+
+[cli.error.historyTagRequiresSave]
+other = "error: --history-tag requires --save-history"
+
+[cli.error.unknownHardwareTool]
+other = 'error: unknown hardware tool "{{.Value}}"'
+
+[cli.error.noValidHardwareTools]
+other = 'error: no valid hardware tools in "{{.Value}}" (available: {{.Available}})'
+
+[cli.error.savingHistory]
+other = "error saving history: {{.Err}}"
+
+[cli.error.writingJSON]
+other = "error writing JSON: {{.Err}}"
+
+[cli.error.writingHTML]
+other = "error writing HTML: {{.Err}}"
+
+[cli.error.badIPVersion]
+other = "error: --ip-version must be one of: v4, v6, dual"
+
+[cli.error.unknownSectionOnly]
+other = 'error: unknown section "{{.Value}}" in --only'
+
+[cli.error.unknownSectionSkip]
+other = 'error: unknown section "{{.Value}}" in --skip'
+
+[cli.error.unknownRoutePreset]
+other = 'error: unknown route preset "{{.Value}}"'
+
+[cli.error.unknownSpeedProvider]
+other = 'error: unknown speed provider "{{.Value}}"'
+
+[cli.error.unknownMediaSet]
+other = 'error: unknown media set "{{.Value}}" (available: {{.Available}})'
+
+[cli.error.unknownIPSource]
+other = 'error: unknown IP quality source "{{.Value}}" (available: {{.Available}})'
+
+[cli.error.noValidSpeedProviders]
+other = 'error: no valid speed providers in "{{.Value}}" (available: {{.Available}})'
+
+[cli.error.unknownPreset]
+other = 'error: unknown suite preset "{{.Value}}" (available: {{.Available}})'
+
+[cli.error.noSectionsEnabled]
+other = "error: at least one suite section must remain enabled"
+
+[cli.error.compareNeedsTwo]
+other = "error: at least 2 JSON report files required"
+
+[cli.error.readingReport]
+other = "error reading {{.Path}}: {{.Err}}"
+
+[cli.error.unknownNodesCommand]
+other = "unknown nodes command: {{.Command}}"
+
+[cli.error.nodesNoPositional]
+other = "error: nodes list does not accept positional arguments"
+
+[cli.error.invalidNodesVerify]
+other = "error: invalid nodes verify arguments"
+
+[cli.error.signatureRequired]
+other = "error: --signature is required when a public key is provided"
+
+[cli.error.updateRequires]
+other = "error: --url, --signature, and a positive --timeout are required"
+
+[cli.error.healthRange]
+other = "error: timeout must be positive and concurrency must be between 1 and 32"
+
+[cli.error.noNodesMatch]
+other = "error: no nodes match the selected health filters"
+
+[cli.error.unknownHistoryCommand]
+other = 'error: unknown history command "{{.Command}}"'
+
+[cli.error.historyCompareNoPaths]
+other = "error: history compare does not accept report paths"
+
+[cli.error.historyLastRange]
+other = "error: --last must be between 2 and 100"
+
+[cli.error.historyMixedKinds]
+other = "error: latest {{.Count}} reports mix {{.KindA}} and {{.KindB}} kinds; delete/select history so the latest set has one kind"
+
+[cli.error.historyListNoArgs]
+other = "error: history list does not accept arguments"
+
+[cli.error.historyShowOneID]
+other = "error: history show requires exactly one ID"
+
+[cli.error.historyDeleteOneID]
+other = "error: history delete requires exactly one ID"
+
+[cli.error.invalidStoredReport]
+other = "error: invalid stored report: {{.Err}}"
+
+[cli.notice.networkScopeTransfer]
+other = "notice: network scope is enabled and may transfer about 1.75 GB before optional speedtest/iperf workloads"
+
+[cli.notice.historySaved]
+other = "history: saved {{.ID}}"
+
+[cli.notice.missingHardwareTools]
+other = "notice: missing hardware tools: {{.Tools}}; affected workloads will be recorded as structured errors"
+
+[cli.notice.installHint]
+other = "hint: Debian/Ubuntu: sudo apt-get install -y {{.Packages}}"
+
+[cli.progress.done]
+other = "done"
+
+[cli.progress.fail]
+other = "FAIL"
+
+[cli.progress.running]
+other = "running"
+
+[cli.progress.complete]
+other = "complete"
+
+[cli.progress.benchmarkComplete]
+other = "Benchmark complete"
+
+[cli.list.workload]
+other = "Workload"
+
+[cli.list.category]
+other = "Category"
+
+[cli.list.description]
+other = "Description"
+
+[cli.nodes.colID]
+other = "ID"
+
+[cli.nodes.colKind]
+other = "KIND"
+
+[cli.nodes.colCity]
+other = "CITY"
+
+[cli.nodes.colCarrier]
+other = "CARRIER"
+
+[cli.nodes.colASN]
+other = "ASN"
+
+[cli.nodes.colIP]
+other = "IP"
+
+[cli.nodes.colProtocol]
+other = "PROTOCOL"
+
+[cli.nodes.colEndpoint]
+other = "ENDPOINT"
+
+[cli.nodes.colTraffic]
+other = "TRAFFIC"
+
+[cli.nodes.colNode]
+other = "NODE"
+
+[cli.nodes.colStatus]
+other = "STATUS"
+
+[cli.nodes.colMethod]
+other = "METHOD"
+
+[cli.nodes.colLatency]
+other = "LATENCY"
+
+[cli.nodes.colDetail]
+other = "DETAIL"
+
+[cli.nodes.catalogValid]
+other = "node catalog {{.Revision}} is valid ({{.Count}} nodes, {{.Verified}} verified)"
+
+[cli.nodes.catalogUpdated]
+other = "updated node catalog {{.Revision}} ({{.Count}} nodes) at {{.Path}}"
+
+[cli.nodes.catalogNotice]
+other = "catalog: {{.Revision}} ({{.Source}})"
+
+[cli.nodes.catalogWarning]
+other = "warning: {{.Warning}}"
+
+[cli.history.colKind]
+other = "KIND"
+
+[cli.history.colReportTime]
+other = "REPORT TIME"
+
+[cli.history.colTag]
+other = "TAG"
+
+[cli.history.deleted]
+other = "deleted {{.ID}}"
+
+[cli.sysinfo.title]
+other = "VMBench System Info"
+
+[cli.sysinfo.host]
+other = "Host"
+
+[cli.sysinfo.os]
+other = "OS"
+
+[cli.sysinfo.cpu]
+other = "CPU"
+
+[cli.sysinfo.memory]
+other = "Memory"
+
+[cli.sysinfo.virtual]
+other = "Virtual"
+
+[cli.sysinfo.features]
+other = "Features"
+
+[cli.sysinfo.gpu]
+other = "GPU"
+
+[cli.sysinfo.go]
+other = "Go"
+
+[cli.sysinfo.platformTitle]
+other = "Platform Diagnostics"
+
+[cli.sysinfo.uptime]
+other = "Uptime"
+
+[cli.sysinfo.load]
+other = "Load"
+
+[cli.sysinfo.timezone]
+other = "Timezone"
+
+[cli.sysinfo.swap]
+other = "Swap"
+
+[cli.sysinfo.balloon]
+other = "Balloon"
+
+[cli.sysinfo.ksm]
+other = "KSM"
+
+[cli.sysinfo.tcp]
+other = "TCP"
+
+[cli.sysinfo.tcpRmem]
+other = "TCP rmem"
+
+[cli.sysinfo.tcpWmem]
+other = "TCP wmem"
+
+[cli.sysinfo.nestedVirt]
+other = "Nested virt"
+
+[cli.sysinfo.hugePages]
+other = "HugePages"
+
+[cli.sysinfo.bootDisk]
+other = "Boot disk"
+
+[cli.sysinfo.disksTitle]
+other = "Disks"
+
+[cli.sysinfo.device]
+other = "Device"
+
+[cli.sysinfo.mountpoint]
+other = "Mountpoint"
+
+[cli.sysinfo.fs]
+other = "FS"
+
+[cli.sysinfo.total]
+other = "Total"
+
+[cli.sysinfo.network]
+other = "Network"
+
+[cli.sysinfo.warnings]
+other = "Warnings"
+
+[cli.sysinfo.swapUsed]
+other = "{{.Used}} used of {{.Total}}"
+
+[cli.sysinfo.ksmPages]
+other = "{{.Value}} ({{.Pages}} pages shared)"
+
+[cli.sysinfo.hugePagesCount]
+other = "{{.Total}} total / {{.Free}} free ({{.Each}} each)"
+
+[cli.sysinfo.ifaceCount]
+other = "{{.Count}} interfaces ({{.Names}})"

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cloudapp3/vmbench/history"
+	"github.com/cloudapp3/vmbench/i18n"
 )
 
 func runHistory(args []string) int {
@@ -34,7 +35,7 @@ func runHistory(args []string) int {
 		printHistoryUsage(os.Stdout)
 		return 0
 	default:
-		fmt.Fprintf(os.Stderr, "error: unknown history command %q\n", args[0])
+		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownHistoryCommand", map[string]any{"Command": args[0]}))
 		printHistoryUsage(os.Stderr)
 		return 2
 	}
@@ -42,7 +43,7 @@ func runHistory(args []string) int {
 
 func printHistoryUsage(w *os.File) {
 	fmt.Fprintln(w, strings.Join([]string{
-		"Usage:",
+		i18n.T("cli.usage.header"),
 		"  vmbench history add FILE [--tag TAG]",
 		"  vmbench history list",
 		"  vmbench history show ID",
@@ -58,17 +59,17 @@ func runHistoryAdd(args []string) int {
 		return 0
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 2
 	}
 	store, err := history.Open("")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	record, err := store.AddFile(path, tag)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	fmt.Fprintln(os.Stdout, record.ID)
@@ -109,21 +110,21 @@ func runHistoryList(args []string) int {
 			fmt.Fprintln(os.Stdout, "Usage: vmbench history list")
 			return 0
 		}
-		fmt.Fprintln(os.Stderr, "error: history list does not accept arguments")
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error.historyListNoArgs"))
 		return 2
 	}
 	store, err := history.Open("")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	records, err := store.List()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	tw := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tKIND\tREPORT TIME\tTAG")
+	fmt.Fprintln(tw, strings.Join([]string{i18n.T("cli.nodes.colID"), i18n.T("cli.history.colKind"), i18n.T("cli.history.colReportTime"), i18n.T("cli.history.colTag")}, "\t"))
 	for _, record := range records {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", record.ID, record.Kind, record.ReportTime.Local().Format(time.RFC3339), record.Tag)
 	}
@@ -137,22 +138,22 @@ func runHistoryShow(args []string) int {
 		return 0
 	}
 	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "error: history show requires exactly one ID")
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error.historyShowOneID"))
 		return 2
 	}
 	store, err := history.Open("")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	record, err := store.Get(args[0])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	var formatted bytes.Buffer
 	if err := json.Indent(&formatted, record.Report, "", "  "); err != nil {
-		fmt.Fprintf(os.Stderr, "error: invalid stored report: %v\n", err)
+		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.invalidStoredReport", map[string]any{"Err": err.Error()}))
 		return 1
 	}
 	formatted.WriteByte('\n')
@@ -166,19 +167,19 @@ func runHistoryDelete(args []string) int {
 		return 0
 	}
 	if len(args) != 1 {
-		fmt.Fprintln(os.Stderr, "error: history delete requires exactly one ID")
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error.historyDeleteOneID"))
 		return 2
 	}
 	store, err := history.Open("")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	if err := store.Delete(args[0]); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
-	fmt.Fprintf(os.Stdout, "deleted %s\n", args[0])
+	fmt.Fprintf(os.Stdout, "%s\n", i18n.Tf("cli.history.deleted", map[string]any{"ID": args[0]}))
 	return 0
 }
 
@@ -187,7 +188,7 @@ func runHistoryCompare(args []string) int {
 	fs.SetOutput(os.Stderr)
 	registerLangFlag(fs)
 	last := 2
-	fs.IntVar(&last, "last", 2, "compare the latest N reports")
+	fs.IntVar(&last, "last", 2, i18n.T("cli.flag.historyLast"))
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: vmbench history compare --last N")
 	}
@@ -198,27 +199,27 @@ func runHistoryCompare(args []string) int {
 		return 2
 	}
 	if fs.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "error: history compare does not accept report paths")
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error.historyCompareNoPaths"))
 		return 2
 	}
 	if last < 2 || last > 100 {
-		fmt.Fprintln(os.Stderr, "error: --last must be between 2 and 100")
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error.historyLastRange"))
 		return 2
 	}
 	store, err := history.Open("")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	records, err := store.Latest(last)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	kind := records[0].Kind
 	for _, record := range records[1:] {
 		if record.Kind != kind {
-			fmt.Fprintf(os.Stderr, "error: latest %s reports mix %s and %s kinds; delete/select history so the latest set has one kind\n", strconv.Itoa(last), kind, record.Kind)
+			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.historyMixedKinds", map[string]any{"Count": strconv.Itoa(last), "KindA": kind, "KindB": record.Kind}))
 			return 2
 		}
 	}
@@ -227,7 +228,7 @@ func runHistoryCompare(args []string) int {
 		raw[i] = record.Report
 	}
 	if err := writeReportComparison(os.Stdout, raw); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	return 0

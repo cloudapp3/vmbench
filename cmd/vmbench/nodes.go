@@ -14,6 +14,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/nodecatalog"
 )
 
@@ -47,13 +48,13 @@ func printNodesUsage(w io.Writer) {
 	fmt.Fprintln(w, strings.Join([]string{
 		"Usage: vmbench nodes <command> [flags]",
 		"",
-		"Commands:",
-		"  list      list nodes from a selected catalog",
-		"  verify    validate schema/revision and optionally a detached signature",
-		"  update    download and cache a mandatory Ed25519-signed catalog",
-		"  health    run lightweight HEAD/DNS/TCP availability checks",
+		i18n.T("cli.usage.nodesCommands"),
+		"  list      " + i18n.T("cli.usage.nodesList"),
+		"  verify    " + i18n.T("cli.usage.nodesVerify"),
+		"  update    " + i18n.T("cli.usage.nodesUpdate"),
+		"  health    " + i18n.T("cli.usage.nodesHealth"),
 		"",
-		"Catalog selection:",
+		i18n.T("cli.usage.nodesCatalog"),
 		"  --node-catalog embedded|auto|PATH",
 		"  --node-revision REVISION",
 	}, "\n"))
@@ -66,9 +67,9 @@ type nodeLoadFlags struct {
 }
 
 func addNodeLoadFlags(fs *flag.FlagSet, values *nodeLoadFlags) {
-	fs.StringVar(&values.source, "node-catalog", nodecatalog.SourceEmbedded, "catalog source: embedded, auto, or JSON path")
-	fs.StringVar(&values.revision, "node-revision", "", "require an exact catalog revision")
-	fs.StringVar(&values.cachePath, "node-cache", "", "override auto catalog cache path")
+	fs.StringVar(&values.source, "node-catalog", nodecatalog.SourceEmbedded, i18n.T("cli.flag.nodeCatalogNodes"))
+	fs.StringVar(&values.revision, "node-revision", "", i18n.T("cli.flag.nodeRevision"))
+	fs.StringVar(&values.cachePath, "node-cache", "", i18n.T("cli.flag.nodeCacheNodes"))
 }
 
 func (values nodeLoadFlags) load() (nodecatalog.Loaded, error) {
@@ -87,12 +88,12 @@ func runNodesList(args []string) int {
 	var asJSON bool
 	var kind, family, region, city, carrier string
 	addNodeLoadFlags(fs, &loadFlags)
-	fs.BoolVar(&asJSON, "json", false, "output JSON")
-	fs.StringVar(&kind, "kind", "", "filter kind: download, upload, route, ping, or route_ping")
-	fs.StringVar(&family, "ip-family", "", "filter IP family: v4, v6, dual, or any")
-	fs.StringVar(&region, "region", "", "filter region")
-	fs.StringVar(&city, "city", "", "filter city")
-	fs.StringVar(&carrier, "carrier", "", "filter carrier")
+	fs.BoolVar(&asJSON, "json", false, i18n.T("cli.flag.jsonOutput"))
+	fs.StringVar(&kind, "kind", "", i18n.T("cli.flag.nodesKind"))
+	fs.StringVar(&family, "ip-family", "", i18n.T("cli.flag.nodesFamily"))
+	fs.StringVar(&region, "region", "", i18n.T("cli.flag.nodesRegion"))
+	fs.StringVar(&city, "city", "", i18n.T("cli.flag.nodesCity"))
+	fs.StringVar(&carrier, "carrier", "", i18n.T("cli.flag.nodesCarrier"))
 	fs.Usage = func() { fmt.Fprintln(os.Stderr, "Usage: vmbench nodes list [flags]") }
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -101,16 +102,16 @@ func runNodesList(args []string) int {
 		return 2
 	}
 	if fs.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "error: nodes list does not accept positional arguments")
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error.nodesNoPositional"))
 		return 2
 	}
 	if err := validateNodeFilter(kind, family); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 2
 	}
 	loaded, err := loadFlags.load()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	nodes := loaded.Manifest.Select(nodecatalog.Filter{Kind: kind, IPFamily: family, Region: region, City: city, Carrier: carrier})
@@ -137,7 +138,7 @@ func runNodesList(args []string) int {
 	}
 	writeCatalogNotice(os.Stderr, loaded)
 	tw := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tKIND\tCITY\tCARRIER\tASN\tIP\tPROTOCOL\tENDPOINT\tTRAFFIC")
+	fmt.Fprintln(tw, strings.Join([]string{i18n.T("cli.nodes.colID"), i18n.T("cli.nodes.colKind"), i18n.T("cli.nodes.colCity"), i18n.T("cli.nodes.colCarrier"), i18n.T("cli.nodes.colASN"), i18n.T("cli.nodes.colIP"), i18n.T("cli.nodes.colProtocol"), i18n.T("cli.nodes.colEndpoint"), i18n.T("cli.nodes.colTraffic")}, "\t"))
 	for _, node := range nodes {
 		traffic := "-"
 		if node.TrafficBytes > 0 {
@@ -166,11 +167,11 @@ func runNodesVerify(args []string) int {
 	var asJSON bool
 	var timeout time.Duration
 	addNodeLoadFlags(fs, &loadFlags)
-	fs.StringVar(&signatureRef, "signature", "", "detached signature path or URL")
-	fs.StringVar(&publicKeyFile, "public-key", "", "Ed25519 public key file")
-	fs.StringVar(&publicKeyValue, "public-key-value", "", "inline base64, hex, or PEM Ed25519 public key")
-	fs.DurationVar(&timeout, "timeout", 15*time.Second, "signature download timeout")
-	fs.BoolVar(&asJSON, "json", false, "output JSON")
+	fs.StringVar(&signatureRef, "signature", "", i18n.T("cli.flag.signature"))
+	fs.StringVar(&publicKeyFile, "public-key", "", i18n.T("cli.flag.publicKey"))
+	fs.StringVar(&publicKeyValue, "public-key-value", "", i18n.T("cli.flag.publicKeyValue"))
+	fs.DurationVar(&timeout, "timeout", 15*time.Second, i18n.T("cli.flag.signatureTimeout"))
+	fs.BoolVar(&asJSON, "json", false, i18n.T("cli.flag.jsonOutput"))
 	fs.Usage = func() { fmt.Fprintln(os.Stderr, "Usage: vmbench nodes verify [flags]") }
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -179,35 +180,35 @@ func runNodesVerify(args []string) int {
 		return 2
 	}
 	if fs.NArg() != 0 || timeout <= 0 {
-		fmt.Fprintln(os.Stderr, "error: invalid nodes verify arguments")
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error.invalidNodesVerify"))
 		return 2
 	}
 	loaded, err := loadFlags.load()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	signed := strings.TrimSpace(signatureRef) != "" || strings.TrimSpace(publicKeyFile) != "" || strings.TrimSpace(publicKeyValue) != ""
 	if signed && strings.TrimSpace(signatureRef) == "" {
-		fmt.Fprintln(os.Stderr, "error: --signature is required when a public key is provided")
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error.signatureRequired"))
 		return 2
 	}
 	var key ed25519.PublicKey
 	if signed {
 		key, err = explicitPublicKey(publicKeyFile, publicKeyValue)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			printErr(err)
 			return 2
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		signature, signatureErr := loadSignatureReference(ctx, signatureRef, http.DefaultClient)
 		cancel()
 		if signatureErr != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", signatureErr)
+			printErr(signatureErr)
 			return 1
 		}
 		if err := nodecatalog.Verify(loaded.Raw, signature, key); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			printErr(err)
 			return 1
 		}
 	}
@@ -225,7 +226,7 @@ func runNodesVerify(args []string) int {
 	if signed {
 		verification += "/signature"
 	}
-	fmt.Fprintf(os.Stdout, "node catalog %s is valid (%d nodes, %s verified)\n", loaded.Manifest.Revision, len(loaded.Manifest.Nodes), verification)
+	fmt.Fprintf(os.Stdout, "%s\n", i18n.Tf("cli.nodes.catalogValid", map[string]any{"Revision": loaded.Manifest.Revision, "Count": len(loaded.Manifest.Nodes), "Verified": verification}))
 	writeCatalogNotice(os.Stderr, loaded)
 	return 0
 }
@@ -237,13 +238,13 @@ func runNodesUpdate(args []string) int {
 	var manifestURL, signatureRef, publicKeyFile, publicKeyValue, destination string
 	var timeout time.Duration
 	var asJSON bool
-	fs.StringVar(&manifestURL, "url", "", "node catalog manifest URL")
-	fs.StringVar(&signatureRef, "signature", "", "detached signature path or URL")
-	fs.StringVar(&publicKeyFile, "public-key", "", "Ed25519 public key file")
-	fs.StringVar(&publicKeyValue, "public-key-value", "", "inline base64, hex, or PEM Ed25519 public key")
-	fs.StringVar(&destination, "cache", "", "cache destination (default user cache)")
-	fs.DurationVar(&timeout, "timeout", 30*time.Second, "complete update timeout")
-	fs.BoolVar(&asJSON, "json", false, "output JSON")
+	fs.StringVar(&manifestURL, "url", "", i18n.T("cli.flag.updateURL"))
+	fs.StringVar(&signatureRef, "signature", "", i18n.T("cli.flag.signature"))
+	fs.StringVar(&publicKeyFile, "public-key", "", i18n.T("cli.flag.publicKey"))
+	fs.StringVar(&publicKeyValue, "public-key-value", "", i18n.T("cli.flag.publicKeyValue"))
+	fs.StringVar(&destination, "cache", "", i18n.T("cli.flag.updateCache"))
+	fs.DurationVar(&timeout, "timeout", 30*time.Second, i18n.T("cli.flag.updateTimeout"))
+	fs.BoolVar(&asJSON, "json", false, i18n.T("cli.flag.jsonOutput"))
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: vmbench nodes update --url URL --signature PATH|URL (--public-key PATH|--public-key-value KEY) [flags]")
 	}
@@ -254,12 +255,12 @@ func runNodesUpdate(args []string) int {
 		return 2
 	}
 	if fs.NArg() != 0 || strings.TrimSpace(manifestURL) == "" || strings.TrimSpace(signatureRef) == "" || timeout <= 0 {
-		fmt.Fprintln(os.Stderr, "error: --url, --signature, and a positive --timeout are required")
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error.updateRequires"))
 		return 2
 	}
 	key, err := explicitPublicKey(publicKeyFile, publicKeyValue)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 2
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -275,13 +276,13 @@ func runNodesUpdate(args []string) int {
 	} else {
 		options.Signature, err = nodecatalog.ReadSignature(signatureRef)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			printErr(err)
 			return 1
 		}
 	}
 	loaded, err := nodecatalog.Update(ctx, options)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	if asJSON {
@@ -293,7 +294,7 @@ func runNodesUpdate(args []string) int {
 			Warning   string `json:"warning,omitempty"`
 		}{true, loaded.Manifest.Revision, len(loaded.Manifest.Nodes), loaded.Path, loaded.Warning})
 	}
-	fmt.Fprintf(os.Stdout, "updated node catalog %s (%d nodes) at %s\n", loaded.Manifest.Revision, len(loaded.Manifest.Nodes), loaded.Path)
+	fmt.Fprintf(os.Stdout, "%s\n", i18n.Tf("cli.nodes.catalogUpdated", map[string]any{"Revision": loaded.Manifest.Revision, "Count": len(loaded.Manifest.Nodes), "Path": loaded.Path}))
 	writeCatalogNotice(os.Stderr, loaded)
 	return 0
 }
@@ -308,14 +309,14 @@ func runNodesHealth(args []string) int {
 	var timeout time.Duration
 	var concurrency int
 	addNodeLoadFlags(fs, &loadFlags)
-	fs.BoolVar(&asJSON, "json", false, "output JSON")
-	fs.StringVar(&kind, "kind", "", "filter kind")
-	fs.StringVar(&family, "ip-family", "", "filter IP family")
-	fs.StringVar(&region, "region", "", "filter region")
-	fs.StringVar(&city, "city", "", "filter city")
-	fs.StringVar(&carrier, "carrier", "", "filter carrier")
-	fs.DurationVar(&timeout, "timeout", 5*time.Second, "timeout per node")
-	fs.IntVar(&concurrency, "concurrency", 8, "concurrent checks (1-32)")
+	fs.BoolVar(&asJSON, "json", false, i18n.T("cli.flag.jsonOutput"))
+	fs.StringVar(&kind, "kind", "", i18n.T("cli.flag.nodesKindShort"))
+	fs.StringVar(&family, "ip-family", "", i18n.T("cli.flag.nodesFamilyShort"))
+	fs.StringVar(&region, "region", "", i18n.T("cli.flag.nodesRegion"))
+	fs.StringVar(&city, "city", "", i18n.T("cli.flag.nodesCity"))
+	fs.StringVar(&carrier, "carrier", "", i18n.T("cli.flag.nodesCarrier"))
+	fs.DurationVar(&timeout, "timeout", 5*time.Second, i18n.T("cli.flag.healthTimeout"))
+	fs.IntVar(&concurrency, "concurrency", 8, i18n.T("cli.flag.healthConcurrency"))
 	fs.Usage = func() { fmt.Fprintln(os.Stderr, "Usage: vmbench nodes health [flags]") }
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -324,21 +325,21 @@ func runNodesHealth(args []string) int {
 		return 2
 	}
 	if fs.NArg() != 0 || timeout <= 0 || concurrency < 1 || concurrency > 32 {
-		fmt.Fprintln(os.Stderr, "error: timeout must be positive and concurrency must be between 1 and 32")
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error.healthRange"))
 		return 2
 	}
 	if err := validateNodeFilter(kind, family); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 2
 	}
 	loaded, err := loadFlags.load()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		printErr(err)
 		return 1
 	}
 	filter := nodecatalog.Filter{Kind: kind, IPFamily: family, Region: region, City: city, Carrier: carrier}
 	if len(loaded.Manifest.Select(filter)) == 0 {
-		fmt.Fprintln(os.Stderr, "error: no nodes match the selected health filters")
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error.noNodesMatch"))
 		return 2
 	}
 	results := nodecatalog.CheckHealth(context.Background(), loaded.Manifest, nodecatalog.HealthOptions{
@@ -363,7 +364,7 @@ func runNodesHealth(args []string) int {
 	} else {
 		writeCatalogNotice(os.Stderr, loaded)
 		tw := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
-		fmt.Fprintln(tw, "NODE\tSTATUS\tMETHOD\tLATENCY\tDETAIL")
+		fmt.Fprintln(tw, strings.Join([]string{i18n.T("cli.nodes.colNode"), i18n.T("cli.nodes.colStatus"), i18n.T("cli.nodes.colMethod"), i18n.T("cli.nodes.colLatency"), i18n.T("cli.nodes.colDetail")}, "\t"))
 		for _, result := range results {
 			detail := result.Endpoint
 			if result.Error != "" {
@@ -444,9 +445,9 @@ func validateNodeFilter(kind, family string) error {
 }
 
 func writeCatalogNotice(w io.Writer, loaded nodecatalog.Loaded) {
-	fmt.Fprintf(w, "catalog: %s (%s)\n", loaded.Manifest.Revision, loaded.Source)
+	fmt.Fprintf(w, "%s\n", i18n.Tf("cli.nodes.catalogNotice", map[string]any{"Revision": loaded.Manifest.Revision, "Source": loaded.Source}))
 	if loaded.Warning != "" {
-		fmt.Fprintf(w, "warning: %s\n", loaded.Warning)
+		fmt.Fprintf(w, "%s\n", i18n.Tf("cli.nodes.catalogWarning", map[string]any{"Warning": loaded.Warning}))
 	}
 }
 

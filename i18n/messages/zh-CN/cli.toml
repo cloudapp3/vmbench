@@ -1,0 +1,598 @@
+# CLI 界面: 用法、参数、错误、提示、进度、表格与 sysinfo 标签。
+
+[cli.usage.tagline]
+other = "vmbench — 跨平台 CPU 与网络基准测试套件"
+
+[cli.usage.header]
+other = "用法:"
+
+[cli.usage.cmdRun]
+other = "运行基准测试工作负载"
+
+[cli.usage.cmdSuite]
+other = "运行 VPS 综合测试套件"
+
+[cli.usage.cmdTui]
+other = "交互式 TUI 模式"
+
+[cli.usage.cmdMcp]
+other = "通过 stdio 提供 MCP 工具"
+
+[cli.usage.cmdList]
+other = "列出可用工作负载"
+
+[cli.usage.cmdNodes]
+other = "管理版本化网络节点"
+
+[cli.usage.cmdSysinfo]
+other = "显示系统信息"
+
+[cli.usage.cmdCompare]
+other = "对比两份报告"
+
+[cli.usage.cmdHistory]
+other = "管理本地报告历史"
+
+[cli.usage.cmdVersion]
+other = "显示版本"
+
+[cli.usage.detailHint]
+other = "运行 'vmbench run --help'、'vmbench suite --help' 或 'vmbench mcp serve --help' 查看详细参数。"
+
+[cli.usage.runDetail]
+other = "运行基准测试工作负载并生成测量报告。"
+
+[cli.usage.suiteDetail]
+other = "以 VPS 综合测试套件形式运行 hardware/network_info/route/ping/speed/ip_quality/reachability/mail/media。"
+
+[cli.usage.flags]
+other = "参数:"
+
+[cli.usage.presets]
+other = "预设:"
+
+[cli.usage.speedProviders]
+other = "测速提供方:"
+
+[cli.usage.hardwareTools]
+other = "硬件测试工具:"
+
+[cli.usage.requires]
+other = "需要"
+
+[cli.usage.defaultTool]
+other = "默认。"
+
+[cli.usage.listDetail]
+other = "列出可用工作负载。"
+
+[cli.usage.sysinfoDetail]
+other = "显示当前主机的系统信息。"
+
+[cli.usage.compareDetail]
+other = "并排对比两份基准测试报告。"
+
+[cli.usage.nodesCommands]
+other = "子命令:"
+
+[cli.usage.nodesList]
+other = "列出所选节点目录中的节点"
+
+[cli.usage.nodesVerify]
+other = "校验 schema/版本,可选校验独立签名"
+
+[cli.usage.nodesUpdate]
+other = "下载并缓存强制 Ed25519 签名的节点目录"
+
+[cli.usage.nodesHealth]
+other = "执行轻量 HEAD/DNS/TCP 可用性检查"
+
+[cli.usage.nodesCatalog]
+other = "节点目录选择:"
+
+[cli.flag.iterationsRun]
+other = "每个工作负载的迭代次数 (1-9)"
+
+[cli.flag.filterRun]
+other = "运行匹配正则的工作负载"
+
+[cli.flag.lang]
+other = "界面语言 (en, zh-CN)"
+
+[cli.flag.diskPath]
+other = "磁盘测试临时目录"
+
+[cli.flag.timeoutRun]
+other = "单个工作负载超时 (默认 5m)"
+
+[cli.flag.jsonRun]
+other = "将 JSON 报告写入文件"
+
+[cli.flag.htmlRun]
+other = "将 HTML 报告写入文件"
+
+[cli.flag.quietRun]
+other = "抑制进度输出"
+
+[cli.flag.mode]
+other = "兼容模式: single (旧版 multi/all 也只运行一次目录)"
+
+[cli.flag.scope]
+other = "工作负载范围: hardware、network 或 all"
+
+[cli.flag.iperfHostRun]
+other = "网络测试的 iperf3 服务器 (多个用逗号分隔)"
+
+[cli.flag.hardwareTool]
+other = "硬件测试工具 (逗号分隔: sysbench,openssl,fio,dd,stream,mbw,geekbench,winsat;all 表示全部适配器)"
+
+[cli.flag.saveHistory]
+other = "将报告保存到本地历史"
+
+[cli.flag.historyTag]
+other = "与 --save-history 配合使用的可选标签"
+
+[cli.flag.nodeCatalog]
+other = "节点目录来源: embedded、auto 或 JSON 路径"
+
+[cli.flag.nodeRevision]
+other = "要求精确的节点目录版本"
+
+[cli.flag.nodeCache]
+other = "--node-catalog auto 时的缓存路径覆盖"
+
+[cli.flag.iterationsSuite]
+other = "硬件工作负载的迭代次数"
+
+[cli.flag.filterSuite]
+other = "运行匹配正则的硬件工作负载"
+
+[cli.flag.timeoutSuite]
+other = "单个 section 超时 (默认 5m;hardware 按工作负载应用)"
+
+[cli.flag.jsonSuite]
+other = "将 suite JSON 报告写入文件"
+
+[cli.flag.htmlSuite]
+other = "将 suite HTML 报告写入文件"
+
+[cli.flag.preset]
+other = "场景预设: quick、website、proxy、mail"
+
+[cli.flag.routePresets]
+other = "逗号分隔的回程预设 (gz,bj,sh,cd,cernet,cstnet)"
+
+[cli.flag.speedProvider]
+other = "测速提供方 (逗号分隔: cloudflare,speedtest_net,speedtest_cn,iperf3,china_isp,speedtest_isp)"
+
+[cli.flag.iperfHostSuite]
+other = "测速 section 的 iperf3 服务器 (逗号分隔)"
+
+[cli.flag.only]
+other = "仅运行所选 section (逗号分隔: hardware,network_info,route,ping,speed,ip,reachability,mail,media)"
+
+[cli.flag.skip]
+other = "跳过所选 section (逗号分隔: hardware,network_info,route,ping,speed,ip,reachability,mail,media)"
+
+[cli.flag.ipVersion]
+other = "网络 IP 版本: v4、v6 或 dual"
+
+[cli.flag.mediaSet]
+other = "流媒体解锁集合: all、globe、tw、hk、jp、kr、na、sa、eu、afr、sea、oce、ai 或逗号组合"
+
+[cli.flag.ipQualitySource]
+other = "IP 质量证据来源 (逗号分隔: builtin,securitycheck)"
+
+[cli.flag.noHardware]
+other = "跳过 hardware section"
+
+[cli.flag.noNetworkInfo]
+other = "跳过网络身份 section"
+
+[cli.flag.noRoute]
+other = "跳过 route section"
+
+[cli.flag.noPing]
+other = "跳过 ping section"
+
+[cli.flag.noSpeed]
+other = "跳过 speed section"
+
+[cli.flag.noIP]
+other = "跳过 IP 质量 section"
+
+[cli.flag.noMail]
+other = "跳过邮件端口 section"
+
+[cli.flag.noMedia]
+other = "跳过流媒体 section"
+
+[cli.flag.noReachability]
+other = "跳过网站与 Telegram 可达性 section"
+
+[cli.flag.quietSuite]
+other = "抑制 section 进度输出"
+
+[cli.flag.jsonSysinfo]
+other = "以 JSON 输出"
+
+[cli.flag.nodeCatalogNodes]
+other = "目录来源: embedded、auto 或 JSON 路径"
+
+[cli.flag.nodeCacheNodes]
+other = "覆盖 auto 目录缓存路径"
+
+[cli.flag.jsonOutput]
+other = "输出 JSON"
+
+[cli.flag.nodesKind]
+other = "筛选类型: download、upload、route、ping 或 route_ping"
+
+[cli.flag.nodesFamily]
+other = "筛选 IP 协议族: v4、v6、dual 或 any"
+
+[cli.flag.nodesRegion]
+other = "筛选地区"
+
+[cli.flag.nodesCity]
+other = "筛选城市"
+
+[cli.flag.nodesCarrier]
+other = "筛选运营商"
+
+[cli.flag.nodesKindShort]
+other = "筛选类型"
+
+[cli.flag.nodesFamilyShort]
+other = "筛选 IP 协议族"
+
+[cli.flag.signature]
+other = "独立签名路径或 URL"
+
+[cli.flag.publicKey]
+other = "Ed25519 公钥文件"
+
+[cli.flag.publicKeyValue]
+other = "内联 base64、hex 或 PEM 格式 Ed25519 公钥"
+
+[cli.flag.signatureTimeout]
+other = "签名下载超时"
+
+[cli.flag.updateURL]
+other = "节点目录清单 URL"
+
+[cli.flag.updateCache]
+other = "缓存目标位置 (默认用户缓存)"
+
+[cli.flag.updateTimeout]
+other = "整个更新过程超时"
+
+[cli.flag.healthTimeout]
+other = "单节点超时"
+
+[cli.flag.healthConcurrency]
+other = "并发检查数 (1-32)"
+
+[cli.flag.historyLast]
+other = "对比最近 N 份报告"
+
+[cli.error.wrap]
+other = "错误: {{.Err}}"
+
+[cli.error.unknownCommand]
+other = "未知命令: {{.Command}}"
+
+[cli.error.iterationsRange]
+other = "错误: --iterations 必须在 1 到 9 之间"
+
+[cli.error.timeoutNegative]
+other = "错误: --timeout 不能为负"
+
+[cli.error.badFilterRegex]
+other = "错误: 无效的 --filter 正则: {{.Err}}"
+
+[cli.error.badMode]
+other = "错误: --mode 必须是 single、multi、all 之一"
+
+[cli.error.badScope]
+other = "错误: --scope 必须是 hardware、network、all 之一"
+
+[cli.error.historyTagRequiresSave]
+other = "错误: --history-tag 需要 --save-history"
+
+[cli.error.unknownHardwareTool]
+other = '错误: 未知硬件测试工具 "{{.Value}}"'
+
+[cli.error.noValidHardwareTools]
+other = '错误: "{{.Value}}" 中没有有效的硬件测试工具 (可用: {{.Available}})'
+
+[cli.error.savingHistory]
+other = "保存历史失败: {{.Err}}"
+
+[cli.error.writingJSON]
+other = "写入 JSON 失败: {{.Err}}"
+
+[cli.error.writingHTML]
+other = "写入 HTML 失败: {{.Err}}"
+
+[cli.error.badIPVersion]
+other = "错误: --ip-version 必须是 v4、v6、dual 之一"
+
+[cli.error.unknownSectionOnly]
+other = '错误: --only 中存在未知 section "{{.Value}}"'
+
+[cli.error.unknownSectionSkip]
+other = '错误: --skip 中存在未知 section "{{.Value}}"'
+
+[cli.error.unknownRoutePreset]
+other = '错误: 未知回程预设 "{{.Value}}"'
+
+[cli.error.unknownSpeedProvider]
+other = '错误: 未知测速提供方 "{{.Value}}"'
+
+[cli.error.unknownMediaSet]
+other = '错误: 未知流媒体集合 "{{.Value}}" (可用: {{.Available}})'
+
+[cli.error.unknownIPSource]
+other = '错误: 未知 IP 质量来源 "{{.Value}}" (可用: {{.Available}})'
+
+[cli.error.noValidSpeedProviders]
+other = '错误: "{{.Value}}" 中没有有效的测速提供方 (可用: {{.Available}})'
+
+[cli.error.unknownPreset]
+other = '错误: 未知 suite 预设 "{{.Value}}" (可用: {{.Available}})'
+
+[cli.error.noSectionsEnabled]
+other = "错误: 至少需要保留一个启用的 suite section"
+
+[cli.error.compareNeedsTwo]
+other = "错误: 至少需要 2 个 JSON 报告文件"
+
+[cli.error.readingReport]
+other = "读取 {{.Path}} 失败: {{.Err}}"
+
+[cli.error.unknownNodesCommand]
+other = "未知 nodes 子命令: {{.Command}}"
+
+[cli.error.nodesNoPositional]
+other = "错误: nodes list 不接受位置参数"
+
+[cli.error.invalidNodesVerify]
+other = "错误: 无效的 nodes verify 参数"
+
+[cli.error.signatureRequired]
+other = "错误: 提供公钥时必须提供 --signature"
+
+[cli.error.updateRequires]
+other = "错误: 必须提供 --url、--signature 以及正的 --timeout"
+
+[cli.error.healthRange]
+other = "错误: timeout 必须为正,concurrency 必须在 1 到 32 之间"
+
+[cli.error.noNodesMatch]
+other = "错误: 没有节点匹配所选的健康检查筛选条件"
+
+[cli.error.unknownHistoryCommand]
+other = '错误: 未知 history 子命令 "{{.Command}}"'
+
+[cli.error.historyCompareNoPaths]
+other = "错误: history compare 不接受报告路径"
+
+[cli.error.historyLastRange]
+other = "错误: --last 必须在 2 到 100 之间"
+
+[cli.error.historyMixedKinds]
+other = "错误: 最近 {{.Count}} 份报告混合了 {{.KindA}} 与 {{.KindB}} 两种类型;请删除/选择历史记录使最近一组只有一种类型"
+
+[cli.error.historyListNoArgs]
+other = "错误: history list 不接受参数"
+
+[cli.error.historyShowOneID]
+other = "错误: history show 只需要一个 ID"
+
+[cli.error.historyDeleteOneID]
+other = "错误: history delete 只需要一个 ID"
+
+[cli.error.invalidStoredReport]
+other = "错误: 存储的报告无效: {{.Err}}"
+
+[cli.notice.networkScopeTransfer]
+other = "提示: 已启用 network 范围,在可选的 speedtest/iperf 工作负载之前可能传输约 1.75 GB 流量"
+
+[cli.notice.historySaved]
+other = "历史: 已保存 {{.ID}}"
+
+[cli.notice.missingHardwareTools]
+other = "提示: 缺少硬件测试工具: {{.Tools}};受影响的工作负载将记录为结构化错误"
+
+[cli.notice.installHint]
+other = "提示: Debian/Ubuntu 可执行 sudo apt-get install -y {{.Packages}}"
+
+[cli.progress.done]
+other = "完成"
+
+[cli.progress.fail]
+other = "失败"
+
+[cli.progress.running]
+other = "运行中"
+
+[cli.progress.complete]
+other = "已完成"
+
+[cli.progress.benchmarkComplete]
+other = "基准测试完成"
+
+[cli.list.workload]
+other = "工作负载"
+
+[cli.list.category]
+other = "分类"
+
+[cli.list.description]
+other = "描述"
+
+[cli.nodes.colID]
+other = "ID"
+
+[cli.nodes.colKind]
+other = "类型"
+
+[cli.nodes.colCity]
+other = "城市"
+
+[cli.nodes.colCarrier]
+other = "运营商"
+
+[cli.nodes.colASN]
+other = "ASN"
+
+[cli.nodes.colIP]
+other = "IP"
+
+[cli.nodes.colProtocol]
+other = "协议"
+
+[cli.nodes.colEndpoint]
+other = "端点"
+
+[cli.nodes.colTraffic]
+other = "流量"
+
+[cli.nodes.colNode]
+other = "节点"
+
+[cli.nodes.colStatus]
+other = "状态"
+
+[cli.nodes.colMethod]
+other = "方式"
+
+[cli.nodes.colLatency]
+other = "延迟"
+
+[cli.nodes.colDetail]
+other = "详情"
+
+[cli.nodes.catalogValid]
+other = "节点目录 {{.Revision}} 有效 ({{.Count}} 个节点,已验证 {{.Verified}})"
+
+[cli.nodes.catalogUpdated]
+other = "已更新节点目录 {{.Revision}} ({{.Count}} 个节点),位置 {{.Path}}"
+
+[cli.nodes.catalogNotice]
+other = "目录: {{.Revision}} ({{.Source}})"
+
+[cli.nodes.catalogWarning]
+other = "警告: {{.Warning}}"
+
+[cli.history.colKind]
+other = "类型"
+
+[cli.history.colReportTime]
+other = "报告时间"
+
+[cli.history.colTag]
+other = "标签"
+
+[cli.history.deleted]
+other = "已删除 {{.ID}}"
+
+[cli.sysinfo.title]
+other = "VMBench 系统信息"
+
+[cli.sysinfo.host]
+other = "主机"
+
+[cli.sysinfo.os]
+other = "系统"
+
+[cli.sysinfo.cpu]
+other = "CPU"
+
+[cli.sysinfo.memory]
+other = "内存"
+
+[cli.sysinfo.virtual]
+other = "虚拟化"
+
+[cli.sysinfo.features]
+other = "特性"
+
+[cli.sysinfo.gpu]
+other = "GPU"
+
+[cli.sysinfo.go]
+other = "Go"
+
+[cli.sysinfo.platformTitle]
+other = "平台诊断"
+
+[cli.sysinfo.uptime]
+other = "运行时长"
+
+[cli.sysinfo.load]
+other = "负载"
+
+[cli.sysinfo.timezone]
+other = "时区"
+
+[cli.sysinfo.swap]
+other = "交换分区"
+
+[cli.sysinfo.balloon]
+other = "内存气球"
+
+[cli.sysinfo.ksm]
+other = "KSM"
+
+[cli.sysinfo.tcp]
+other = "TCP"
+
+[cli.sysinfo.tcpRmem]
+other = "TCP rmem"
+
+[cli.sysinfo.tcpWmem]
+other = "TCP wmem"
+
+[cli.sysinfo.nestedVirt]
+other = "嵌套虚拟化"
+
+[cli.sysinfo.hugePages]
+other = "大页内存"
+
+[cli.sysinfo.bootDisk]
+other = "启动磁盘"
+
+[cli.sysinfo.disksTitle]
+other = "磁盘"
+
+[cli.sysinfo.device]
+other = "设备"
+
+[cli.sysinfo.mountpoint]
+other = "挂载点"
+
+[cli.sysinfo.fs]
+other = "文件系统"
+
+[cli.sysinfo.total]
+other = "总量"
+
+[cli.sysinfo.network]
+other = "网络"
+
+[cli.sysinfo.warnings]
+other = "警告"
+
+[cli.sysinfo.swapUsed]
+other = "已用 {{.Used}} / 共 {{.Total}}"
+
+[cli.sysinfo.ksmPages]
+other = "{{.Value}} (共享 {{.Pages}} 页)"
+
+[cli.sysinfo.hugePagesCount]
+other = "共 {{.Total}} / 空闲 {{.Free}} (每页 {{.Each}})"
+
+[cli.sysinfo.ifaceCount]
+other = "{{.Count}} 个接口 ({{.Names}})"

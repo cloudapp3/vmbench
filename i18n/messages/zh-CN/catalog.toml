@@ -1,0 +1,172 @@
+# 规格显示名与描述 (suite 预设、测速提供方、回程预设、IP 来源、硬件工具)。结构体字段保持英文,此处仅作显示层翻译。
+
+[suite.preset.quick.name]
+other = "快速 VPS"
+
+[suite.preset.quick.description]
+other = "类 YABS 快速测试: 硬件、网络身份、测速与 IP 质量。"
+
+[suite.preset.website.name]
+other = "网站托管"
+
+[suite.preset.website.description]
+other = "网站/服务器场景: 硬件、网络身份、国内 ping/回程、测速、可达性、IP 质量与邮件端口。"
+
+[suite.preset.proxy.name]
+other = "代理/解锁"
+
+[suite.preset.proxy.description]
+other = "代理场景: 网络身份、国内 ping/回程、测速、可达性、IP 质量与流媒体解锁。"
+
+[suite.preset.mail.name]
+other = "邮件服务器"
+
+[suite.preset.mail.description]
+other = "邮件场景: 网络身份、IP 质量、邮件端口与回程诊断。"
+
+[suite.speed.cloudflare.name]
+other = "Cloudflare"
+
+[suite.speed.cloudflare.description]
+other = "通过 speed.cloudflare.com 进行 HTTP 多线程下载与上传。"
+
+[suite.speed.speedtest_net.name]
+other = "Speedtest.net"
+
+[suite.speed.speedtest_net.description]
+other = "Ookla Speedtest CLI 的 JSON 结果。"
+
+[suite.speed.speedtest_net.requires]
+other = "speedtest CLI"
+
+[suite.speed.speedtest_cn.name]
+other = "Speedtest.cn"
+
+[suite.speed.speedtest_cn.description]
+other = "兼容 speedtest.cn 的 CLI JSON 结果。"
+
+[suite.speed.speedtest_cn.requires]
+other = "兼容 speedtest-cn 的 CLI"
+
+[suite.speed.iperf3.name]
+other = "iperf3"
+
+[suite.speed.iperf3.description]
+other = "到用户提供的 --iperf-host 目标的 TCP 带宽。"
+
+[suite.speed.iperf3.requires]
+other = "iperf3 CLI 与 --iperf-host"
+
+[suite.speed.china_isp.name]
+other = "国内三网 (speedtest.cn)"
+
+[suite.speed.china_isp.description]
+other = "按国内运营商 (电信/联通/移动) 从版本化目录 isp_download 节点直接 HTTP 下载。"
+
+[suite.speed.speedtest_isp.name]
+other = "国内三网 (speedtest.net)"
+
+[suite.speed.speedtest_isp.description]
+other = "Ookla speedtest CLI 固定到各运营商国内服务器 ID。"
+
+[suite.speed.speedtest_isp.requires]
+other = "speedtest CLI"
+
+[suite.route.gz.name]
+other = "Guangzhou triple-carrier"
+
+[suite.route.gz.description]
+other = "Guangzhou telecom / unicom / mobile presets"
+
+[suite.route.bj.name]
+other = "Beijing triple-carrier"
+
+[suite.route.bj.description]
+other = "Beijing telecom / unicom / mobile presets"
+
+[suite.route.sh.name]
+other = "Shanghai triple-carrier"
+
+[suite.route.sh.description]
+other = "Shanghai telecom / unicom / mobile presets"
+
+[suite.route.cd.name]
+other = "Chengdu routes"
+
+[suite.route.cd.description]
+other = "Chengdu telecom / unicom / mobile / CERNET presets"
+
+[suite.route.cernet.name]
+other = "CERNET"
+
+[suite.route.cernet.description]
+other = "Verifiable CERNET presets"
+
+[suite.route.cstnet.name]
+other = "CSTNET"
+
+[suite.route.cstnet.description]
+other = "Verifiable CSTNET presets"
+
+[suite.ipSource.builtin.name]
+other = "内置"
+
+[suite.ipSource.builtin.description]
+other = "ip-api.com 元数据、ipapi.is 归属交叉验证、DNSBL、邮件端口。"
+
+[suite.ipSource.securitycheck.name]
+other = "securityCheck"
+
+[suite.ipSource.securitycheck.description]
+other = "来自外部 securityCheck 二进制的 18 库 IP 质量视图。"
+
+[suite.ipSource.securitycheck.requires]
+other = "securityCheck 二进制 (github.com/oneclickvirt/securityCheck)"
+
+[catalog.tool.sysbench.name]
+other = "sysbench"
+
+[catalog.tool.sysbench.description]
+other = "CPU 单核/多核质数与内存带宽。"
+
+[catalog.tool.openssl.name]
+other = "OpenSSL"
+
+[catalog.tool.openssl.description]
+other = "通过 openssl speed 测量 CPU 加解密吞吐。"
+
+[catalog.tool.fio.name]
+other = "fio"
+
+[catalog.tool.fio.description]
+other = "磁盘顺序与随机 4K I/O。"
+
+[catalog.tool.dd.name]
+other = "dd"
+
+[catalog.tool.dd.description]
+other = "磁盘顺序写入/读取吞吐。"
+
+[catalog.tool.stream.name]
+other = "STREAM"
+
+[catalog.tool.stream.description]
+other = "来自 STREAM Copy/Scale/Add/Triad 的内存带宽。"
+
+[catalog.tool.mbw.name]
+other = "mbw"
+
+[catalog.tool.mbw.description]
+other = "通过 mbw 测量内存拷贝带宽。"
+
+[catalog.tool.geekbench.name]
+other = "Geekbench"
+
+[catalog.tool.geekbench.description]
+other = "可选的上游 Geekbench CPU 成绩;默认不启用。"
+
+[catalog.tool.winsat.name]
+other = "WinSAT"
+
+[catalog.tool.winsat.description]
+other = "可选的 Windows 系统评估工具 CPU/内存/磁盘探测。"

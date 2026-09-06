@@ -8,6 +8,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/klauspost/cpuid/v2 v2.2.9
+	github.com/mattn/go-runewidth v0.0.24
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
 	github.com/oneclickvirt/UnlockTests v0.0.51
 	github.com/oneclickvirt/backtrace v0.0.21
@@ -41,7 +42,6 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
-	github.com/mattn/go-runewidth v0.0.24 // indirect
 	github.com/miekg/dns v1.1.73 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
