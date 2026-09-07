@@ -93,6 +93,43 @@ other = "choose"
 [tui.hint.toggle]
 other = "toggle"
 
+[tui.hint.help]
+other = "help"
+[tui.hint.wheel]
+other = "scroll wheel scrolls"
+[tui.hint.pageUp]
+other = "scroll page up / down"
+[tui.hint.top]
+other = "jump to top / bottom"
+[tui.help.title]
+other = "? Keybindings"
+[tui.help.currentSection]
+other = "Current page"
+[tui.help.allPages]
+other = "All pages"
+[tui.help.globalSection]
+other = "Global"
+[tui.help.sec.dashboard]
+other = "Dashboard"
+[tui.help.sec.running]
+other = "Hardware Benchmark Running"
+[tui.help.sec.results]
+other = "Benchmark Results"
+[tui.help.sec.compare]
+other = "Compare Reports"
+[tui.help.sec.suiteConfig]
+other = "Suite Config"
+[tui.help.sec.suiteRunning]
+other = "Suite Running"
+[tui.help.sec.suiteResults]
+other = "Suite Results"
+
+[tui.hint.digits]
+other = "toggle section 1-9"
+
+[tui.hint.scroll]
+other = "scroll"
+
 [tui.hint.start]
 other = "start"
 
@@ -195,6 +232,175 @@ other = "Status"
 [tui.col.metric]
 other = "Metric"
 
+[tui.running.eta]
+other = "~{{.Eta}} left"
+
+[tui.running.samples]
+other = "{{.Done}}/{{.Total}} samples"
+
+[tui.suiteSummary.title]
+other = "Run Summary"
+[tui.suiteSummary.sections]
+other = "Sections"
+[tui.suiteSummary.nodes]
+other = "Nodes"
+[tui.suiteSummary.routeNodes]
+other = "route {{.Route}} · ping {{.Ping}}"
+[tui.suiteSummary.speedNodes]
+other = "speed {{.Count}}"
+[tui.suiteSummary.nodesPending]
+other = "counting…"
+[tui.suiteSummary.workloads]
+other = "Hardware"
+[tui.suiteSummary.workloadCount]
+other = "{{.Count}} workloads"
+[tui.suiteSummary.estimatedLabel]
+other = "Estimated"
+[tui.suiteSummary.estimated]
+other = "~{{.Duration}} (avg of {{.Samples}} history runs)"
+[tui.suiteSummary.estimatedRough]
+other = "~{{.Duration}} (rough)"
+[tui.suiteSummary.etaLine]
+other = "estimated ~{{.Duration}}"
+[tui.suiteSummary.minutes]
+other = "{{.Minutes}}m"
+[tui.suiteSummary.minutesSeconds]
+other = "{{.Minutes}}m{{.Seconds}}s"
+[tui.suiteSummary.seconds]
+other = "{{.Seconds}}s"
+
+[tui.detail.title]
+other = "Workload Detail"
+
+[tui.detail.metrics]
+other = "Metrics"
+
+[tui.detail.samples]
+other = "Samples"
+
+[tui.detail.detailTitle]
+other = "Raw Output"
+
+[tui.detail.errorTitle]
+other = "Error"
+
+[tui.detail.noDetail]
+other = "No detail available."
+
+[tui.col.iterations]
+other = "Iterations"
+
+[tui.col.bytes]
+other = "Bytes"
+
+[tui.col.ops]
+other = "Ops"
+
+[tui.hint.detail]
+other = "detail"
+
+[tui.hint.repick]
+other = "repick"
+
+[tui.help.sec.resultDetail]
+other = "Workload Detail"
+
+[tui.compare.pickerTitle]
+other = "⇄ Compare Reports"
+
+[tui.compare.pickerDesc]
+other = "Pick two history records to compare, or view one. m for manual paths."
+
+[tui.compare.pickerHint]
+other = "pick A and B with space, then c to compare"
+
+[tui.compare.col.time]
+other = "Time"
+
+[tui.compare.col.kind]
+other = "Kind"
+
+[tui.compare.col.tag]
+other = "Tag"
+
+[tui.compare.col.id]
+other = "ID"
+
+[tui.compare.manual]
+other = "Manual Paths"
+
+[tui.compare.manualHint]
+other = "enter two report paths, tab to switch, enter to compare"
+
+[tui.compare.needTwo]
+other = "pick two records first"
+
+[tui.compare.mixedKinds]
+other = "cannot compare a run report with a suite report"
+
+[tui.compare.noHistory]
+other = "No history records yet. Run a benchmark with --save-history or vmbench history add."
+
+[tui.compare.historyError]
+other = "history error: {{.Err}}"
+
+[tui.compare.loadingHistory]
+other = "loading history…"
+
+[tui.help.sec.comparePicker]
+other = "Compare Picker"
+
+[tui.hint.pick]
+other = "pick A/B"
+
+[tui.hint.compareSel]
+other = "compare"
+
+[tui.hint.viewRecord]
+other = "view record"
+
+[tui.hint.manual]
+other = "manual paths"
+
+[tui.runConfig.title]
+other = "▶ Hardware Benchmark Config"
+[tui.runConfig.description]
+other = "Choose iterations, tools, and a workload filter before running the external-tool benchmark."
+[tui.runConfig.iterations]
+other = "Iterations"
+[tui.runConfig.tools]
+other = "Hardware Tools"
+[tui.runConfig.filter]
+other = "Filter"
+[tui.runConfig.filterAll]
+other = "All"
+[tui.runConfig.filterCPU]
+other = "CPU"
+[tui.runConfig.filterDisk]
+other = "Disk"
+[tui.runConfig.filterMemory]
+other = "Memory"
+[tui.runConfig.filterCustom]
+other = "Custom"
+[tui.runConfig.filterCustomHint]
+other = "type a regex, e.g. sysbench|fio"
+[tui.runConfig.preflight]
+other = "Tool Preflight"
+[tui.runConfig.preflightPending]
+other = "checking…"
+[tui.runConfig.missingTools]
+other = "missing tools (their workloads will report structured errors):"
+[tui.runConfig.missingNone]
+other = "all selected tools found"
+[tui.runConfig.start]
+other = "Start Benchmark"
+[tui.runConfig.startDisabled]
+other = "Nothing selected"
+[tui.runConfig.plannedWorkloads]
+other = "{{.Count}} workloads planned"
+[tui.help.sec.runConfig]
+other = "Hardware Benchmark Config"
+
 [tui.compare.title]
 other = "⇄ Compare Reports"
 
@@ -203,6 +409,9 @@ other = "Usage:\n  vmbench tui --compare-a <a.json> --compare-b <b.json>\n\nOr u
 
 [tui.compare.howTo]
 other = "How to compare"
+
+[tui.compare.loading]
+other = "Loading reports…"
 
 [tui.compare.error]
 other = "Error: {{.Err}}"
@@ -344,6 +553,9 @@ other = "▶ Start (disabled)"
 
 [tui.suiteResults.title]
 other = "◈ Suite Report"
+
+[tui.suiteResults.noResults]
+other = "No suite results."
 
 [tui.suiteResults.noSections]
 other = "No enabled sections."

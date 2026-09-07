@@ -3,7 +3,11 @@
 package tui
 
 import (
+	"time"
+
 	"github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/history"
+	gbreport "github.com/cloudapp3/vmbench/report"
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/sysinfo"
 )
@@ -50,6 +54,48 @@ func WithPageForRender(m Model, name string) Model {
 		}
 	case "suite-results":
 		m.page = pageSuiteResults
+	case "help":
+		m.helpFrom = pageDashboard
+		m.page = pageHelp
+	case "run-config":
+		m.page = pageRunConfig
+	case "compare-picker":
+		m.page = pageComparePicker
+		m.picker.records = []history.Record{
+			{ID: "run-20260907-101010", Kind: history.KindRun, Tag: "baseline", ReportTime: time.Date(2026, 9, 7, 10, 10, 10, 0, time.UTC)},
+			{ID: "suite-20260906-220000", Kind: history.KindSuite, Tag: "evening", ReportTime: time.Date(2026, 9, 6, 22, 0, 0, 0, time.UTC)},
+			{ID: "run-20260905-090000", Kind: history.KindRun, ReportTime: time.Date(2026, 9, 5, 9, 0, 0, 0, time.UTC)},
+		}
+		m.picker.a = 0
+		m.picker.b = 2
+	case "result-detail":
+		m.page = pageResultDetail
+		m.resultsDetail = 0
+		if m.report == nil {
+			report := vmbench.Report(gbreport.Document{Results: gbreport.ResultsSection{
+				Workloads: []gbreport.WorkloadEntry{
+					{
+						Name:     "Disk 4K Random Read Q1 (fio)",
+						Category: "Disk",
+						Result: &gbreport.ResultEntry{
+							Iterations:       3,
+							MedianMS:         3000,
+							SamplesMS:        []float64{2990, 3005, 3008},
+							ThroughputPerSec: 18200,
+							ThroughputUnit:   "IOPS",
+							AvgNSPerAccess:   54000,
+							Detail:           "fio-3.36\nread: IOPS=18200, BW=71MiB/s\n  lat (usec): min=48, max=2100, avg=54",
+						},
+					},
+					{
+						Name:     "Memory Write Bandwidth (sysbench)",
+						Category: "Memory",
+						Result:   &gbreport.ResultEntry{Iterations: 3, MedianMS: 1200, Error: "sysbench: command not found"},
+					},
+				},
+			}})
+			m.report = &report
+		}
 	}
 	return m
 }

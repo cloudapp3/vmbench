@@ -5,7 +5,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -27,6 +26,11 @@ func updateResults(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
+			if m.reportCameFromPicker {
+				m.reportCameFromPicker = false
+				m.page = pageComparePicker
+				return m, nil
+			}
 			m.page = pageDashboard
 			m.report = nil
 			return m, nil
@@ -38,13 +42,13 @@ func updateResults(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.resultsCur > 0 {
 				m.resultsCur--
 			}
-			return m, nil
+			return followFocus(m), nil
 		case "down", "j":
 			maxScroll := maxResultsScroll(m)
 			if m.resultsCur < maxScroll {
 				m.resultsCur++
 			}
-			return m, nil
+			return followFocus(m), nil
 		case "enter":
 			if m.resultsTab == 1 && m.report != nil {
 				cats := resultCategories(m.report.Results.Workloads)
@@ -58,24 +62,17 @@ func updateResults(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.report != nil {
 				return m, saveReportCmd(m.report)
 			}
+		case "d":
+			// Open the full evidence view for the flat-table cursor row.
+			if m.resultsTab == 2 && m.report != nil &&
+				m.resultsCur >= 0 && m.resultsCur < len(m.report.Results.Workloads) {
+				m.resultsDetail = m.resultsCur
+				m.page = pageResultDetail
+				return m, nil
+			}
 		case "q":
 			return m, tea.Quit
 		}
-	case saveDoneMsg:
-		var t comp.Toast
-		var c tea.Cmd
-		if msg.err != nil {
-			t, c = comp.ShowToast("save failed: "+msg.err.Error(), comp.ToastError, 4*time.Second)
-		} else {
-			t, c = comp.ShowToast("saved → "+msg.path, comp.ToastSuccess, 3*time.Second)
-		}
-		m.toast = t
-		return m, c
-	case comp.ToastExpireMsg:
-		if msg.Stamp == m.toast.Until {
-			m.toast = comp.Toast{}
-		}
-		return m, nil
 	}
 	return m, nil
 }
@@ -85,14 +82,54 @@ func maxResultsScroll(m Model) int {
 		return 0
 	}
 	switch m.resultsTab {
-	case 0:
-		return len(m.report.Results.Workloads) - 1
-	case 1:
+	case 1: // grouped: cursor walks category rows
 		return len(resultCategories(m.report.Results.Workloads)) - 1
-	default:
+	case 2: // flat: cursor walks workload rows
+		return len(m.report.Results.Workloads) - 1
+	default: // cards grid has no cursor
 		return 0
 	}
 }
+
+// resultsFocusedLine mirrors viewResults/viewResultsFlat/viewResultsGrouped
+// layout math to report the 0-based content line of the cursor row:
+// parts [headerTitle, stats, "", tabs, ""] occupy lines 0-4, the flat table
+// adds a header + separator, grouped emits one category line plus workload
+// lines of expanded categories.
+func resultsFocusedLine(m Model) (int, bool) {
+	if m.report == nil {
+		return 0, false
+	}
+	switch m.resultsTab {
+	case 1: // grouped: cursor walks category lines
+		cats := resultCategories(m.report.Results.Workloads)
+		if m.resultsCur >= len(cats) {
+			return 0, false
+		}
+		bodyLine := 0
+		for i, cat := range cats {
+			if i == m.resultsCur {
+				return resultsBodyStartLine + bodyLine, true
+			}
+			bodyLine++
+			if m.expanded[cat] {
+				for _, w := range m.report.Results.Workloads {
+					if w.Category == cat {
+						bodyLine++
+					}
+				}
+			}
+		}
+		return 0, false
+	default: // flat: header + separator + one row per workload
+		if m.resultsCur >= len(m.report.Results.Workloads) {
+			return 0, false
+		}
+		return resultsBodyStartLine + 2 + m.resultsCur, true
+	}
+}
+
+const resultsBodyStartLine = 5
 
 func saveReportCmd(report *vmbench.Report) tea.Cmd {
 	return func() tea.Msg {

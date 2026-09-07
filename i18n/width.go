@@ -1,6 +1,9 @@
 package i18n
 
-import "github.com/mattn/go-runewidth"
+import (
+	"github.com/charmbracelet/x/ansi"
+	"github.com/mattn/go-runewidth"
+)
 
 // Display-width-aware helpers for mixed ASCII/CJK output. Plain fmt padding
 // ("%-20s") and rune-count truncation count every rune as one cell, so
@@ -36,4 +39,19 @@ func PadCells(s string, width int) string {
 		s = runewidth.Truncate(s, width, "")
 	}
 	return runewidth.FillRight(s, width)
+}
+
+// StyledWidth and TruncateStyled are ANSI-aware variants for strings that
+// already carry terminal escape sequences: the plain runewidth helpers count
+// escape runes as visible cells, so truncating a styled line with them
+// corrupts both the width math and the sequences.
+func StyledWidth(s string) int {
+	return ansi.StringWidth(s)
+}
+
+func TruncateStyled(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	return ansi.Truncate(s, max, "")
 }

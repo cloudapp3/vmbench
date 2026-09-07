@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/cloudapp3/vmbench/history"
 	"github.com/cloudapp3/vmbench/i18n"
 	gbreport "github.com/cloudapp3/vmbench/report"
 	"github.com/cloudapp3/vmbench/tui/comp"
@@ -26,16 +27,30 @@ func updateCompare(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
-			m.page = pageDashboard
+			m.page = pageComparePicker
+			return m, nil
+		case "r":
+			// Back to the picker to change the selection.
+			m.page = pageComparePicker
+			if m.picker.records == nil && !m.picker.loading && m.picker.err == nil {
+				m.picker.loading = true
+				return m, loadHistoryCmd()
+			}
 			return m, nil
 		case "q":
 			return m, tea.Quit
 		}
-	case compareLoadedMsg:
-		_ = msg
-		return m, nil
 	}
 	return m, nil
+}
+
+// loadCompareCmd loads both compare reports off the render path so View()
+// stays free of file IO.
+func loadCompareCmd(a, b string) tea.Cmd {
+	return func() tea.Msg {
+		docs, err := loadCompareDocs(a, b)
+		return compareLoadedMsg{docs: docs, err: err}
+	}
 }
 
 func viewCompare(m Model) string {
@@ -53,10 +68,27 @@ func viewCompare(m Model) string {
 		return title + "\n\n" + card.Render()
 	}
 
-	docs, err := loadCompareDocs(m.compareA, m.compareB)
-	if err != nil {
-		return lipgloss.NewStyle().Foreground(t.Danger).Render("  " + i18n.Tf("tui.compare.error", map[string]any{"Err": err.Error()}))
+	if m.compareLoading && len(m.compareDocs) == 0 {
+		return lipgloss.NewStyle().Foreground(t.Muted).Render("  " + m.spinner.View() + " " + i18n.T("tui.compare.loading"))
 	}
+	if m.compareErr != nil {
+		return lipgloss.NewStyle().Foreground(t.Danger).Render("  " + i18n.Tf("tui.compare.error", map[string]any{"Err": m.compareErr.Error()}))
+	}
+	if len(m.compareDocs) != 2 {
+		return lipgloss.NewStyle().Foreground(t.Danger).Render("  " + i18n.Tf("tui.compare.error", map[string]any{"Err": "not loaded"}))
+	}
+
+	// Suite comparisons arrive as pre-rendered textgrid output from
+	// suitecompare; the P0 clipping keeps the long table scrollable.
+	if m.compareKind == string(history.KindSuite) {
+		if m.suiteCompareText == "" {
+			return lipgloss.NewStyle().Foreground(t.Muted).Render("  " + i18n.T("tui.compare.loading"))
+		}
+		title := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render(i18n.T("tui.compare.title"))
+		return strings.Join([]string{title, "", m.suiteCompareText}, "\n")
+	}
+
+	docs := m.compareDocs
 
 	dA, dB := docs[0], docs[1]
 	width := m.width

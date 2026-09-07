@@ -19,6 +19,11 @@ func updateSuiteResults(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
+			if m.reportCameFromPicker {
+				m.reportCameFromPicker = false
+				m.page = pageComparePicker
+				return m, nil
+			}
 			m.page = pageDashboard
 			m.suiteReport = nil
 			return m, nil
@@ -36,7 +41,7 @@ func updateSuiteResults(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func viewSuiteResults(m Model) string {
 	if m.suiteReport == nil {
-		return lipgloss.NewStyle().Foreground(theme.Active.Muted).Render("  No suite results.")
+		return lipgloss.NewStyle().Foreground(theme.Active.Muted).Render("  " + i18n.T("tui.suiteResults.noResults"))
 	}
 	t := theme.Active
 	width := m.width
@@ -495,7 +500,7 @@ func mediaResultCard(r suite.SuiteReport, width int) string {
 
 func sectionStateCard(id suite.SectionID, st suite.SectionState, width int) string {
 	t := theme.Active
-	body := lipgloss.NewStyle().Foreground(t.Muted).Render(firstStr(st.Message, "no data"))
+	body := lipgloss.NewStyle().Foreground(t.Muted).Render(firstStr(st.Message, i18n.T("tui.suiteResults.noData")))
 	if !strings.EqualFold(st.Status, "ok") && st.Status != "" {
 		body = lipgloss.NewStyle().Foreground(t.Danger).Render(st.Status + ": " + st.Message)
 	}

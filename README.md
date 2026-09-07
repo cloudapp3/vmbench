@@ -8,7 +8,7 @@ Cross-platform VPS benchmark suite written in Go, with TUI interface.
 
 Documentation: [中文说明](docs/README.zh-CN.md) · [Product](docs/product.md) · [Tech stack](docs/tech-stack.md) · [Current state](docs/current-state.md) · [Docs source](https://github.com/cloudapp3/vmdocs/tree/main/sites/vmbench/docs)
 
-[Quick start](#quick-start) · [Why vmbench](#why-vmbench) · [Commands](#commands) · [VPS Suite](#vps-suite) · [Reports](#report-formats) · [Community](#community--support)
+[Quick start](#quick-start) · [Install](#install) · [Why vmbench](#why-vmbench) · [Commands](#commands) · [VPS Suite](#vps-suite) · [Reports](#report-formats) · [Community](#community--support)
 
 Hardware benchmarks use **external tools only**. Defaults are sysbench/fio/OpenSSL on Linux, OpenSSL on macOS, and WinSAT on Windows; dd, STREAM, mbw, Geekbench, and the remaining adapters are opt-in. Missing tools are reported as structured errors; vmbench does not fall back to in-process benchmark code.
 
@@ -17,40 +17,39 @@ vmbench reports raw metrics and structured diagnostics. It does **not** output a
 ## Quick Start
 
 ```bash
-# Install from source
-go install github.com/cloudapp3/vmbench/cmd/vmbench@latest
-
-# Or build locally
-go build -ldflags "-X github.com/cloudapp3/vmbench.Version=$(git describe --tags 2>/dev/null || echo dev)" -o vmbench ./cmd/vmbench/
+# One-line install (Linux / macOS; downloads the latest GitHub Release, verifies SHA-256)
+curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash
 
 # Run (opens TUI by default)
-./vmbench
+vmbench
 
 # Or use CLI directly
-./vmbench run
-./vmbench run --json report.json --html report.html
-./vmbench run --filter 'sysbench|fio'
-./vmbench run --hardware-tool sysbench,openssl,fio,dd
-./vmbench run --scope network --iterations 1
-./vmbench run --scope all --iterations 1
+vmbench run
+vmbench run --json report.json --html report.html
+vmbench run --filter 'sysbench|fio'
+vmbench run --hardware-tool sysbench,openssl,fio,dd
+vmbench run --scope network --iterations 1
+vmbench run --scope all --iterations 1
 
 # VPS scenario suite (one-command default, ECS-like sections)
-./vmbench suite
-./vmbench suite --preset quick
-./vmbench suite --preset website --json suite.json --html suite.html
-./vmbench suite --only ping,mail
-./vmbench suite --speed-provider cloudflare,speedtest_net
-./vmbench suite --only hardware --hardware-tool dd,stream,mbw
+vmbench suite
+vmbench suite --preset quick
+vmbench suite --preset website --json suite.json --html suite.html
+vmbench suite --only ping,mail
+vmbench suite --speed-provider cloudflare,speedtest_net
+vmbench suite --only hardware --hardware-tool dd,stream,mbw
 
 # Versioned network nodes and reproducible Suite evidence
-./vmbench nodes list --node-catalog embedded
-./vmbench nodes health --node-catalog auto --ip-family v6
-./vmbench suite --node-catalog auto --node-revision 2026-07-13.1 --save-history
-./vmbench history compare --last 3
+vmbench nodes list --node-catalog embedded
+vmbench nodes health --node-catalog auto --ip-family v6
+vmbench suite --node-catalog auto --node-revision 2026-07-13.1 --save-history
+vmbench history compare --last 3
 
 # Expose vmbench to LLM clients through MCP stdio
-./vmbench mcp serve --transport stdio
+vmbench mcp serve --transport stdio
 ```
+
+Windows, pinned versions, custom directories, and building from source are covered under [Install](#install).
 
 ## Why vmbench
 
@@ -78,13 +77,11 @@ vmbench has three primary ways to inspect a host:
 
 Screenshots and richer docs are being staged in the external docs repository: [cloudapp3/vmdocs/sites/vmbench/docs](https://github.com/cloudapp3/vmdocs/tree/main/sites/vmbench/docs).
 
-## Install from GitHub Releases
+## Install
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash
-```
+The [Quick Start](#quick-start) one-liner downloads the latest release archive for your OS/arch from GitHub Releases, verifies its SHA-256 checksum against `checksums.txt`, and installs to the first writable directory among `/usr/local/bin`, `~/.local/bin`, and `~/bin`.
 
-Other install options:
+Other installer options:
 
 ```bash
 # Install a specific release tag
@@ -93,6 +90,15 @@ curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh |
 # Custom directory
 curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash -s -- --dir /opt/bin
 ```
+
+Alternatives:
+
+```bash
+# Go toolchain
+go install github.com/cloudapp3/vmbench/cmd/vmbench@latest
+```
+
+Windows has no installer script: download `vmbench-<version>-windows-amd64.zip` from [Releases](https://github.com/cloudapp3/vmbench/releases) (WinSAT provides the default hardware probes), or use `go install`. Building from source is described under [Build from source](#build-from-source).
 
 ## Commands
 
@@ -290,17 +296,19 @@ Official source and release archives do not vendor third-party benchmark tools b
 
 ## TUI Interface
 
-Launch with `./vmbench` (no arguments). Features:
+Launch with `vmbench` (no arguments). Features:
 
-- **Dashboard**: External benchmark, suite, compare, and sysinfo entry points
-- **Running**: Real-time progress with per-workload status
-- **Results**: Raw timing, throughput, latency, detail/error tables
-- **Suite Configuration**: The same normalized iterations, IP version, timeout, tools/providers, iperf, section, route, catalog source, and revision fields used by CLI/MCP
+- **Dashboard**: External benchmark, suite, compare, and sysinfo entry points; menu rows respond to mouse clicks, the wheel scrolls every page
+- **Run Config**: Pick iterations, hardware tools, and a workload filter (with live planned-workload count and async missing-tool preflight) before starting an external benchmark
+- **Running**: Real-time progress with per-workload status, iteration mini-bars, sample counts, and wall-clock ETA after the first workload completes
+- **Results**: Cards / grouped / flat views with cursor navigation; `d` opens a per-workload detail page with metrics, samples, structured errors, and raw tool output
+- **Suite Configuration**: The same normalized iterations, IP version, timeout, tools/providers, iperf, section, route, catalog source, and revision fields used by CLI/MCP, plus a summary card (planned workloads and estimated duration from history averages) and `1-9` section jumps
+- **Compare Picker**: Browse history records (or enter paths manually), view a single record, or pick two to compare — benchmark deltas in-TUI and suite comparisons via the same textgrid output as the CLI
 - **Compact terminals**: Suite config/running/results switch to focused or one-line summaries below 40 rows and fit an 80x24 terminal without horizontal overflow
-- **Compare**: Side-by-side benchmark report comparison; Suite Compare is available through CLI/history
+- **Help & scrolling**: `?` opens a per-page keybinding reference; `PgUp/PgDn`, `Home/End`, and the mouse wheel scroll every page, with a position indicator in the footer
 - **Themes**: Press `t` on Dashboard to cycle color themes; the selection is saved locally
 
-Key bindings: `↑↓` navigate, `Enter` select, `t` cycle theme on Dashboard, `Tab` toggle view, `s` save, `Esc` back, `q` quit.
+Key bindings: `?` help, `↑↓` navigate, `Enter` select, `t` cycle theme on Dashboard, `Tab` toggle view, `d` workload detail, `s` save, `Esc` back, `q` quit.
 
 ## Measurement Model
 
@@ -332,6 +340,20 @@ CLI `--json` and `--html` exports are written through a same-directory temporary
 `vmbench compare` auto-detects benchmark versus Suite JSON and rejects mixed report kinds. Suite Compare aligns raw metrics across two or more reports, but calculates a delta only when unit, actual protocol/IP family, provider/probe tool, target/node identity, and required catalog revision are compatible; otherwise it preserves values and prints the incompatibility reason. Route metrics additionally require explicit `status=ok` and `destination_reached=true`; legacy route entries without destination evidence are unavailable for delta calculation. Mail latency is comparable only for `status=open`; refused, timeout, and error durations are not successful connection latency. `vmbench history add/list/show/delete` manages atomic local records (`0700` directory and `0600` files on Unix), `run`/`suite --save-history [--history-tag TAG]` saves directly, and `vmbench history compare --last N` compares the latest same-kind reports.
 
 `run` exits with status 1 when no workload matches or any selected workload fails. Its JSON config records normalized `scope`, optional `iperf_hosts`, and network-only catalog source/revision/node IDs; hardware reports set `extensions=false`, while network/all set it to `true`. Suite returns a non-zero CLI exit unless every enabled section is `ok`; enabled empty/skipped/partial/error states all fail. No report or comparison produces a benchmark total score, grade, or category score.
+
+## Languages
+
+The CLI, TUI, and console/HTML report labels are localized in English and Simplified Chinese; adding a language means adding a message directory (`i18n/messages/<locale>/`).
+
+Language selection precedence: `--lang` flag (all subcommands) > `VMBENCH_LANG` env > `lang` field in the TUI config file (`~/.config/vmbench/config.json`) > OS locale (`zh*` resolves to `zh-CN`) > English. Unknown values fall back to English with a one-line notice.
+
+```bash
+VMBENCH_LANG=zh-CN vmbench --help
+vmbench suite --lang zh-CN
+vmbench tui --lang en
+```
+
+JSON report field names, status enum tokens (`ok`/`fail`/...), suite section IDs, workload names (matched by `--filter`), and adapter error messages stay English in every locale; translation happens only at render time.
 
 ## Platform Support
 
@@ -384,11 +406,15 @@ vmbench/
 ├── tui/
 │   ├── app.go         # Main TUI model with page routing
 │   ├── dashboard.go   # Main menu
-│   ├── running.go     # Real-time progress
-│   ├── results.go     # Result tables
+│   ├── run_config.go  # Hardware run configuration page
+│   ├── running.go     # Real-time progress with ETA
+│   ├── results.go     # Result tables (cards/grouped/flat)
+│   ├── result_detail.go # Per-workload detail page
+│   ├── compare_picker.go # History record picker
 │   ├── compare.go     # Report comparison
-│   ├── styles.go      # Lip Gloss styles (categories, status)
-│   └── keys.go        # Key bindings
+│   ├── scroll.go      # Central clip-based scrolling
+│   ├── help.go        # Keybinding registry + help page
+│   └── mouse.go       # Wheel scrolling + menu clicks
 ├── run.go             # RunCore() orchestration
 ├── events.go          # Event types
 ├── emit.go            # Event emission helpers
@@ -404,7 +430,7 @@ vmbench/
 |-----------|---------|---------|
 | charmbracelet/bubbletea | v1.3+ | TUI framework |
 | charmbracelet/lipgloss | v1.1+ | TUI styling |
-| charmbracelet/bubbles | v1.0+ | TUI components (keys) |
+| charmbracelet/bubbles | v1.0+ | TUI components (spinner, textinput) |
 | shirou/gopsutil | v4.25 | System info collection |
 | oneclickvirt/UnlockTests | v0.0.51 | Streaming / AI platform unlock probes (Apache-2.0) |
 | oneclickvirt/backtrace | v0.0.21 | China carrier return-route line classification + BGP/RDAP relationships (Apache-2.0) |

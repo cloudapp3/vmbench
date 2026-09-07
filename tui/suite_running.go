@@ -19,10 +19,11 @@ type suiteEventMsg struct{ event suite.Event }
 type suiteDoneMsg struct{ report suite.SuiteReport }
 
 type suiteSection struct {
-	id      suite.SectionID
-	label   string
-	status  string
-	message string
+	id        suite.SectionID
+	label     string
+	status    string
+	message   string
+	startedAt time.Time
 }
 
 func newSuiteSections(sel suite.SectionSelector) []suiteSection {
@@ -109,9 +110,16 @@ func updateSuiteEvent(m Model, ev suite.Event) (tea.Model, tea.Cmd) {
 	switch ev.Kind {
 	case suite.EventSectionStart:
 		updateSection("running", "")
+		for i := range m.suiteSections {
+			if m.suiteSections[i].id == ev.Section {
+				m.suiteSections[i].startedAt = time.Now()
+				break
+			}
+		}
 		addLog("▸ start  " + string(ev.Section))
 	case suite.EventSectionDone:
 		updateSection("done", ev.Message)
+		clearSectionStartedAt(&m, ev.Section)
 		addLog("✓ " + i18n.PadCells(i18n.StatusLabel("done"), 7) + "   " + string(ev.Section) + "  " + ev.Message)
 	case suite.EventSectionFail:
 		status := strings.ToLower(strings.TrimSpace(ev.Status))
@@ -130,10 +138,21 @@ func updateSuiteEvent(m Model, ev suite.Event) (tea.Model, tea.Cmd) {
 		addLog(marker + " " + i18n.PadCells(i18n.StatusLabel(status), 7) + "   " + string(ev.Section) + "  " + ev.Message)
 	case suite.EventSectionSkip:
 		updateSection("skip", "")
+		clearSectionStartedAt(&m, ev.Section)
 	case suite.EventSuiteDone:
 		addLog("● " + i18n.T("tui.suiteRunning.complete") + "  " + ev.Message)
 	}
 	return m, waitForSuiteEvent(m.suiteEventCh)
+}
+
+// clearSectionStartedAt stops the elapsed timer for a finished section.
+func clearSectionStartedAt(m *Model, id suite.SectionID) {
+	for i := range m.suiteSections {
+		if m.suiteSections[i].id == id {
+			m.suiteSections[i].startedAt = time.Time{}
+			return
+		}
+	}
 }
 
 func updateSuiteRunning(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -303,7 +322,12 @@ func suiteSectionStatus(m Model, s suiteSection, maxWidth int) string {
 	case "skip", "skipped":
 		return comp.StatusPill(comp.StatusSkip, "skipped")
 	case "running":
-		return m.spinner.View() + " " + lipgloss.NewStyle().Foreground(theme.Active.Warning).Render(i18n.T("tui.suiteRunning.runningNow"))
+		elapsed := ""
+		if !s.startedAt.IsZero() {
+			elapsed = " " + lipgloss.NewStyle().Foreground(theme.Active.Subtle).Render(
+				time.Since(s.startedAt).Truncate(time.Second).String())
+		}
+		return m.spinner.View() + " " + lipgloss.NewStyle().Foreground(theme.Active.Warning).Render(i18n.T("tui.suiteRunning.runningNow")) + elapsed
 	default:
 		return comp.StatusPill(comp.StatusWaiting, i18n.StatusLabel("waiting"))
 	}

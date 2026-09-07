@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/tui/theme"
 )
 
@@ -30,6 +31,9 @@ func Footer(width int, hints []Hint) string {
 		parts = append(parts, keyStyle.Render(h.Key)+descStyle.Render(" "+h.Desc))
 	}
 	line := strings.Join(parts, "  ")
+	if w := i18n.StyledWidth(line); w > width {
+		line = i18n.TruncateStyled(line, width)
+	}
 	border := lipgloss.NewStyle().
 		Foreground(t.Border).
 		Render(strings.Repeat("─", width))

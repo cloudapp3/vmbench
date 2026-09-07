@@ -1458,14 +1458,18 @@ vmbench/
 ├── tui/                            # Bubble Tea TUI
 │   ├── app.go                      # 主模型 + 页面路由
 │   ├── dashboard.go                # 主菜单
-│   ├── running.go                  # 实时进度页
-│   ├── results.go                  # 结果展示页
+│   ├── run_config.go               # 硬件跑分配置页
+│   ├── running.go                  # 实时进度页（ETA/迭代迷你条）
+│   ├── results.go                  # 结果展示页（卡片/分组/平铺）
+│   ├── result_detail.go            # 单 workload 详情页
+│   ├── compare_picker.go           # 历史记录选择器
 │   ├── compare.go                  # 报告对比页
-│   ├── suite_config.go             # Suite 配置页
+│   ├── suite_config.go             # Suite 配置页（含摘要卡）
 │   ├── suite_running.go            # Suite 执行进度页
 │   ├── suite_results.go            # Suite 结果页
-│   ├── styles.go                   # Lip Gloss 样式定义
-│   ├── keys.go                     # 快捷键绑定
+│   ├── scroll.go                   # 中央裁剪滚动
+│   ├── help.go                     # 按键注册表 + 帮助页
+│   ├── mouse.go                    # 滚轮 + 菜单点击
 │   ├── config.go                   # 主题持久化
 │   ├── theme/                      # 8 套主题
 │   │   └── theme.go                # Theme 结构 + AdaptiveColor

@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 	"github.com/cloudapp3/vmbench/tui/theme"
 )
 
-func startBenchmark(m Model, mode string, engine string) (tea.Model, tea.Cmd) {
+func startBenchmark(m Model, opts vmbench.Options) (tea.Model, tea.Cmd) {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
 	m.eventCh = make(chan vmbench.Event, 100)
@@ -24,8 +25,25 @@ func startBenchmark(m Model, mode string, engine string) (tea.Model, tea.Cmd) {
 	m.confirm = false
 	m.startedAt = time.Now()
 	m.eventLog = m.eventLog[:0]
+	m.workloadDoneAt = nil
+	m.runSamplesDone = 0
+	m.runSamplesTotal = 0
 
-	defs := catalog.ExternalHardwareDefinitions("")
+	// Prefill from the exact definition set the runner will execute (tools
+	// + filter), so the running page never shows waiting ghost rows for
+	// adapters that are not part of the configured run.
+	defs := catalog.ExternalHardwareDefinitionsForTools("", opts.HardwareTools)
+	if expr := strings.TrimSpace(opts.Filter); expr != "" {
+		if re, err := regexp.Compile(expr); err == nil {
+			filtered := defs[:0]
+			for _, d := range defs {
+				if re.MatchString(d.Name) || re.MatchString(d.Category) {
+					filtered = append(filtered, d)
+				}
+			}
+			defs = filtered
+		}
+	}
 	m.workloads = make([]workloadState, 0, len(defs))
 	for _, d := range defs {
 		m.workloads = append(m.workloads, workloadState{
@@ -40,23 +58,18 @@ func startBenchmark(m Model, mode string, engine string) (tea.Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(
-		runBenchmarkCmd(ctx, mode, engine, m.eventCh),
+		runBenchmarkCmd(ctx, opts, m.eventCh),
 		waitForEvent(m.eventCh),
 		m.spinner.Tick,
 	)
 }
 
-func runBenchmarkCmd(ctx context.Context, mode string, engine string, ch chan<- vmbench.Event) tea.Cmd {
+func runBenchmarkCmd(ctx context.Context, opts vmbench.Options, ch chan<- vmbench.Event) tea.Cmd {
 	return func() tea.Msg {
-		report := vmbench.RunCore(ctx, vmbench.Options{
-			Mode:       mode,
-			Engine:     engine,
-			Scope:      vmbench.ScopeHardware,
-			Iterations: 3,
-			OnEvent: func(ev vmbench.Event) {
-				ch <- ev
-			},
-		})
+		opts.OnEvent = func(ev vmbench.Event) {
+			ch <- ev
+		}
+		report := vmbench.RunCore(ctx, opts)
 		return benchmarkDoneMsg{report: report}
 	}
 }
@@ -84,6 +97,9 @@ func updateWorkloadEvent(m Model, ev vmbench.Event) (tea.Model, tea.Cmd) {
 		for i := range m.workloads {
 			if m.workloads[i].name == ev.Workload {
 				m.workloads[i].status = "running"
+				m.workloads[i].startedAt = time.Now()
+				m.workloads[i].iterCur = 0
+				m.workloads[i].iterTotal = 0
 				break
 			}
 		}
@@ -93,9 +109,26 @@ func updateWorkloadEvent(m Model, ev vmbench.Event) (tea.Model, tea.Cmd) {
 		addLog("▸ start  " + ev.Workload)
 		return m, waitForEvent(m.eventCh)
 
+	case vmbench.EventSuiteProgress:
+		// Run-wide sample counters plus the current workload's iteration
+		// mini progress (ev.Total is samples across the whole run).
+		m.runSamplesDone = ev.Current
+		m.runSamplesTotal = ev.Total
+		for i := range m.workloads {
+			if m.workloads[i].name == ev.Workload && m.workloads[i].status == "running" {
+				m.workloads[i].iterCur = ev.Iteration
+				if ev.Iteration > m.workloads[i].iterTotal {
+					m.workloads[i].iterTotal = ev.Iteration
+				}
+				break
+			}
+		}
+		return m, waitForEvent(m.eventCh)
+
 	case vmbench.EventSuiteDone:
 		for i := range m.workloads {
 			if m.workloads[i].name == ev.Workload {
+				m.recordWorkloadDone(i)
 				m.workloads[i].status = "done"
 				m.workloads[i].metric = ev.Metric
 				m.workloads[i].duration = ev.Duration.String()
@@ -108,6 +141,7 @@ func updateWorkloadEvent(m Model, ev vmbench.Event) (tea.Model, tea.Cmd) {
 	case vmbench.EventSuiteFail:
 		for i := range m.workloads {
 			if m.workloads[i].name == ev.Workload {
+				m.recordWorkloadDone(i)
 				m.workloads[i].status = "fail"
 				if ev.Err != nil {
 					m.workloads[i].metric = ev.Err.Error()
@@ -157,6 +191,46 @@ func updateRunning(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	return m, nil
+}
+
+// recordWorkloadDone banks the wall-clock duration of a finished workload
+// for the ETA extrapolation (ev.Duration is the median sample time, not
+// wall time, so it cannot be used here).
+func (m *Model) recordWorkloadDone(i int) {
+	if i < 0 || i >= len(m.workloads) {
+		return
+	}
+	w := &m.workloads[i]
+	if !w.startedAt.IsZero() {
+		m.workloadDoneAt = append(m.workloadDoneAt, time.Since(w.startedAt).Truncate(time.Second))
+	}
+	w.startedAt = time.Time{}
+}
+
+// runETA extrapolates remaining time from the average wall-clock duration of
+// finished workloads. Workloads run strictly serially, so average ×
+// remaining is a reasonable estimate; it reports false before the first
+// completion.
+func runETA(m Model) (time.Duration, bool) {
+	if len(m.workloadDoneAt) == 0 {
+		return 0, false
+	}
+	remaining := 0
+	for _, w := range m.workloads {
+		switch w.status {
+		case "waiting":
+			remaining++
+		}
+	}
+	if remaining == 0 {
+		return 0, false
+	}
+	var total time.Duration
+	for _, d := range m.workloadDoneAt {
+		total += d
+	}
+	avg := total / time.Duration(len(m.workloadDoneAt))
+	return (avg * time.Duration(remaining)).Truncate(time.Second), true
 }
 
 func handleConfirm(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -213,7 +287,20 @@ func viewRunning(m Model) string {
 	timeStr := lipgloss.NewStyle().Foreground(t.Muted).Render(
 		i18n.Tf("tui.running.elapsed", map[string]any{"Elapsed": elapsed.String()}),
 	)
-	headLine := lipgloss.JoinHorizontal(lipgloss.Bottom, headerTitle, "    ", timeStr)
+	headParts := []string{headerTitle, "    ", timeStr}
+	if eta, ok := runETA(m); ok {
+		headParts = append(headParts, "   ",
+			lipgloss.NewStyle().Foreground(t.Secondary).Render(
+				i18n.Tf("tui.running.eta", map[string]any{"Eta": eta.String()}),
+			))
+	}
+	if m.runSamplesTotal > 0 {
+		headParts = append(headParts, "   ",
+			lipgloss.NewStyle().Foreground(t.Subtle).Render(
+				i18n.Tf("tui.running.samples", map[string]any{"Done": m.runSamplesDone, "Total": m.runSamplesTotal}),
+			))
+	}
+	headLine := lipgloss.JoinHorizontal(lipgloss.Bottom, headParts...)
 
 	barWidth := width - 30
 	if barWidth < 20 {
@@ -315,6 +402,18 @@ func runningCard(m Model, g workloadGroup, width int) string {
 			status = comp.StatusPill(comp.StatusDone, w.metric)
 		case "running":
 			status = m.spinner.View() + " " + lipgloss.NewStyle().Foreground(t.Warning).Render(i18n.StatusLabel("running"))
+			if w.iterTotal > 0 {
+				ratio := float64(w.iterCur) / float64(w.iterTotal)
+				if ratio > 1 {
+					ratio = 1
+				}
+				status += " " + comp.ProgressBar(6, ratio, t.Warning) +
+					" " + fmt.Sprintf("%d/%d", w.iterCur, w.iterTotal)
+			}
+			if !w.startedAt.IsZero() {
+				status += " " + lipgloss.NewStyle().Foreground(t.Subtle).Render(
+					time.Since(w.startedAt).Truncate(time.Second).String())
+			}
 		case "fail":
 			msg := i18n.TruncateCells(w.metric, 30)
 			status = comp.StatusPill(comp.StatusFail, msg)
@@ -360,8 +459,4 @@ func firstStr(values ...string) string {
 		}
 	}
 	return ""
-}
-
-func truncate(s string, max int) string {
-	return truncStr(s, max)
 }

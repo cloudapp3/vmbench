@@ -1,5 +1,19 @@
 # VMBench Changelog
 
+## v0.6.0（2026-09-07）
+
+### TUI 人性化重构（滚动 / 帮助 / 鼠标 / 配置页 / 对比重做 / 详情页）
+
+- **全页滚动**（`tui/scroll.go`）：中央裁剪实现，每页内容按 offset 切片，`PgUp/PgDn`、`Home/End`、鼠标滚轮统一驱动；页面切换与 resize 自动归零；每行做 ANSI 感知宽度守卫（`i18n.TruncateStyled`），80 列终端长行不再软折行撑破视口。footer 在内容可滚时显示 `n/m` 位置提示，光标移动后最小滚动保持焦点行可见。此前 Suite 结果 9 张卡片在 24 行终端下溢出屏幕且无法查看。
+- **帮助页与提示单一事实源**（`tui/help.go`）：`?` 打开当前页优先的按键参考页；footer 提示与帮助页共用 `helpFor()` 注册表；文本输入聚焦（SuiteConfig Advanced / RunConfig Custom 过滤 / Picker 手输）时抑制 `?`/`q` 全局键，避免按键被吞进输入框或误退出。删除死代码 `tui/keys.go`、`tui/styles.go` 与 results.go 中不可达的保存提示分支。
+- **鼠标**（`tui/mouse.go`）：滚轮全页滚动；Dashboard 菜单行点击 = 选中 + 确认，主题行点击切换主题。此前启用了 cell-motion 模式却零处理，滚轮事件被吞。
+- **RunConfig 新页**（`tui/run_config.go`）：硬件跑分先配置再运行——iterations（1-9）、硬件工具多选、过滤 chips（All/CPU/Disk/Memory/Custom 正则手输），实时 "N workloads planned" 计数与异步缺失工具预检（warning 非阻塞，对齐 CLI）。修复幽灵行 bug：Running 页预填的 workload 列表与 runner 实际执行集合同源（工具×过滤镜像），不再出现永远 waiting 的行；此前硬编码 `iterations=3` 且不过滤。
+- **SuiteConfig 摘要卡**（`tui/suite_summary.go`）：启用 section 数、节点目录规模、计划 workload 数、预计总时长（优先近 10 条历史记录的 per-section 墙钟均值，无历史回退静态粗估，hardware 随 iterations 缩放）；统计经 `catalogStatsMsg`/`historyStatsMsg` 异步加载，View 无 IO。新增 `1-9` 数字键快切 section（Advanced 输入态忽略）。
+- **Running 反馈**：ETA（首个 workload 完成后按墙钟均值外推剩余，不再误用 MedianTime）、run 级采样计数（消费此前被丢弃的 `EventSuiteProgress` 事件）、当前 workload 迭代迷你条 `▰▱ n/m` 与已耗时；Suite 页 section 行同样显示已耗时。
+- **Compare 重做**（`tui/compare_picker.go`）：入口先进历史选择器（最新在前、重验证、上限 50 条），`spc` 标记 A/B（第三条顶掉最旧）、`c` 对比、`v` 查看单条（run→Results、suite→SuiteResults，Esc 返回）、`m` 手输路径模式（`-compare-a/-b` flag 预填）。kind 路由：两条 run → 既有 delta 表；两条 suite → 在 TUI 内直接渲染 `suitecompare` textgrid（此前必须退出到 CLI）；混合 kind toast 拒绝。Compare 页 View 不再每帧同步读盘（IO 全部移入 Cmd→Msg），flag 双路径仍直达对比页。
+- **ResultDetail 新页**（`tui/result_detail.go`）：Results flat 视图 `d` 进入单 workload 证据页——指标 KVGrid、结构化错误红卡、每次迭代采样、适配器原始输出（逐行截宽保换行，超长截断 40 行）；Esc 返回且光标保留。另修复 flat 视图光标无法移动的映射错误。
+- 配套：i18n 新增约 90 组 key（en/zh-CN 成对，parity 测试强制）；渲染边界测试扩展到全部新页面（80x24 双语）；`charmbracelet/x/ansi` 转直接依赖；Suite Results 文案补齐 i18n；`docs/tui-design.md`/`README`/`docs/product.md` 同步更新。
+
 ## v0.5.0（2026-09-06）
 
 ### 多语言界面（en / zh-CN）

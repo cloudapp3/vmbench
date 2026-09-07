@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -10,7 +11,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/history"
 	"github.com/cloudapp3/vmbench/i18n"
+	gbreport "github.com/cloudapp3/vmbench/report"
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/sysinfo"
 	"github.com/cloudapp3/vmbench/tui/comp"
@@ -27,6 +30,10 @@ const (
 	pageSuiteConfig
 	pageSuiteRunning
 	pageSuiteResults
+	pageHelp
+	pageRunConfig
+	pageComparePicker
+	pageResultDetail
 )
 
 type menuItem struct {
@@ -48,10 +55,6 @@ func menuItems() []menuItem {
 	}
 }
 
-type benchmarkStartMsg struct {
-	mode   string
-	engine string
-}
 type benchmarkEventMsg struct{ event vmbench.Event }
 type benchmarkDoneMsg struct{ report vmbench.Report }
 type sysinfoDoneMsg struct {
@@ -61,11 +64,14 @@ type sysinfoDoneMsg struct {
 type tickMsg time.Time
 
 type workloadState struct {
-	name     string
-	category string
-	status   string
-	metric   string
-	duration string
+	name      string
+	category  string
+	status    string
+	metric    string
+	duration  string
+	startedAt time.Time // set on EventSuiteStart; wall clock for elapsed/ETA
+	iterCur   int       // completed iteration samples of the current workload
+	iterTotal int       // grown as iterations are observed
 }
 
 type Model struct {
@@ -87,37 +93,74 @@ type Model struct {
 	showLog   bool
 	spinner   spinner.Model
 
+	// ETA bookkeeping: wall-clock durations of finished workloads and the
+	// run-wide sample counters from EventSuiteProgress.
+	workloadDoneAt  []time.Duration
+	runSamplesDone  int
+	runSamplesTotal int
+
 	suiteConfig   suiteConfigState
 	suiteSections []suiteSection
 	suiteEventCh  chan suite.Event
 	suiteReport   *suite.SuiteReport
 
+	runConfig runConfigState
+
+	catalogStats catalogStats
+	historyStats historyStats
+
 	compareA string
 	compareB string
 
-	resultsTab int
-	resultsCur int
-	expanded   map[string]bool
+	compareDocs      []gbreport.Document
+	compareErr       error
+	compareLoading   bool
+	compareKind      string
+	suiteCompareText string
+
+	picker               pickerState
+	reportCameFromPicker bool
+
+	resultsTab    int
+	resultsCur    int
+	resultsDetail int
+	expanded      map[string]bool
 
 	toast comp.Toast
+
+	scroll scrollState
+
+	helpFrom page
 
 	width  int
 	height int
 }
 
 func NewModel(compareA, compareB string) Model {
-	return Model{
+	m := Model{
 		page:        pageDashboard,
 		compareA:    compareA,
 		compareB:    compareB,
 		expanded:    make(map[string]bool),
 		spinner:     comp.NewSpinner(),
 		suiteConfig: newSuiteConfigState(),
+		runConfig:   newRunConfigState(),
+		picker:      newPickerState(compareA, compareB),
 	}
+	// Flag users passing both reports land on the comparison directly.
+	if compareA != "" && compareB != "" {
+		m.page = pageCompare
+		m.compareLoading = true
+	}
+	return m
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(loadSysinfo(), tickEvery(), m.spinner.Tick)
+	cmds := []tea.Cmd{loadSysinfo(), tickEvery(), m.spinner.Tick, loadCatalogStatsCmd()}
+	if m.page == pageCompare && m.compareA != "" && m.compareB != "" {
+		cmds = append(cmds, loadCompareCmd(m.compareA, m.compareB))
+	}
+	return tea.Batch(cmds...)
 }
 
 func loadSysinfo() tea.Cmd {
@@ -134,10 +177,21 @@ func tickEvery() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	next, cmd := m.update(msg)
+	// syncScrollPage after the fact so page transitions performed inside
+	// update reset the scroll offset immediately.
+	if nm, ok := next.(Model); ok {
+		next = syncScrollPage(nm)
+	}
+	return next, cmd
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.scroll.offset = 0
 		return m, nil
 
 	case tickMsg:
@@ -148,9 +202,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 
+	case tea.MouseMsg:
+		return updateMouse(m, msg)
+
 	case tea.KeyMsg:
 		if m.confirm {
 			return handleConfirm(m, msg)
+		}
+		if msg.String() == "?" && !textEntryActive(m) {
+			toggled, _ := toggleHelp(m)
+			return toggled, nil
+		}
+		if scrolled, ok := handleScrollKeys(m, msg); ok {
+			return scrolled, nil
 		}
 		switch m.page {
 		case pageDashboard:
@@ -167,6 +231,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return updateSuiteRunning(m, msg)
 		case pageSuiteResults:
 			return updateSuiteResults(m, msg)
+		case pageHelp:
+			return updateHelp(m, msg)
+		case pageRunConfig:
+			return updateRunConfig(m, msg)
+		case pageComparePicker:
+			return updateComparePicker(m, msg)
+		case pageResultDetail:
+			return updateResultDetail(m, msg)
 		}
 
 	case sysinfoDoneMsg:
@@ -174,8 +246,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sysWarnings = msg.warnings
 		return m, nil
 
-	case benchmarkStartMsg:
-		return startBenchmark(m, msg.mode, msg.engine)
+	case hardwareStartMsg:
+		return startBenchmark(m, msg.opts)
+
+	case missingToolsMsg:
+		m.runConfig.missing = msg.missing
+		m.runConfig.missingOK = true
+		return m, nil
+
+	case catalogStatsMsg:
+		m.catalogStats = msg.stats
+		return m, nil
+
+	case historyStatsMsg:
+		m.historyStats = msg.stats
+		return m, nil
 
 	case benchmarkEventMsg:
 		return updateWorkloadEvent(m, msg.event)
@@ -194,6 +279,69 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case suiteDoneMsg:
 		m.suiteReport = &msg.report
 		m.page = pageSuiteResults
+		return m, nil
+
+	case compareLoadedMsg:
+		m.compareLoading = false
+		if msg.err != nil {
+			m.compareErr = msg.err
+			m.compareDocs = nil
+		} else {
+			m.compareErr = nil
+			m.compareDocs = msg.docs
+			m.page = pageCompare
+		}
+		return m, nil
+
+	case historyListMsg:
+		m.picker.loading = false
+		if msg.err != nil {
+			m.picker.err = msg.err
+			m.picker.records = nil
+		} else {
+			m.picker.err = nil
+			m.picker.records = msg.records
+			if m.picker.a >= len(msg.records) {
+				m.picker.a = -1
+			}
+			if m.picker.b >= len(msg.records) {
+				m.picker.b = -1
+			}
+		}
+		return followFocus(m), nil
+
+	case suiteCompareMsg:
+		m.compareLoading = false
+		if msg.err != nil {
+			m.compareErr = msg.err
+			m.suiteCompareText = ""
+			m.page = pageComparePicker
+		} else {
+			m.compareErr = nil
+			m.suiteCompareText = msg.text
+			m.page = pageCompare
+		}
+		return m, nil
+
+	case recordViewMsg:
+		if msg.err != nil {
+			var cmd tea.Cmd
+			m.toast, cmd = comp.ShowToast(msg.err.Error(), comp.ToastError, 4*time.Second)
+			return m, cmd
+		}
+		if msg.kind == history.KindSuite && msg.suite != nil {
+			m.suiteReport = msg.suite
+			m.reportCameFromPicker = true
+			m.page = pageSuiteResults
+			return m, nil
+		}
+		if msg.run != nil {
+			doc := *msg.run
+			m.report = &doc
+			m.reportCameFromPicker = true
+			m.resultsCur = 0
+			m.page = pageResults
+		}
 		return m, nil
 
 	case comp.ToastExpireMsg:
@@ -224,36 +372,17 @@ func (m Model) View() string {
 	}
 
 	header := renderHeader(m)
-	footer := renderFooter(m)
-
-	contentHeight := m.height - lipgloss.Height(header) - lipgloss.Height(footer) - 2
-	if contentHeight < 5 {
-		contentHeight = 5
-	}
-
-	var content string
-	switch m.page {
-	case pageDashboard:
-		content = viewDashboard(m)
-	case pageRunning:
-		content = viewRunning(m)
-	case pageResults:
-		content = viewResults(m)
-	case pageCompare:
-		content = viewCompare(m)
-	case pageSuiteConfig:
-		content = viewSuiteConfig(m)
-	case pageSuiteRunning:
-		content = viewSuiteRunning(m)
-	case pageSuiteResults:
-		content = viewSuiteResults(m)
-	}
+	// The body is clipped to the viewport so tall pages (suite results,
+	// compare tables) scroll instead of overflowing the alt screen.
+	content, pos := viewScrollPos(m)
 
 	bodyStyle := lipgloss.NewStyle().
 		Foreground(theme.Active.Fg).
 		Width(m.width).
 		Padding(1, 0, 1, 2)
 	body := bodyStyle.Render(content)
+
+	footer := renderFooter(m, pos)
 
 	view := lipgloss.JoinVertical(lipgloss.Left, header, body, footer)
 	return view
@@ -276,53 +405,17 @@ func renderHeader(m Model) string {
 	})
 }
 
-func renderFooter(m Model) string {
-	var hints []comp.Hint
-	switch m.page {
-	case pageDashboard:
-		hints = []comp.Hint{
-			{Key: "↑↓", Desc: i18n.T("tui.hint.nav")},
-			{Key: "↵", Desc: i18n.T("tui.hint.select")},
-			{Key: "t", Desc: i18n.T("tui.hint.theme")},
-			{Key: "q", Desc: i18n.T("tui.hint.quit")},
+func renderFooter(m Model, pos scrollPos) string {
+	hints := helpFooterHints(m.page)
+	if pos.scrollable {
+		scrollHint := comp.Hint{
+			Key:  fmt.Sprintf("%d/%d", pos.line, pos.total),
+			Desc: i18n.T("tui.hint.scroll"),
 		}
-	case pageRunning:
-		hints = []comp.Hint{
-			{Key: "esc", Desc: i18n.T("tui.hint.cancel")},
-			{Key: "tab", Desc: i18n.T("tui.hint.log")},
-			{Key: "q", Desc: i18n.T("tui.hint.quit")},
-		}
-	case pageResults:
-		hints = []comp.Hint{
-			{Key: "tab", Desc: i18n.T("tui.hint.view")},
-			{Key: "↑↓", Desc: i18n.T("tui.hint.nav")},
-			{Key: "↵", Desc: i18n.T("tui.hint.expand")},
-			{Key: "s", Desc: i18n.T("tui.hint.save")},
-			{Key: "esc", Desc: i18n.T("tui.hint.back")},
-		}
-	case pageCompare:
-		hints = []comp.Hint{
-			{Key: "esc", Desc: i18n.T("tui.hint.back")},
-			{Key: "q", Desc: i18n.T("tui.hint.quit")},
-		}
-	case pageSuiteConfig:
-		hints = []comp.Hint{
-			{Key: "↑↓", Desc: i18n.T("tui.hint.field")},
-			{Key: "←→", Desc: i18n.T("tui.hint.choose")},
-			{Key: "spc", Desc: i18n.T("tui.hint.toggle")},
-			{Key: "↵", Desc: i18n.T("tui.hint.start")},
-			{Key: "esc", Desc: i18n.T("tui.hint.back")},
-		}
-	case pageSuiteRunning:
-		hints = []comp.Hint{
-			{Key: "esc", Desc: i18n.T("tui.hint.cancel")},
-			{Key: "tab", Desc: i18n.T("tui.hint.log")},
-			{Key: "q", Desc: i18n.T("tui.hint.quit")},
-		}
-	case pageSuiteResults:
-		hints = []comp.Hint{
-			{Key: "esc", Desc: i18n.T("tui.hint.back")},
-			{Key: "q", Desc: i18n.T("tui.hint.quit")},
+		// The position hint is dropped first when space runs out.
+		footer := comp.Footer(m.width, append(hints, scrollHint))
+		if line := strings.Split(footer, "\n")[1]; i18n.StyledWidth(line) <= m.width {
+			return footer
 		}
 	}
 	return comp.Footer(m.width, hints)

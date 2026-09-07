@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -276,7 +277,20 @@ func updateSuiteConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.page = pageDashboard
 		return m, nil
 	case "q":
+		if s.field == fieldAdvanced {
+			s.appendAdvanced("q")
+			return m, nil
+		}
 		return m, tea.Quit
+	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
+		// Quick section toggle by digit; the Advanced text field keeps runes.
+		if s.field != fieldAdvanced {
+			if digit := int(msg.String()[0] - '1'); digit < len(s.sectionIDs) {
+				s.sectionToggle(digit)
+				s.preset = 0 // custom
+			}
+			return m, nil
+		}
 	case "tab", "down":
 		s.field = suiteConfigField((int(s.field) + 1) % suiteConfigFieldCount)
 		return m, nil
@@ -520,6 +534,7 @@ func viewSuiteConfig(m Model) string {
 	ipSourceCard := suiteFieldIPSources(s, cardWidth, s.field == fieldIPSources)
 	advancedCard := suiteFieldAdvanced(s, cardWidth, s.field == fieldAdvanced)
 	startBtn := suiteStartButton(s, width-4, s.field == fieldStart)
+	summaryCard := suiteSummaryCard(s, m.historyStats, m.catalogStats, width-4)
 
 	help := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(i18n.T("tui.suiteConfig.helpFull"))
 
@@ -536,7 +551,7 @@ func viewSuiteConfig(m Model) string {
 	} else {
 		fields = strings.Join([]string{presetCard, runtimeCard, sectionsCard, hardwareCard, speedCard, routeCard, mediaCard, ipSourceCard, advancedCard}, "\n")
 	}
-	parts := []string{title, desc, "", fields, "", startBtn, "", help}
+	parts := []string{title, desc, "", fields, "", summaryCard, "", startBtn, "", help}
 	if m.toast.Active() {
 		parts = append(parts, "", m.toast.Render(width-4))
 	}
@@ -592,7 +607,9 @@ func viewSuiteConfigCompact(m Model, title string) string {
 
 	startBtn := suiteStartButton(s, width-4, s.field == fieldStart)
 	help := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(i18n.T("tui.suiteConfig.helpCompact"))
-	parts := []string{title, summary, "", field, "", startBtn, help}
+	etaLine := lipgloss.NewStyle().Foreground(t.Secondary).Render(
+		truncStr(i18n.Tf("tui.suiteSummary.etaLine", map[string]any{"Duration": formatDuration(estimateSuiteDuration(s, m.historyStats))}), width-4))
+	parts := []string{title, summary, etaLine, "", field, "", startBtn, help}
 	if m.toast.Active() {
 		parts = append(parts, "", m.toast.Render(width-4))
 	}
@@ -654,7 +671,7 @@ func suiteFieldSections(s suiteConfigState, width int, focus bool) string {
 		default:
 			st = lipgloss.NewStyle().Foreground(t.Muted).Padding(0, 1)
 		}
-		pills = append(pills, st.Render(icon+" "+i18n.SectionLabel(string(id))))
+		pills = append(pills, st.Render(icon+" "+fmt.Sprintf("%d", i+1)+" "+i18n.SectionLabel(string(id))))
 	}
 	body := strings.Join(pills, " ")
 	if !s.sections.AnyEnabled() {

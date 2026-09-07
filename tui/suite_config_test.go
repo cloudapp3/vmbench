@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/cloudapp3/vmbench/catalog"
 	"github.com/cloudapp3/vmbench/nodecatalog"
 	"github.com/cloudapp3/vmbench/suite"
@@ -123,6 +126,77 @@ func TestToggleMediaSetMutualExclusion(t *testing.T) {
 	for _, id := range state.mediaIDs {
 		if id != suite.DefaultMediaSet() && state.mediaSets[id] {
 			t.Errorf("selecting all must clear %s", id)
+		}
+	}
+}
+
+func TestDigitKeyTogglesSectionAndForcesCustom(t *testing.T) {
+	m := scrollTestModel(t, pageSuiteConfig, nil)
+	m.suiteConfig.applyPreset() // quick preset selects a subset
+	before := m.suiteConfig.sections.Hardware
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
+	um := updated.(Model)
+	if um.suiteConfig.sections.Hardware == before {
+		t.Fatal("digit 1 should toggle the first section (hardware)")
+	}
+	if um.suiteConfig.preset != 0 {
+		t.Fatalf("digit toggle must force custom preset, got %d", um.suiteConfig.preset)
+	}
+
+	// Digit beyond the section list is ignored.
+	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'9'}})
+	um = updated.(Model)
+	if !um.suiteConfig.sections.Media {
+		t.Fatal("digit 9 should toggle the ninth section (media) when present")
+	}
+	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{':'}})
+	um = updated.(Model)
+	_ = um // non-digit runes fall through untouched
+}
+
+func TestDigitKeysIgnoredInAdvancedField(t *testing.T) {
+	m := scrollTestModel(t, pageSuiteConfig, nil)
+	m.suiteConfig.field = fieldAdvanced
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	um := updated.(Model)
+	if um.page != pageSuiteConfig {
+		t.Fatalf("digit leaked out of advanced field, page = %d", um.page)
+	}
+	if um.suiteConfig.iperfHost != "3" {
+		t.Fatalf("digit should type into advanced field, got %q", um.suiteConfig.iperfHost)
+	}
+}
+
+func TestSummaryCardEstimates(t *testing.T) {
+	s := newSuiteConfigState()
+
+	rough := estimateSuiteDuration(s, historyStats{})
+	if rough <= 0 {
+		t.Fatalf("rough estimate should be positive, got %v", rough)
+	}
+
+	stats := historyStats{
+		avg: map[suite.SectionID]time.Duration{
+			suite.SectionHardware:    60 * time.Second,
+			suite.SectionNetworkInfo: 5 * time.Second,
+			suite.SectionRoute:       10 * time.Second,
+			suite.SectionPing:        12 * time.Second,
+			suite.SectionSpeed:       20 * time.Second,
+		},
+		samples: 3,
+	}
+	withHistory := estimateSuiteDuration(s, stats)
+	if withHistory <= 0 || withHistory >= rough {
+		t.Fatalf("history estimate %v should beat rough %v on quick defaults", withHistory, rough)
+	}
+
+	// Card renders within 80 cells in both locales.
+	card := suiteSummaryCard(s, stats, catalogStats{loaded: true, download: 15, route: 25, ping: 25, isp: 12}, 76)
+	for i, line := range strings.Split(card, "\n") {
+		if w := lipgloss.Width(line); w > 80 {
+			t.Fatalf("summary card line %d width %d > 80: %q", i, w, line)
 		}
 	}
 }

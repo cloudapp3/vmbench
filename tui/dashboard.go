@@ -27,16 +27,21 @@ func updateDashboard(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		item := items[m.cursor]
 		switch item.mode {
 		case "single", "multi", "all":
-			m.page = pageRunning
+			m.page = pageRunConfig
 			m.engine = item.engine
-			return m, func() tea.Msg {
-				return benchmarkStartMsg{mode: item.mode, engine: item.engine}
-			}
+			return m, runMissingToolsCmd(m.runConfig)
 		case "suite":
 			m.page = pageSuiteConfig
+			if m.historyStats.samples == 0 && len(m.historyStats.avg) == 0 {
+				return m, loadHistoryStatsCmd()
+			}
 			return m, nil
 		case "compare":
-			m.page = pageCompare
+			m.page = pageComparePicker
+			if m.picker.records == nil && !m.picker.loading && m.picker.err == nil {
+				m.picker.loading = true
+				return m, loadHistoryCmd()
+			}
 			return m, nil
 		case "sysinfo":
 			m.showSysInfo = !m.showSysInfo

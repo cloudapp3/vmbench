@@ -93,6 +93,43 @@ other = "选择"
 [tui.hint.toggle]
 other = "勾选"
 
+[tui.hint.help]
+other = "帮助"
+[tui.hint.wheel]
+other = "滚轮滚动页面"
+[tui.hint.pageUp]
+other = "上/下翻页"
+[tui.hint.top]
+other = "跳到页首/页尾"
+[tui.help.title]
+other = "? 快捷键"
+[tui.help.currentSection]
+other = "当前页面"
+[tui.help.allPages]
+other = "所有页面"
+[tui.help.globalSection]
+other = "全局按键"
+[tui.help.sec.dashboard]
+other = "主菜单"
+[tui.help.sec.running]
+other = "硬件跑分进行中"
+[tui.help.sec.results]
+other = "跑分结果"
+[tui.help.sec.compare]
+other = "报告对比"
+[tui.help.sec.suiteConfig]
+other = "Suite 配置"
+[tui.help.sec.suiteRunning]
+other = "Suite 进行中"
+[tui.help.sec.suiteResults]
+other = "Suite 结果"
+
+[tui.hint.digits]
+other = "切换 section 1-9"
+
+[tui.hint.scroll]
+other = "滚动"
+
 [tui.hint.start]
 other = "开始"
 
@@ -195,6 +232,175 @@ other = "状态"
 [tui.col.metric]
 other = "指标"
 
+[tui.running.eta]
+other = "剩余 ~{{.Eta}}"
+
+[tui.running.samples]
+other = "{{.Done}}/{{.Total}} 采样"
+
+[tui.suiteSummary.title]
+other = "运行摘要"
+[tui.suiteSummary.sections]
+other = "Section"
+[tui.suiteSummary.nodes]
+other = "节点"
+[tui.suiteSummary.routeNodes]
+other = "路由 {{.Route}} · Ping {{.Ping}}"
+[tui.suiteSummary.speedNodes]
+other = "测速 {{.Count}}"
+[tui.suiteSummary.nodesPending]
+other = "统计中…"
+[tui.suiteSummary.workloads]
+other = "硬件"
+[tui.suiteSummary.workloadCount]
+other = "{{.Count}} 个 workload"
+[tui.suiteSummary.estimatedLabel]
+other = "预计"
+[tui.suiteSummary.estimated]
+other = "~{{.Duration}}(近 {{.Samples}} 次历史均值)"
+[tui.suiteSummary.estimatedRough]
+other = "~{{.Duration}}(粗估)"
+[tui.suiteSummary.etaLine]
+other = "预计 ~{{.Duration}}"
+[tui.suiteSummary.minutes]
+other = "{{.Minutes}} 分"
+[tui.suiteSummary.minutesSeconds]
+other = "{{.Minutes}} 分 {{.Seconds}} 秒"
+[tui.suiteSummary.seconds]
+other = "{{.Seconds}} 秒"
+
+[tui.detail.title]
+other = "Workload 详情"
+
+[tui.detail.metrics]
+other = "指标"
+
+[tui.detail.samples]
+other = "采样"
+
+[tui.detail.detailTitle]
+other = "原始输出"
+
+[tui.detail.errorTitle]
+other = "错误"
+
+[tui.detail.noDetail]
+other = "暂无详情。"
+
+[tui.col.iterations]
+other = "迭代"
+
+[tui.col.bytes]
+other = "字节"
+
+[tui.col.ops]
+other = "操作数"
+
+[tui.hint.detail]
+other = "详情"
+
+[tui.hint.repick]
+other = "重选"
+
+[tui.help.sec.resultDetail]
+other = "Workload 详情"
+
+[tui.compare.pickerTitle]
+other = "⇄ 对比报告"
+
+[tui.compare.pickerDesc]
+other = "从历史记录选两条对比,或查看单条。按 m 手动输入路径。"
+
+[tui.compare.pickerHint]
+other = "空格选 A/B,再按 c 对比"
+
+[tui.compare.col.time]
+other = "时间"
+
+[tui.compare.col.kind]
+other = "类型"
+
+[tui.compare.col.tag]
+other = "标签"
+
+[tui.compare.col.id]
+other = "ID"
+
+[tui.compare.manual]
+other = "手动路径"
+
+[tui.compare.manualHint]
+other = "输入两份报告路径,tab 切换,回车对比"
+
+[tui.compare.needTwo]
+other = "请先选择两条记录"
+
+[tui.compare.mixedKinds]
+other = "跑分报告与 Suite 报告无法互相对比"
+
+[tui.compare.noHistory]
+other = "暂无历史记录。可用 --save-history 跑分或 vmbench history add 添加。"
+
+[tui.compare.historyError]
+other = "历史记录错误: {{.Err}}"
+
+[tui.compare.loadingHistory]
+other = "正在加载历史…"
+
+[tui.help.sec.comparePicker]
+other = "对比选择器"
+
+[tui.hint.pick]
+other = "选 A/B"
+
+[tui.hint.compareSel]
+other = "对比"
+
+[tui.hint.viewRecord]
+other = "查看记录"
+
+[tui.hint.manual]
+other = "手动路径"
+
+[tui.runConfig.title]
+other = "▶ 硬件跑分配置"
+[tui.runConfig.description]
+other = "运行外部工具跑分前,选择迭代次数、工具与 workload 过滤。"
+[tui.runConfig.iterations]
+other = "迭代次数"
+[tui.runConfig.tools]
+other = "硬件工具"
+[tui.runConfig.filter]
+other = "过滤"
+[tui.runConfig.filterAll]
+other = "全部"
+[tui.runConfig.filterCPU]
+other = "CPU"
+[tui.runConfig.filterDisk]
+other = "磁盘"
+[tui.runConfig.filterMemory]
+other = "内存"
+[tui.runConfig.filterCustom]
+other = "自定义"
+[tui.runConfig.filterCustomHint]
+other = "输入正则,如 sysbench|fio"
+[tui.runConfig.preflight]
+other = "工具预检"
+[tui.runConfig.preflightPending]
+other = "检查中…"
+[tui.runConfig.missingTools]
+other = "缺失工具(对应 workload 将报结构化错误):"
+[tui.runConfig.missingNone]
+other = "所选工具均已就绪"
+[tui.runConfig.start]
+other = "开始跑分"
+[tui.runConfig.startDisabled]
+other = "未选择任何项"
+[tui.runConfig.plannedWorkloads]
+other = "计划运行 {{.Count}} 个 workload"
+[tui.help.sec.runConfig]
+other = "硬件跑分配置"
+
 [tui.compare.title]
 other = "⇄ 对比报告"
 
@@ -203,6 +409,9 @@ other = "用法:\n  vmbench tui --compare-a <a.json> --compare-b <b.json>\n\n或
 
 [tui.compare.howTo]
 other = "如何对比"
+
+[tui.compare.loading]
+other = "正在加载报告…"
 
 [tui.compare.error]
 other = "错误: {{.Err}}"
@@ -344,6 +553,9 @@ other = "▶ 开始 (未就绪)"
 
 [tui.suiteResults.title]
 other = "◈ 综合测试报告"
+
+[tui.suiteResults.noResults]
+other = "暂无 Suite 结果。"
 
 [tui.suiteResults.noSections]
 other = "没有启用的 section。"

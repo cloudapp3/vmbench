@@ -22,45 +22,55 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，提供 CLI、
 ## 快速开始
 
 ```bash
-# 从源码安装
-go install github.com/cloudapp3/vmbench/cmd/vmbench@latest
-
-# 或本地构建
-go build -o vmbench ./cmd/vmbench
-
-# 项目验证脚本使用 CGO_ENABLED=0，输出到临时目录（可用 VMBENCH_OUTPUT_DIR 覆盖）
-./sh/build.sh
+# 一键安装（Linux / macOS，从 GitHub Releases 下载并校验 SHA-256）
+curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash
 
 # 默认进入 TUI
-./vmbench
+vmbench
 
 # CLI 测评
-./vmbench run
-./vmbench run --json report.json --html report.html
-./vmbench run --filter 'sysbench|fio|OpenSSL'
-./vmbench run --hardware-tool sysbench,openssl,fio,dd
-./vmbench run --scope network --iterations 1
-./vmbench run --scope all --iterations 1
+vmbench run
+vmbench run --json report.json --html report.html
+vmbench run --filter 'sysbench|fio|OpenSSL'
+vmbench run --hardware-tool sysbench,openssl,fio,dd
+vmbench run --scope network --iterations 1
+vmbench run --scope all --iterations 1
 
 # VPS 综合测评
-./vmbench suite
-./vmbench suite --preset quick
-./vmbench suite --preset website --json suite.json --html suite.html
-./vmbench suite --only ping,mail
-./vmbench suite --only hardware --hardware-tool dd,stream,mbw
-./vmbench suite --node-catalog auto --node-revision 2026-07-13.1 --save-history
-./vmbench suite --quiet --json suite.json
+vmbench suite
+vmbench suite --preset quick
+vmbench suite --preset website --json suite.json --html suite.html
+vmbench suite --only ping,mail
+vmbench suite --only hardware --hardware-tool dd,stream,mbw
+vmbench suite --node-catalog auto --node-revision 2026-07-13.1 --save-history
+vmbench suite --quiet --json suite.json
 
 # 报告对比
-./vmbench compare a.json b.json
-./vmbench history compare --last 3
+vmbench compare a.json b.json
+vmbench history compare --last 3
 
 # 节点目录
-./vmbench nodes list --node-catalog embedded
-./vmbench nodes health --node-catalog auto --ip-family v6
+vmbench nodes list --node-catalog embedded
+vmbench nodes health --node-catalog auto --ip-family v6
 ```
 
+其他安装方式（固定版本、自定义目录、Windows、`go install`、源码构建）：源码方式可用 `go install github.com/cloudapp3/vmbench/cmd/vmbench@latest`，或本地构建 `go build -o vmbench ./cmd/vmbench`（项目验证脚本 `./sh/build.sh` 使用 CGO_ENABLED=0，输出到临时目录，可用 `VMBENCH_OUTPUT_DIR` 覆盖）；完整说明见英文 README 的 Install 一节。
+
 `vmbench run` 默认只运行 `hardware` scope。`network` / `all` 必须显式选择，CLI 会提示基础网络 workload 可能传输约 1.75 GB 数据；所有网络 workload 最多执行一次真实探测。workload 始终串行隔离，旧的 `--mode multi/all` 只保留兼容 warning，不会并发 workload 或生成第二轮重复结果。
+
+## 界面语言
+
+CLI、TUI 与 console/HTML 报告标签支持英文与简体中文；新增语言只需在 `i18n/messages/` 下新增消息目录。
+
+选择优先级：`--lang` 参数（所有子命令）> `VMBENCH_LANG` 环境变量 > TUI 配置文件（`~/.config/vmbench/config.json`）的 `lang` 字段 > 系统 locale（`zh*` 自动归一到 `zh-CN`）> 英文；未知取值回退英文并提示一次。
+
+```bash
+vmbench --help                      # 跟随系统 locale
+VMBENCH_LANG=zh-CN vmbench suite    # 强制中文
+vmbench tui --lang en               # 单次指定英文
+```
+
+JSON 字段名、状态枚举 token（`ok`/`fail`/...）、suite section ID、workload 名称（与 `--filter` 匹配耦合）以及适配器错误信息在任何语言下保持英文；翻译只发生在渲染层。
 
 ## Suite sections
 
@@ -103,11 +113,13 @@ vmbench
 
 Dashboard 支持：
 
-- 运行串行隔离的外部工具硬件测评（无独立 Multi-Core 入口）
+- 运行串行隔离的外部工具硬件测评（无独立 Multi-Core 入口）；启动前先进入配置页选 iterations / 硬件工具 / workload 过滤，实时显示计划 workload 数与缺失工具预检
 - 运行 VPS suite
-- 配置与 CLI/MCP 相同的 iterations/timeout/IP version/tools/providers/iperf/sections/route/catalog source/revision
+- 配置与 CLI/MCP 相同的 iterations/timeout/IP version/tools/providers/iperf/sections/route/catalog source/revision；配置页含摘要卡（计划 workload 数、按历史均值估算的总时长），`1-9` 数字键快切 section
 - 打开系统信息
-- 比较两份 benchmark 报告；Suite Compare 使用 CLI/history
+- 比较报告：从历史记录选两条（或手输路径），run 报告出 delta 表，suite 报告用与 CLI 相同的 textgrid 对比，也可查看单条历史记录
+- Running 页显示迭代迷你条、采样进度与完成后按墙钟外推的 ETA；Results 三视图（卡片/分组/平铺）+ `d` 进单 workload 详情（指标/采样/错误/原始输出）
+- 全页滚动（`PgUp/PgDn`、`Home/End`、鼠标滚轮）、`?` 帮助页、Dashboard 菜单支持鼠标点击
 - 按 `t` 循环切换 8 种颜色主题，退出后持久化到本地配置
 
 ## 外部工具策略
