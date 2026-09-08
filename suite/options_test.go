@@ -28,6 +28,27 @@ func TestDefaultSectionsIncludeNetworkEvidence(t *testing.T) {
 	}
 }
 
+func TestSectionSelectorHardwareOnly(t *testing.T) {
+	tests := []struct {
+		name  string
+		input SectionSelector
+		want  bool
+	}{
+		{"empty", SectionSelector{}, false},
+		{"hardware only", SectionSelector{Hardware: true}, true},
+		{"hardware plus speed", SectionSelector{Hardware: true, Speed: true}, false},
+		{"network only", SectionSelector{Speed: true}, false},
+		{"all", DefaultSections(), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.input.HardwareOnly(); got != tt.want {
+				t.Fatalf("HardwareOnly(%+v) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSectionsFromListSupportsNetworkEvidenceAliases(t *testing.T) {
 	tests := []struct {
 		value            string

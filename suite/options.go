@@ -236,6 +236,14 @@ func (s SectionSelector) AnyEnabled() bool {
 	return s.Hardware || s.NetworkInfo || s.Route || s.Ping || s.Speed || s.IPQuality || s.Reachability || s.Mail || s.Media
 }
 
+// HardwareOnly reports whether exactly the hardware section is enabled.
+// It decides the report kind: a hardware-only selection runs the bare
+// hardware benchmark (run report), anything else runs the full suite.
+func (s SectionSelector) HardwareOnly() bool {
+	return s.Hardware && !s.NetworkInfo && !s.Route && !s.Ping && !s.Speed &&
+		!s.IPQuality && !s.Reachability && !s.Mail && !s.Media
+}
+
 func (s SectionSelector) Names() []string {
 	names := make([]string, 0, 9)
 	if s.Hardware {
