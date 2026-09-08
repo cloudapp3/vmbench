@@ -67,31 +67,31 @@ func TestHelpShowsEveryPageSection(t *testing.T) {
 }
 
 func TestHelpSuppressedDuringTextEntry(t *testing.T) {
-	m := scrollTestModel(t, pageSuiteConfig, nil)
-	m.suiteConfig.field = fieldAdvanced
+	m := scrollTestModel(t, pageConfig, nil)
+	m.config.field = fieldAdvanced
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
 	um, ok := updated.(Model)
 	if !ok {
 		t.Fatalf("Update returned %T, want Model", updated)
 	}
-	if um.page != pageSuiteConfig {
+	if um.page != pageConfig {
 		t.Fatalf("? must not toggle help while text entry is focused, page = %d", um.page)
 	}
-	if got := um.suiteConfig.iperfHost; got != "?" {
+	if got := um.config.iperfHost; got != "?" {
 		t.Fatalf("rune should reach the text field, got %q", got)
 	}
 }
 
 func TestHelpPageFitsCompactTerminal(t *testing.T) {
 	m := scrollTestModel(t, pageHelp, nil)
-	m.helpFrom = pageSuiteConfig
+	m.helpFrom = pageConfig
 	assertRenderBounds(t, m.View(), 80, 24)
 
 	i18n.SetLang("zh-CN")
 	t.Cleanup(func() { i18n.SetLang("en") })
 	mZh := scrollTestModel(t, pageHelp, nil)
-	mZh.helpFrom = pageSuiteConfig
+	mZh.helpFrom = pageConfig
 	assertRenderBounds(t, mZh.View(), 80, 24)
 	if !strings.Contains(mZh.View(), i18n.T("tui.help.title")) {
 		t.Fatalf("zh-CN help page missing translated title")

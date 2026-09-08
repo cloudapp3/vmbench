@@ -27,28 +27,25 @@ const (
 	pageRunning
 	pageResults
 	pageCompare
-	pageSuiteConfig
+	pageConfig
 	pageSuiteRunning
 	pageSuiteResults
 	pageHelp
-	pageRunConfig
 	pageComparePicker
 	pageResultDetail
 )
 
 type menuItem struct {
-	label  string
-	desc   string
-	mode   string
-	engine string
+	label string
+	desc  string
+	mode  string
 }
 
 // menuItems is a function, not a package var: package vars initialize
 // before main() runs, before the active language is selected.
 func menuItems() []menuItem {
 	return []menuItem{
-		{label: i18n.T("tui.menu.runHardware"), desc: i18n.T("tui.menu.runHardwareDesc"), mode: "single", engine: "external"},
-		{label: i18n.T("tui.menu.runSuite"), desc: i18n.T("tui.menu.runSuiteDesc"), mode: "suite"},
+		{label: i18n.T("tui.menu.benchmark"), desc: i18n.T("tui.menu.benchmarkDesc"), mode: "bench"},
 		{label: i18n.T("tui.menu.compare"), desc: i18n.T("tui.menu.compareDesc"), mode: "compare"},
 		{label: i18n.T("tui.menu.sysinfo"), desc: i18n.T("tui.menu.sysinfoDesc"), mode: "sysinfo"},
 		{label: i18n.T("tui.menu.quit"), desc: "", mode: "quit"},
@@ -99,12 +96,14 @@ type Model struct {
 	runSamplesDone  int
 	runSamplesTotal int
 
-	suiteConfig   suiteConfigState
+	// config is the single benchmark configuration page; runKind records
+	// which report kind a started benchmark produces ("run" or "suite").
+	config  configState
+	runKind string
+
 	suiteSections []suiteSection
 	suiteEventCh  chan suite.Event
 	suiteReport   *suite.SuiteReport
-
-	runConfig runConfigState
 
 	catalogStats catalogStats
 	historyStats historyStats
@@ -138,14 +137,13 @@ type Model struct {
 
 func NewModel(compareA, compareB string) Model {
 	m := Model{
-		page:        pageDashboard,
-		compareA:    compareA,
-		compareB:    compareB,
-		expanded:    make(map[string]bool),
-		spinner:     comp.NewSpinner(),
-		suiteConfig: newSuiteConfigState(),
-		runConfig:   newRunConfigState(),
-		picker:      newPickerState(compareA, compareB),
+		page:     pageDashboard,
+		compareA: compareA,
+		compareB: compareB,
+		expanded: make(map[string]bool),
+		spinner:  comp.NewSpinner(),
+		config:   newConfigState(),
+		picker:   newPickerState(compareA, compareB),
 	}
 	// Flag users passing both reports land on the comparison directly.
 	if compareA != "" && compareB != "" {
@@ -225,16 +223,14 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return updateResults(m, msg)
 		case pageCompare:
 			return updateCompare(m, msg)
-		case pageSuiteConfig:
-			return updateSuiteConfig(m, msg)
+		case pageConfig:
+			return updateConfig(m, msg)
 		case pageSuiteRunning:
 			return updateSuiteRunning(m, msg)
 		case pageSuiteResults:
 			return updateSuiteResults(m, msg)
 		case pageHelp:
 			return updateHelp(m, msg)
-		case pageRunConfig:
-			return updateRunConfig(m, msg)
 		case pageComparePicker:
 			return updateComparePicker(m, msg)
 		case pageResultDetail:
@@ -250,8 +246,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return startBenchmark(m, msg.opts)
 
 	case missingToolsMsg:
-		m.runConfig.missing = msg.missing
-		m.runConfig.missingOK = true
+		m.config.missing = msg.missing
+		m.config.missingOK = true
 		return m, nil
 
 	case catalogStatsMsg:

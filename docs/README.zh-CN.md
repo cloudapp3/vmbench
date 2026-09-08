@@ -22,8 +22,11 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，提供 CLI、
 ## 快速开始
 
 ```bash
-# 一键安装（Linux / macOS，从 GitHub Releases 下载并校验 SHA-256）
-curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash
+# 一键安装（Linux / macOS，从 GitHub Releases 下载并校验 SHA-256），
+# 并把安装目录加入当前 shell 的 PATH
+VMBENCH_BIN_DIR="$(
+  curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash -s -- --print-install-dir
+)" && export PATH="$VMBENCH_BIN_DIR:$PATH"
 
 # 默认进入 TUI
 vmbench
@@ -51,6 +54,16 @@ vmbench history compare --last 3
 vmbench nodes list --node-catalog embedded
 vmbench nodes health --node-catalog auto --ip-family v6
 ```
+
+安装目录自动选择：已有安装（`~/.local/bin`、`~/bin`、`/usr/local/bin`）优先复用；root 安装使用 `/usr/local/bin`；普通用户优先选择已在 `PATH` 中的 `~/.local/bin` 或 `~/bin`。自动装到主目录且该目录不在 `PATH` 时，安装脚本会把一条幂等的 `export PATH=...` 追加到当前 shell 的启动文件（`.zshrc`、`.bashrc` 或 `.profile`）并打印精确的 reload 命令；其他 shell 只给警告。其他 flags：`--dir PATH` 自定义目录（绝不改 shell 启动文件，只打印 PATH 提示）、`--system` 系统级安装（仅在需要时用 sudo 检查和写入目标）、`--version vX.Y.Z` 固定版本、`--no-modify-path` 不动启动文件、`--print-install-dir` 供脚本读取安装目录、`--skip-verify` 跳过校验；`VMBENCH_INSTALL_DIR` 等价于 `--dir`。
+
+卸载：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash -s -- --uninstall
+```
+
+会移除二进制、平台数据目录（Linux `~/.local/share/vmbench`，macOS `~/Library/Application Support/vmbench`，含全部本地历史报告）、手动创建的 `vmbench` systemd/launchd unit，以及安装脚本自己写入的 `# vmbench user install` PATH 条目。手写的 PATH 行与自定义 `VMBENCH_HISTORY_DIR` 下的报告会保留；root 系统级安装请用 `sudo bash -s -- --uninstall`。
 
 其他安装方式（固定版本、自定义目录、Windows、`go install`、源码构建）：源码方式可用 `go install github.com/cloudapp3/vmbench/cmd/vmbench@latest`，或本地构建 `go build -o vmbench ./cmd/vmbench`（项目验证脚本 `./sh/build.sh` 使用 CGO_ENABLED=0，输出到临时目录，可用 `VMBENCH_OUTPUT_DIR` 覆盖）；完整说明见英文 README 的 Install 一节。
 

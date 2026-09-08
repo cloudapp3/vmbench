@@ -38,7 +38,7 @@ func TestSuitePagesFitCompactTerminalWidth(t *testing.T) {
 		page  page
 		setup func(*Model)
 	}{
-		{name: "config", page: pageSuiteConfig},
+		{name: "config", page: pageConfig},
 		{name: "running", page: pageSuiteRunning, setup: func(m *Model) {
 			m.suiteSections = []suiteSection{
 				{id: suite.SectionHardware, label: "Hardware", status: "done", message: "ok"},
@@ -152,11 +152,11 @@ func TestSuitePagesFit80x24Terminal(t *testing.T) {
 	}{
 		{
 			name: "config",
-			page: pageSuiteConfig,
+			page: pageConfig,
 			setup: func(m *Model) {
-				m.suiteConfig.field = fieldAdvanced
+				m.config.field = fieldAdvanced
 			},
-			expected: []string{"Suite Configuration", "Network Provenance", "Start Suite"},
+			expected: []string{"Benchmark Configuration", "Network Provenance", "Start Benchmark"},
 		},
 		{
 			name: "running",
@@ -224,11 +224,11 @@ func TestSuitePagesFit80x24TerminalZhCN(t *testing.T) {
 	}{
 		{
 			name: "config",
-			page: pageSuiteConfig,
+			page: pageConfig,
 			setup: func(m *Model) {
-				m.suiteConfig.field = fieldAdvanced
+				m.config.field = fieldAdvanced
 			},
-			expected: []string{"综合测试配置", "网络目录来源", "开始综合测试"},
+			expected: []string{"评测配置", "网络目录来源", "开始评测"},
 		},
 		{
 			name: "running",
@@ -270,7 +270,7 @@ func TestSuitePagesFit80x24TerminalZhCN(t *testing.T) {
 
 func TestCompactSuiteConfigKeepsFieldNavigation(t *testing.T) {
 	m := NewModel("", "")
-	m.page = pageSuiteConfig
+	m.page = pageConfig
 	m.width = 80
 	m.height = 24
 
@@ -278,20 +278,21 @@ func TestCompactSuiteConfigKeepsFieldNavigation(t *testing.T) {
 	got := updated.(Model)
 	view := got.View()
 	assertRenderBounds(t, view, 80, 24)
-	if got.suiteConfig.field != fieldSections || !strings.Contains(view, "Sections") {
-		t.Fatalf("down key did not move compact config to Sections: field=%d", got.suiteConfig.field)
+	if got.config.field != fieldSections || !strings.Contains(view, "Sections") {
+		t.Fatalf("down key did not move compact config to Sections: field=%d", got.config.field)
 	}
 }
 
 func TestCompactSuiteConfigFieldsFit80x24(t *testing.T) {
 	fields := []struct {
-		field    suiteConfigField
+		field    configField
 		expected string
 	}{
 		{field: fieldPreset, expected: "Preset"},
 		{field: fieldSections, expected: "Sections"},
 		{field: fieldRuntime, expected: "Runtime"},
 		{field: fieldHardwareTools, expected: "Hardware Tools"},
+		{field: fieldFilter, expected: "Workload Filter"},
 		{field: fieldSpeedProviders, expected: "Speed Providers"},
 		{field: fieldRoutePresets, expected: "China Route Presets"},
 		{field: fieldAdvanced, expected: "Network Provenance"},
@@ -300,10 +301,10 @@ func TestCompactSuiteConfigFieldsFit80x24(t *testing.T) {
 	for _, tt := range fields {
 		t.Run(tt.expected, func(t *testing.T) {
 			m := NewModel("", "")
-			m.page = pageSuiteConfig
+			m.page = pageConfig
 			m.width = 80
 			m.height = 24
-			m.suiteConfig.field = tt.field
+			m.config.field = tt.field
 
 			view := m.View()
 			assertRenderBounds(t, view, 80, 24)

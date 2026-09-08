@@ -68,7 +68,7 @@ func helpFor(p page) []helpEntry {
 			{keys: "esc", descKey: "tui.hint.back", short: true},
 			{keys: "q", descKey: "tui.hint.quit", short: true},
 		}
-	case pageSuiteConfig:
+	case pageConfig:
 		return []helpEntry{
 			{keys: "↑↓", descKey: "tui.hint.field", short: true},
 			{keys: "←→", descKey: "tui.hint.choose", short: true},
@@ -88,14 +88,6 @@ func helpFor(p page) []helpEntry {
 			{keys: "esc", descKey: "tui.hint.back", short: true},
 			{keys: "q", descKey: "tui.hint.quit", short: true},
 		}
-	case pageRunConfig:
-		return []helpEntry{
-			{keys: "↑↓", descKey: "tui.hint.field", short: true},
-			{keys: "←→", descKey: "tui.hint.choose", short: true},
-			{keys: "spc/x", descKey: "tui.hint.toggle", short: true},
-			{keys: "↵", descKey: "tui.hint.start", short: true},
-			{keys: "esc", descKey: "tui.hint.back", short: true},
-		}
 	case pageComparePicker:
 		return []helpEntry{
 			{keys: "↑↓", descKey: "tui.hint.nav", short: true},
@@ -113,10 +105,8 @@ func helpFor(p page) []helpEntry {
 // global single-key bindings (?, q) and rune routing stay out of its way.
 func textEntryActive(m Model) bool {
 	switch m.page {
-	case pageSuiteConfig:
-		return m.suiteConfig.field == fieldAdvanced
-	case pageRunConfig:
-		return m.runConfig.field == fieldRunFilter && m.runConfig.filterChip == 4
+	case pageConfig:
+		return m.config.textEntryActive()
 	case pageComparePicker:
 		return m.picker.mode == pickerManual && m.picker.inputFocus != 0
 	}
@@ -147,8 +137,8 @@ func helpSectionTitle(p page) string {
 	switch p {
 	case pageDashboard:
 		return i18n.T("tui.help.sec.dashboard")
-	case pageRunConfig:
-		return i18n.T("tui.help.sec.runConfig")
+	case pageConfig:
+		return i18n.T("tui.help.sec.config")
 	case pageComparePicker:
 		return i18n.T("tui.help.sec.comparePicker")
 	case pageResultDetail:
@@ -159,8 +149,6 @@ func helpSectionTitle(p page) string {
 		return i18n.T("tui.help.sec.results")
 	case pageCompare:
 		return i18n.T("tui.help.sec.compare")
-	case pageSuiteConfig:
-		return i18n.T("tui.help.sec.suiteConfig")
 	case pageSuiteRunning:
 		return i18n.T("tui.help.sec.suiteRunning")
 	case pageSuiteResults:
@@ -171,13 +159,12 @@ func helpSectionTitle(p page) string {
 
 var helpPageOrder = []page{
 	pageDashboard,
-	pageRunConfig,
+	pageConfig,
 	pageRunning,
 	pageResults,
 	pageResultDetail,
 	pageComparePicker,
 	pageCompare,
-	pageSuiteConfig,
 	pageSuiteRunning,
 	pageSuiteResults,
 }

@@ -81,7 +81,7 @@ func TestDashboardClickActivatesMenuItem(t *testing.T) {
 	m := scrollTestModel(t, pageDashboard, nil)
 	top, _, _ := dashboardMenuRegion(m)
 
-	// Click "Run Suite (VPS Composite)" (row 1).
+	// Click "Compare Reports" (row 1).
 	updated, _ := m.Update(clickMsg(5, contentOriginY(m)+top+1))
 	um, ok := updated.(Model)
 	if !ok {
@@ -90,8 +90,8 @@ func TestDashboardClickActivatesMenuItem(t *testing.T) {
 	if um.cursor != 1 {
 		t.Fatalf("click should set cursor to row 1, got %d", um.cursor)
 	}
-	if um.page != pageSuiteConfig {
-		t.Fatalf("click should activate menu row 1 (suite config), page = %d", um.page)
+	if um.page != pageComparePicker {
+		t.Fatalf("click should activate menu row 1 (compare picker), page = %d", um.page)
 	}
 }
 

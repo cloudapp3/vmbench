@@ -25,6 +25,28 @@ func runningTestModel(t *testing.T) Model {
 	return m
 }
 
+// TestHardwareStartLandsOnRunningPage pins the page transition: without it
+// the hardware path stayed on the config page for the whole run, leaving the
+// progress view and the cancel modal unreachable.
+func TestHardwareStartLandsOnRunningPage(t *testing.T) {
+	m := scrollTestModel(t, pageConfig, nil)
+	opts, err := vmbench.NormalizeOptions(vmbench.Options{Engine: "external", Iterations: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, _ := startBenchmark(m, opts)
+	um := updated.(Model)
+	if um.page != pageRunning {
+		t.Fatalf("startBenchmark page = %d, want pageRunning", um.page)
+	}
+	if um.runKind != "run" {
+		t.Fatalf("startBenchmark runKind = %q, want run", um.runKind)
+	}
+	if len(um.workloads) == 0 {
+		t.Fatal("startBenchmark should prefill planned workloads")
+	}
+}
+
 func TestRunETARequiresCompletion(t *testing.T) {
 	m := runningTestModel(t)
 

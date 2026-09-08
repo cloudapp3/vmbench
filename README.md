@@ -15,8 +15,11 @@ Documentation: [中文说明](docs/README.zh-CN.md) · [Full capability referenc
 ## Quick Start
 
 ```bash
-# One-line install (Linux / macOS; latest GitHub Release, SHA-256 verified)
-curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash
+# One-line install (Linux / macOS; latest GitHub Release, SHA-256 verified),
+# then put it on PATH for the current shell
+VMBENCH_BIN_DIR="$(
+  curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash -s -- --print-install-dir
+)" && export PATH="$VMBENCH_BIN_DIR:$PATH"
 
 vmbench                          # interactive TUI (default)
 vmbench run                      # hardware benchmark via external tools
@@ -28,15 +31,28 @@ vmbench update                   # self-update from GitHub Releases
 
 ## Install
 
-The one-liner above installs the **latest release** for your OS/arch, verifies its SHA-256 against `checksums.txt`, and installs to the first writable directory among `/usr/local/bin`, `~/.local/bin`, and `~/bin`.
+The one-liner above installs the **latest release** for your OS/arch and verifies its SHA-256 against `checksums.txt`. Without `--dir`, the install directory is picked automatically: an existing installation in `~/.local/bin`, `~/bin`, or `/usr/local/bin` is reused; a root install uses `/usr/local/bin`; an unprivileged user prefers `~/.local/bin` or `~/bin` when either is already on `PATH`. For an automatic home-directory install that is not yet on `PATH`, the installer adds an idempotent entry to the current shell's startup file (`.zshrc`, `.bashrc`, or `.profile`) and prints the exact reload command; other shells get a warning.
 
 ```bash
-# Custom directory
+# Custom directory (never modifies shell startup files; prints a PATH hint)
 curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash -s -- --dir /opt/bin
+
+# System-wide install (uses sudo only for target checks and writes)
+curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash -s -- --system
 
 # Go toolchain
 go install github.com/cloudapp3/vmbench/cmd/vmbench@latest
 ```
+
+Other installer flags: `--version vX.Y.Z` pins a release, `--no-modify-path` keeps shell startup files untouched, `--print-install-dir` prints the selected directory for scripts, and `--skip-verify` skips checksum verification. `VMBENCH_INSTALL_DIR` mirrors `--dir`; `GITHUB_TOKEN`/`GH_TOKEN` helps with API rate limits or private releases.
+
+### Uninstall
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash -s -- --uninstall
+```
+
+Removes the binary, the platform data directory (`~/.local/share/vmbench` on Linux, `~/Library/Application Support/vmbench` on macOS) including all locally stored benchmark history, any manually created `vmbench` systemd/launchd unit, and the installer-owned `# vmbench user install` PATH entries from `.zshrc`/`.bashrc`/`.profile`. Hand-written PATH lines and reports under a custom `VMBENCH_HISTORY_DIR` are preserved. Use `sudo bash -s -- --uninstall` for a root-owned system installation.
 
 Windows: download `vmbench-<version>-windows-<arch>.zip` from [Releases](https://github.com/cloudapp3/vmbench/releases) (WinSAT provides the default hardware probes).
 

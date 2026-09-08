@@ -70,16 +70,14 @@ func pageContent(m Model) string {
 		return viewResults(m)
 	case pageCompare:
 		return viewCompare(m)
-	case pageSuiteConfig:
-		return viewSuiteConfig(m)
+	case pageConfig:
+		return viewConfig(m)
 	case pageSuiteRunning:
 		return viewSuiteRunning(m)
 	case pageSuiteResults:
 		return viewSuiteResults(m)
 	case pageHelp:
 		return viewHelp(m)
-	case pageRunConfig:
-		return viewRunConfig(m)
 	case pageComparePicker:
 		return viewComparePicker(m)
 	case pageResultDetail:

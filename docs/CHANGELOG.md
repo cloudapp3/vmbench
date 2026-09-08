@@ -1,5 +1,15 @@
 # VMBench Changelog
 
+## Unreleased
+
+### install.sh 对齐 vmflow 安装器（PATH 处理 / --system / --uninstall）
+
+- **PATH 处理**：安装目录自动选择改为复用已有安装（`~/.local/bin`、`~/bin`、`/usr/local/bin`）→ root 用 `/usr/local/bin` → 普通用户优先已在 `PATH` 中的 `~/.local/bin`/`~/bin`；自动装到主目录且该目录不在 `PATH` 时，向 `.zshrc`/`.bashrc`/`.profile` 幂等追加 `# vmbench user install` + `export PATH=...` 块并打印 reload 命令。此前装到不在 PATH 的目录（如 `--dir /opt/bin`）只会打印绝对路径提示，随后必然 `command not found`。显式 `--dir`/`VMBENCH_INSTALL_DIR` 绝不改启动文件，只打印 PATH 警告与精确的 export 提示；`--no-modify-path`/`VMBENCH_NO_MODIFY_PATH` 可整体关闭启动文件修改。
+- **`--system`**：系统级安装到 `/usr/local/bin`（或显式 `--dir`）。root 直接安装；非 root 先验证 sudo（`VMBENCH_SUDO` 可指定绝对路径）再下载，sudo 仅用于目标目录检查（test/mkdir 固定绝对路径）与 `/usr/bin/install` 写入。
+- **`--uninstall`**：优先委托 `vmbench uninstall` 子命令（向前兼容）；否则 shell 兜底——定位二进制（--dir → PATH → 常见目录）、stop/verify 手动创建的 `vmbench` systemd/launchd unit（stop 失败即 fail-closed，不动任何文件）、删除二进制与平台数据目录（Linux `${XDG_DATA_HOME:-~/.local/share}/vmbench`，macOS `~/Library/Application Support/vmbench`，含本地历史报告；拒绝符号链接/非目录路径），并从启动文件精确移除自己写入的 PATH 块（awk 逐块匹配，用户手写行与其他安装的块保留）。终端交互确认；`curl | bash` 管道下跳过确认。
+- **加固**（与 vmflow 同款）：`tar --no-same-owner`（root 解压不恢复归档 uid/gid）；目标路径为符号链接/非普通文件时拒绝覆盖；`--version`/`--dir` 值校验（含 `=` 形式与 env 变量，全部在任何下载动作之前）。
+- README / zh-CN README 同步：Quick Start 换成 `--print-install-dir` + `export PATH` 一行式；Install 节重写目录选择与新 flags；新增 Uninstall 节。install_test.go 从 2 个测试扩到 21 个（fake curl / fake uid / fake sudo fixture；PATH、--system、目录复用、参数校验、卸载全覆盖）。
+
 ## v0.7.0（2026-09-08）
 
 ### CLI 命令面精简（BREAKING）

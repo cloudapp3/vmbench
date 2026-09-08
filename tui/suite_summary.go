@@ -58,7 +58,7 @@ func sectionStates(rep suite.SuiteReport) map[suite.SectionID]suite.SectionState
 }
 
 // catalogStats holds planned node counts from the embedded node catalog so
-// the SuiteConfig summary can show probe volume before the run starts.
+// the config page summary can show probe volume before the run starts.
 type catalogStats struct {
 	loaded   bool // false until catalogStatsMsg arrives; node counts stay hidden
 	route    int
@@ -159,14 +159,14 @@ func roughSectionSeconds(id suite.SectionID, iterations int) time.Duration {
 	return time.Duration(base * float64(time.Second))
 }
 
-func estimateSectionDuration(id suite.SectionID, s suiteConfigState, stats historyStats) time.Duration {
+func estimateSectionDuration(id suite.SectionID, s configState, stats historyStats) time.Duration {
 	if avg, ok := stats.avg[id]; ok && avg > 0 {
 		return avg
 	}
 	return roughSectionSeconds(id, s.iterations)
 }
 
-func estimateSuiteDuration(s suiteConfigState, stats historyStats) time.Duration {
+func estimateSuiteDuration(s configState, stats historyStats) time.Duration {
 	total := time.Duration(0)
 	for _, id := range s.sectionIDs {
 		if !sectionEnabled(s.sections, id) {
@@ -193,7 +193,7 @@ func formatDuration(d time.Duration) string {
 
 // suiteSummaryCard renders the live "what will run" panel: enabled sections,
 // planned probe nodes, hardware workload count, and an estimated duration.
-func suiteSummaryCard(s suiteConfigState, stats historyStats, cat catalogStats, width int) string {
+func suiteSummaryCard(s configState, stats historyStats, cat catalogStats, width int) string {
 	t := theme.Active
 
 	enabled := 0

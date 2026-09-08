@@ -2,12 +2,15 @@ package tui
 
 import (
 	"fmt"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/catalog"
 	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/nodecatalog"
@@ -16,13 +19,14 @@ import (
 	"github.com/cloudapp3/vmbench/tui/theme"
 )
 
-type suiteConfigField int
+type configField int
 
 const (
-	fieldPreset suiteConfigField = iota
+	fieldPreset configField = iota
 	fieldSections
 	fieldRuntime
 	fieldHardwareTools
+	fieldFilter
 	fieldSpeedProviders
 	fieldRoutePresets
 	fieldMediaSets
@@ -31,10 +35,30 @@ const (
 	fieldStart
 )
 
-const suiteConfigFieldCount = int(fieldStart) + 1
+// Pseudo-preset IDs the config page prepends to suite.PresetIDs().
+const (
+	configPresetHardware = "hardware"
+	configPresetCustom   = "custom"
+)
 
-type suiteConfigState struct {
-	field           suiteConfigField
+// configFilterChips maps quick filter presets to the regex the runner applies
+// to workload Name/Category ("" = no filter).
+var configFilterChips = []struct {
+	id       int
+	labelKey string
+	expr     string
+}{
+	{0, "tui.config.filterAll", ""},
+	{1, "tui.config.filterCPU", "CPU"},
+	{2, "tui.config.filterDisk", "Disk"},
+	{3, "tui.config.filterMemory", "Memory"},
+	{4, "tui.config.filterCustom", ""},
+}
+
+const configFilterChipCustom = 4
+
+type configState struct {
+	field           configField
 	preset          int
 	presetIDs       []string
 	sections        suite.SectionSelector
@@ -64,14 +88,16 @@ type suiteConfigState struct {
 	iperfHost       string
 	catalogSource   string
 	catalogRevision string
+	// Hardware-only extras: workload filter chips plus the tool preflight
+	// result. Only consulted while the hardware section is enabled.
+	filterChip int
+	filterText string
+	missing    []string
+	missingOK  bool // preflight result present
 }
 
-func newSuiteConfigState() suiteConfigState {
-	presetIDs := append([]string{"custom"}, suite.PresetIDs()...)
-	sections := suite.DefaultSections()
-	if quick, ok := suite.LookupPreset("quick"); ok {
-		sections = quick.Sections
-	}
+func newConfigState() configState {
+	presetIDs := append([]string{configPresetHardware, configPresetCustom}, suite.PresetIDs()...)
 	speedIDs := suite.SpeedProviderIDs()
 	speed := map[string]bool{}
 	for _, id := range suite.DefaultSpeedProviders() {
@@ -99,10 +125,12 @@ func newSuiteConfigState() suiteConfigState {
 	for _, id := range catalog.DefaultHardwareTools() {
 		hardware[id] = true
 	}
-	return suiteConfigState{
-		preset:    1,
+	return configState{
+		// Hardware only, matching the CLI default: no flags means the bare
+		// hardware benchmark.
+		preset:    0,
 		presetIDs: presetIDs,
-		sections:  sections,
+		sections:  suite.SectionSelector{Hardware: true},
 		sectionIDs: []suite.SectionID{
 			suite.SectionHardware, suite.SectionNetworkInfo, suite.SectionRoute, suite.SectionPing,
 			suite.SectionSpeed, suite.SectionIPQuality, suite.SectionReachability, suite.SectionMail, suite.SectionMedia,
@@ -125,7 +153,7 @@ func newSuiteConfigState() suiteConfigState {
 	}
 }
 
-func (s *suiteConfigState) sectionGet(i int) bool {
+func (s *configState) sectionGet(i int) bool {
 	switch s.sectionIDs[i] {
 	case suite.SectionHardware:
 		return s.sections.Hardware
@@ -149,7 +177,7 @@ func (s *suiteConfigState) sectionGet(i int) bool {
 	return false
 }
 
-func (s *suiteConfigState) sectionToggle(i int) {
+func (s *configState) sectionToggle(i int) {
 	switch s.sectionIDs[i] {
 	case suite.SectionHardware:
 		s.sections.Hardware = !s.sections.Hardware
@@ -174,7 +202,7 @@ func (s *suiteConfigState) sectionToggle(i int) {
 
 // toggleMediaSet flips one media set selection. Selecting "all" clears the
 // region picks; picking any region clears "all" so the value stays meaningful.
-func (s *suiteConfigState) toggleMediaSet(id string) {
+func (s *configState) toggleMediaSet(id string) {
 	s.mediaSets[id] = !s.mediaSets[id]
 	if !s.mediaSets[id] {
 		return
@@ -190,24 +218,133 @@ func (s *suiteConfigState) toggleMediaSet(id string) {
 	s.mediaSets[suite.DefaultMediaSet()] = false
 }
 
-func (s *suiteConfigState) applyPreset() {
-	if s.preset == 0 {
-		return
+// textEntryActive reports whether a raw-text field currently has focus (the
+// advanced provenance inputs, or the custom filter chip).
+func (s configState) textEntryActive() bool {
+	return s.field == fieldAdvanced ||
+		(s.field == fieldFilter && s.filterChip == configFilterChipCustom)
+}
+
+// visibleFields is the tab order pruned to cards that currently render. Field
+// navigation must never land on a hidden card, so every step goes through
+// this list.
+func (s configState) visibleFields() []configField {
+	fields := []configField{fieldPreset, fieldSections, fieldRuntime}
+	if s.sections.Hardware {
+		fields = append(fields, fieldHardwareTools, fieldFilter)
 	}
-	id := s.presetIDs[s.preset]
-	if spec, ok := suite.LookupPreset(id); ok {
-		s.sections = spec.Sections
-		if strings.TrimSpace(spec.IPVersion) != "" {
-			s.ipVersion = spec.IPVersion
+	if s.sections.Speed {
+		fields = append(fields, fieldSpeedProviders)
+	}
+	if s.sections.Route || s.sections.Ping {
+		fields = append(fields, fieldRoutePresets)
+	}
+	if s.sections.Media {
+		fields = append(fields, fieldMediaSets)
+	}
+	if s.sections.IPQuality {
+		fields = append(fields, fieldIPSources)
+	}
+	return append(fields, fieldAdvanced, fieldStart)
+}
+
+// stepField moves focus by delta through the visible fields, wrapping.
+func (s *configState) stepField(delta int) {
+	fields := s.visibleFields()
+	idx := 0
+	for i, f := range fields {
+		if f == s.field {
+			idx = i
+			break
 		}
+	}
+	s.field = fields[(idx+delta+len(fields))%len(fields)]
+}
+
+// snapFocus pulls focus back to a visible field after a visibility change
+// (section toggle, preset switch). It is a no-op while focus is already on a
+// visible card.
+func (s *configState) snapFocus() {
+	for _, f := range s.visibleFields() {
+		if f == s.field {
+			return
+		}
+	}
+	s.field = fieldPreset
+}
+
+// applyPreset rewrites the section selection for the selected preset. The
+// hardware pseudo-preset matches the CLI default; custom keeps current picks.
+func (s *configState) applyPreset() {
+	switch s.presetIDs[s.preset] {
+	case configPresetHardware:
+		s.sections = suite.SectionSelector{Hardware: true}
+	case configPresetCustom:
+		// keep current selections
+	default:
+		if spec, ok := suite.LookupPreset(s.presetIDs[s.preset]); ok {
+			s.sections = spec.Sections
+			if strings.TrimSpace(spec.IPVersion) != "" {
+				s.ipVersion = spec.IPVersion
+			}
+		}
+	}
+	s.missingOK = false
+	s.snapFocus()
+}
+
+func (s configState) presetDisplayName() string {
+	id := s.presetIDs[s.preset]
+	switch id {
+	case configPresetHardware:
+		return i18n.T("tui.config.hardwarePreset")
+	case configPresetCustom:
+		return i18n.T("tui.config.customPreset")
+	}
+	if spec, ok := suite.LookupPreset(id); ok {
+		return spec.LocalizedName()
+	}
+	return id
+}
+
+// suitePreset reports the preset ID to carry into suite.Options: only real
+// suite presets are passed through; hardware/custom selections are expressed
+// by their section selector instead.
+func (s configState) suitePreset() string {
+	id := s.presetIDs[s.preset]
+	if _, ok := suite.LookupPreset(id); ok {
+		return id
+	}
+	return ""
+}
+
+func (s configState) selectedTools() []string {
+	var out []string
+	for _, id := range s.hardwareIDs {
+		if s.hardwareTools[id] {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func (s configState) filterExpr() string {
+	if s.filterChip == configFilterChipCustom {
+		return strings.TrimSpace(s.filterText)
+	}
+	return configFilterChips[s.filterChip].expr
+}
+
+func (s configState) buildRunOptions() vmbench.Options {
+	return vmbench.Options{
+		Engine:        "external",
+		Iterations:    s.iterations,
+		Filter:        s.filterExpr(),
+		HardwareTools: s.selectedTools(),
 	}
 }
 
-func (s suiteConfigState) buildOptions(iperfHost string) suite.Options {
-	preset := ""
-	if s.preset > 0 {
-		preset = s.presetIDs[s.preset]
-	}
+func (s configState) buildSuiteOptions() suite.Options {
 	var providers []string
 	for _, id := range s.speedIDs {
 		if s.speedProviders[id] {
@@ -245,7 +382,7 @@ func (s suiteConfigState) buildOptions(iperfHost string) suite.Options {
 	opts := suite.Options{
 		Iterations:      s.iterations,
 		Sections:        s.sections,
-		Preset:          preset,
+		Preset:          s.suitePreset(),
 		SpeedProviders:  providers,
 		RoutePresets:    routes,
 		HardwareTools:   hardwareTools,
@@ -256,46 +393,81 @@ func (s suiteConfigState) buildOptions(iperfHost string) suite.Options {
 		CatalogSource:   strings.TrimSpace(s.catalogSource),
 		CatalogRevision: strings.TrimSpace(s.catalogRevision),
 	}
-	selectedIperfHost := strings.TrimSpace(s.iperfHost)
-	if strings.TrimSpace(iperfHost) != "" {
-		selectedIperfHost = strings.TrimSpace(iperfHost)
-	}
-	if selectedIperfHost != "" {
-		opts.IperfHosts = []string{selectedIperfHost}
+	if host := strings.TrimSpace(s.iperfHost); host != "" {
+		opts.IperfHosts = []string{host}
 	}
 	return opts
 }
 
-type suiteStartMsg struct {
-	opts suite.Options
+// plannedWorkloads lists the workload rows the hardware run will actually
+// execute, mirroring the runner's filter so the running page never shows
+// ghost rows.
+func (s configState) plannedWorkloads() []catalog.Definition {
+	defs := catalog.ExternalHardwareDefinitionsForTools("", s.selectedTools())
+	expr := s.filterExpr()
+	if expr == "" {
+		return defs
+	}
+	re, err := regexp.Compile(expr)
+	if err != nil {
+		return defs
+	}
+	var out []catalog.Definition
+	for _, d := range defs {
+		if re.MatchString(d.Name) || re.MatchString(d.Category) {
+			out = append(out, d)
+		}
+	}
+	return out
 }
 
-func updateSuiteConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	s := &m.suiteConfig
+type hardwareStartMsg struct{ opts vmbench.Options }
+type missingToolsMsg struct{ missing []string }
+
+// configMissingToolsCmd re-runs the hardware tool preflight in the
+// background; missingToolsMsg carries the result back to the card.
+func configMissingToolsCmd(s configState) tea.Cmd {
+	return func() tea.Msg {
+		expr := s.filterExpr()
+		var re *regexp.Regexp
+		if expr != "" {
+			if compiled, err := regexp.Compile(expr); err == nil {
+				re = compiled
+			}
+		}
+		return missingToolsMsg{missing: catalog.MissingHardwareToolsForFilter(s.selectedTools(), re)}
+	}
+}
+
+func updateConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	s := &m.config
 	switch msg.String() {
 	case "esc":
 		m.page = pageDashboard
 		return m, nil
 	case "q":
-		if s.field == fieldAdvanced {
-			s.appendAdvanced("q")
-			return m, nil
+		if !s.textEntryActive() {
+			return m, tea.Quit
 		}
-		return m, tea.Quit
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
-		// Quick section toggle by digit; the Advanced text field keeps runes.
-		if s.field != fieldAdvanced {
+		// Quick section toggle by digit; text fields keep runes.
+		if !s.textEntryActive() {
 			if digit := int(msg.String()[0] - '1'); digit < len(s.sectionIDs) {
 				s.sectionToggle(digit)
-				s.preset = 0 // custom
+				s.preset = 1 // custom
+				s.missingOK = false
+				s.snapFocus()
+				if s.sections.Hardware {
+					return m, configMissingToolsCmd(*s)
+				}
 			}
 			return m, nil
 		}
 	case "tab", "down":
-		s.field = suiteConfigField((int(s.field) + 1) % suiteConfigFieldCount)
+		s.stepField(1)
 		return m, nil
 	case "shift+tab", "up":
-		s.field = suiteConfigField((int(s.field) + suiteConfigFieldCount - 1) % suiteConfigFieldCount)
+		s.stepField(-1)
 		return m, nil
 	case "left", "h":
 		switch s.field {
@@ -303,11 +475,18 @@ func updateSuiteConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if s.preset > 0 {
 				s.preset--
 				s.applyPreset()
+				if s.sections.Hardware {
+					return m, configMissingToolsCmd(*s)
+				}
 			}
 		case fieldSections:
 			if s.sectionCursor > 0 {
 				s.sectionCursor--
 			}
+		case fieldFilter:
+			s.filterChip = (s.filterChip + len(configFilterChips) - 1) % len(configFilterChips)
+			s.missingOK = false
+			return m, configMissingToolsCmd(*s)
 		case fieldSpeedProviders:
 			if s.speedCursor > 0 {
 				s.speedCursor--
@@ -344,11 +523,18 @@ func updateSuiteConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if s.preset < len(s.presetIDs)-1 {
 				s.preset++
 				s.applyPreset()
+				if s.sections.Hardware {
+					return m, configMissingToolsCmd(*s)
+				}
 			}
 		case fieldSections:
 			if s.sectionCursor < len(s.sectionIDs)-1 {
 				s.sectionCursor++
 			}
+		case fieldFilter:
+			s.filterChip = (s.filterChip + 1) % len(configFilterChips)
+			s.missingOK = false
+			return m, configMissingToolsCmd(*s)
 		case fieldSpeedProviders:
 			if s.speedCursor < len(s.speedIDs)-1 {
 				s.speedCursor++
@@ -380,71 +566,100 @@ func updateSuiteConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case " ", "x":
-		switch s.field {
-		case fieldSections:
-			s.sectionToggle(s.sectionCursor)
-		case fieldSpeedProviders:
-			id := s.speedIDs[s.speedCursor]
-			s.speedProviders[id] = !s.speedProviders[id]
-		case fieldRoutePresets:
-			id := s.routeIDs[s.routeCursor]
-			s.routePresets[id] = !s.routePresets[id]
-		case fieldMediaSets:
-			id := s.mediaIDs[s.mediaCursor]
-			s.toggleMediaSet(id)
-		case fieldIPSources:
-			id := s.ipSourceIDs[s.ipSourceCursor]
-			s.ipSources[id] = !s.ipSources[id]
-		case fieldRuntime:
-			s.cycleRuntimeValue()
-		case fieldHardwareTools:
-			id := s.hardwareIDs[s.hardwareCursor]
-			s.hardwareTools[id] = !s.hardwareTools[id]
-		case fieldAdvanced:
-			if s.advancedCursor == 1 {
-				if s.catalogSource == nodecatalog.SourceAuto {
-					s.catalogSource = nodecatalog.SourceEmbedded
-				} else {
-					s.catalogSource = nodecatalog.SourceAuto
+		if !s.textEntryActive() {
+			switch s.field {
+			case fieldSections:
+				s.sectionToggle(s.sectionCursor)
+				s.preset = 1 // custom
+				s.missingOK = false
+				s.snapFocus()
+				if s.sections.Hardware {
+					return m, configMissingToolsCmd(*s)
 				}
-			} else if msg.String() == "x" {
-				s.appendAdvanced("x")
+			case fieldSpeedProviders:
+				id := s.speedIDs[s.speedCursor]
+				s.speedProviders[id] = !s.speedProviders[id]
+			case fieldRoutePresets:
+				id := s.routeIDs[s.routeCursor]
+				s.routePresets[id] = !s.routePresets[id]
+			case fieldMediaSets:
+				id := s.mediaIDs[s.mediaCursor]
+				s.toggleMediaSet(id)
+			case fieldIPSources:
+				id := s.ipSourceIDs[s.ipSourceCursor]
+				s.ipSources[id] = !s.ipSources[id]
+			case fieldRuntime:
+				s.cycleRuntimeValue()
+			case fieldHardwareTools:
+				id := s.hardwareIDs[s.hardwareCursor]
+				s.hardwareTools[id] = !s.hardwareTools[id]
+				s.missingOK = false
+				return m, configMissingToolsCmd(*s)
 			}
+			return m, nil
 		}
-		return m, nil
 	case "backspace", "ctrl+h":
+		if s.field == fieldFilter && s.filterChip == configFilterChipCustom {
+			if len(s.filterText) > 0 {
+				s.filterText = s.filterText[:len(s.filterText)-1]
+				s.missingOK = false
+			}
+			return m, nil
+		}
 		if s.field == fieldAdvanced {
 			s.backspaceAdvanced()
 		}
 		return m, nil
 	case "ctrl+u":
+		if s.field == fieldFilter && s.filterChip == configFilterChipCustom {
+			s.filterText = ""
+			s.missingOK = false
+			return m, configMissingToolsCmd(*s)
+		}
 		if s.field == fieldAdvanced {
 			s.clearAdvanced()
 		}
 		return m, nil
 	case "enter":
-		if s.field == fieldStart || !s.sections.AnyEnabled() {
-			if !s.sections.AnyEnabled() {
-				return m, nil
-			}
-			norm, err := suite.NormalizeOptions(s.buildOptions(""))
+		if s.field != fieldStart && s.sections.AnyEnabled() {
+			s.stepField(1)
+			return m, nil
+		}
+		if !s.sections.AnyEnabled() {
+			return m, nil
+		}
+		// One report-kind rule, shared with the CLI and MCP: exactly the
+		// hardware section runs the bare benchmark (run report), anything
+		// else runs the suite.
+		if s.sections.HardwareOnly() {
+			opts, err := vmbench.NormalizeOptions(s.buildRunOptions())
 			if err != nil {
 				var cmd tea.Cmd
 				m.toast, cmd = comp.ShowToast(err.Error(), comp.ToastError, 4*time.Second)
 				return m, cmd
 			}
-			return m, func() tea.Msg { return suiteStartMsg{opts: norm} }
+			return m, func() tea.Msg { return hardwareStartMsg{opts: opts} }
 		}
-		s.field = suiteConfigField((int(s.field) + 1) % suiteConfigFieldCount)
-		return m, nil
+		norm, err := suite.NormalizeOptions(s.buildSuiteOptions())
+		if err != nil {
+			var cmd tea.Cmd
+			m.toast, cmd = comp.ShowToast(err.Error(), comp.ToastError, 4*time.Second)
+			return m, cmd
+		}
+		return m, func() tea.Msg { return suiteStartMsg{opts: norm} }
 	}
-	if s.field == fieldAdvanced && msg.Type == tea.KeyRunes {
+	if s.textEntryActive() && (msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace) {
+		if s.field == fieldFilter {
+			s.filterText += string(msg.Runes)
+			s.missingOK = false
+			return m, configMissingToolsCmd(*s)
+		}
 		s.appendAdvanced(string(msg.Runes))
 	}
 	return m, nil
 }
 
-func (s *suiteConfigState) cycleRuntimeValue() {
+func (s *configState) cycleRuntimeValue() {
 	switch s.runtimeCursor {
 	case 0:
 		s.iterations++
@@ -465,7 +680,7 @@ func (s *suiteConfigState) cycleRuntimeValue() {
 	}
 }
 
-func (s *suiteConfigState) appendAdvanced(value string) {
+func (s *configState) appendAdvanced(value string) {
 	switch s.advancedCursor {
 	case 0:
 		s.iperfHost += value
@@ -476,7 +691,7 @@ func (s *suiteConfigState) appendAdvanced(value string) {
 	}
 }
 
-func (s *suiteConfigState) backspaceAdvanced() {
+func (s *configState) backspaceAdvanced() {
 	var value *string
 	switch s.advancedCursor {
 	case 0:
@@ -495,7 +710,7 @@ func (s *suiteConfigState) backspaceAdvanced() {
 	}
 }
 
-func (s *suiteConfigState) clearAdvanced() {
+func (s *configState) clearAdvanced() {
 	switch s.advancedCursor {
 	case 0:
 		s.iperfHost = ""
@@ -506,16 +721,16 @@ func (s *suiteConfigState) clearAdvanced() {
 	}
 }
 
-func viewSuiteConfig(m Model) string {
+func viewConfig(m Model) string {
 	t := theme.Active
-	s := m.suiteConfig
+	s := m.config
 	width := m.width
 
-	title := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render(i18n.T("tui.suiteConfig.title"))
+	title := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render(i18n.T("tui.config.title"))
 	if m.height < 40 {
-		return viewSuiteConfigCompact(m, title)
+		return viewConfigCompact(m, title)
 	}
-	desc := lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.T("tui.suiteConfig.description"))
+	desc := lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.T("tui.config.description"))
 
 	cardWidth := width - 4
 	if cardWidth < 32 {
@@ -524,33 +739,44 @@ func viewSuiteConfig(m Model) string {
 	if width >= 100 {
 		cardWidth = (width - 8) / 2
 	}
-	presetCard := suiteFieldPreset(s, cardWidth, s.field == fieldPreset)
-	sectionsCard := suiteFieldSections(s, cardWidth, s.field == fieldSections)
-	runtimeCard := suiteFieldRuntime(s, cardWidth, s.field == fieldRuntime)
-	hardwareCard := suiteFieldHardware(s, cardWidth, s.field == fieldHardwareTools)
-	speedCard := suiteFieldSpeed(s, cardWidth, s.field == fieldSpeedProviders)
-	routeCard := suiteFieldRoute(s, cardWidth, s.field == fieldRoutePresets)
-	mediaCard := suiteFieldMediaSets(s, cardWidth, s.field == fieldMediaSets)
-	ipSourceCard := suiteFieldIPSources(s, cardWidth, s.field == fieldIPSources)
-	advancedCard := suiteFieldAdvanced(s, cardWidth, s.field == fieldAdvanced)
-	startBtn := suiteStartButton(s, width-4, s.field == fieldStart)
-	summaryCard := suiteSummaryCard(s, m.historyStats, m.catalogStats, width-4)
 
-	help := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(i18n.T("tui.suiteConfig.helpFull"))
+	cards := []string{
+		configCardPreset(s, cardWidth, s.field == fieldPreset),
+		configCardRuntime(s, cardWidth, s.field == fieldRuntime),
+		configCardSections(s, cardWidth, s.field == fieldSections),
+	}
+	if s.sections.Hardware {
+		cards = append(cards,
+			configCardHardware(s, cardWidth, s.field == fieldHardwareTools),
+			configCardFilter(s, cardWidth, s.field == fieldFilter),
+			configCardPreflight(s, cardWidth),
+		)
+	}
+	if s.sections.Speed {
+		cards = append(cards, configCardSpeed(s, cardWidth, s.field == fieldSpeedProviders))
+	}
+	if s.sections.Route || s.sections.Ping {
+		cards = append(cards, configCardRoute(s, cardWidth, s.field == fieldRoutePresets))
+	}
+	if s.sections.Media {
+		cards = append(cards, configCardMediaSets(s, cardWidth, s.field == fieldMediaSets))
+	}
+	if s.sections.IPQuality {
+		cards = append(cards, configCardIPSources(s, cardWidth, s.field == fieldIPSources))
+	}
+	cards = append(cards, configCardAdvanced(s, cardWidth, s.field == fieldAdvanced))
 
 	var fields string
 	if width >= 100 {
-		rows := []string{
-			lipgloss.JoinHorizontal(lipgloss.Top, presetCard, "  ", runtimeCard),
-			lipgloss.JoinHorizontal(lipgloss.Top, sectionsCard, "  ", hardwareCard),
-			lipgloss.JoinHorizontal(lipgloss.Top, speedCard, "  ", routeCard),
-			lipgloss.JoinHorizontal(lipgloss.Top, mediaCard, "  ", ipSourceCard),
-			advancedCard,
-		}
-		fields = strings.Join(rows, "\n")
+		fields = pairCards(cards, width)
 	} else {
-		fields = strings.Join([]string{presetCard, runtimeCard, sectionsCard, hardwareCard, speedCard, routeCard, mediaCard, ipSourceCard, advancedCard}, "\n")
+		fields = strings.Join(cards, "\n")
 	}
+	startBtn := configStartButton(s, width-4, s.field == fieldStart)
+	summaryCard := suiteSummaryCard(s, m.historyStats, m.catalogStats, width-4)
+
+	help := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(i18n.T("tui.config.helpFull"))
+
 	parts := []string{title, desc, "", fields, "", summaryCard, "", startBtn, "", help}
 	if m.toast.Active() {
 		parts = append(parts, "", m.toast.Render(width-4))
@@ -558,16 +784,13 @@ func viewSuiteConfig(m Model) string {
 	return strings.Join(parts, "\n")
 }
 
-func viewSuiteConfigCompact(m Model, title string) string {
+func viewConfigCompact(m Model, title string) string {
 	t := theme.Active
-	s := m.suiteConfig
+	s := m.config
 	width := m.width
-	preset := s.presetIDs[s.preset]
-	if spec, ok := suite.LookupPreset(preset); ok {
-		preset = spec.Name
-	}
-	summary := i18n.Tf("tui.suiteConfig.summary", map[string]any{
-		"Preset": preset, "Sections": len(s.sections.Names()), "IP": s.ipVersion, "Iterations": s.iterations,
+
+	summary := i18n.Tf("tui.config.summary", map[string]any{
+		"Preset": s.presetDisplayName(), "Sections": len(s.sections.Names()), "IP": s.ipVersion, "Iterations": s.iterations,
 	})
 	summary = lipgloss.NewStyle().Foreground(t.Muted).Render(truncStr(summary, width-4))
 
@@ -578,35 +801,37 @@ func viewSuiteConfigCompact(m Model, title string) string {
 	var field string
 	switch s.field {
 	case fieldPreset:
-		field = suiteFieldPreset(s, fieldWidth, true)
+		field = configCardPreset(s, fieldWidth, true)
 	case fieldSections:
-		field = suiteFieldSections(s, fieldWidth, true)
+		field = configCardSections(s, fieldWidth, true)
 	case fieldRuntime:
-		field = suiteFieldRuntime(s, fieldWidth, true)
+		field = configCardRuntime(s, fieldWidth, true)
 	case fieldHardwareTools:
-		field = suiteFieldHardware(s, fieldWidth, true)
+		field = configCardHardware(s, fieldWidth, true)
+	case fieldFilter:
+		field = configCardFilter(s, fieldWidth, true)
 	case fieldSpeedProviders:
-		field = suiteFieldSpeed(s, fieldWidth, true)
+		field = configCardSpeed(s, fieldWidth, true)
 	case fieldRoutePresets:
-		field = suiteFieldRoute(s, fieldWidth, true)
+		field = configCardRoute(s, fieldWidth, true)
 	case fieldMediaSets:
-		field = suiteFieldMediaSets(s, fieldWidth, true)
+		field = configCardMediaSets(s, fieldWidth, true)
 	case fieldIPSources:
-		field = suiteFieldIPSources(s, fieldWidth, true)
+		field = configCardIPSources(s, fieldWidth, true)
 	case fieldAdvanced:
-		field = suiteFieldAdvanced(s, fieldWidth, true)
+		field = configCardAdvanced(s, fieldWidth, true)
 	default:
 		field = comp.Card{
-			Title:   i18n.T("tui.suiteConfig.ready"),
-			Body:    i18n.Tf("tui.suiteConfig.readyBody", map[string]any{"Count": len(s.sections.Names())}),
+			Title:   i18n.T("tui.config.ready"),
+			Body:    i18n.Tf("tui.config.readyBody", map[string]any{"Count": len(s.sections.Names())}),
 			Accent:  t.Success,
 			Width:   fieldWidth,
 			Focused: true,
 		}.Render()
 	}
 
-	startBtn := suiteStartButton(s, width-4, s.field == fieldStart)
-	help := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(i18n.T("tui.suiteConfig.helpCompact"))
+	startBtn := configStartButton(s, width-4, s.field == fieldStart)
+	help := lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(i18n.T("tui.config.helpCompact"))
 	etaLine := lipgloss.NewStyle().Foreground(t.Secondary).Render(
 		truncStr(i18n.Tf("tui.suiteSummary.etaLine", map[string]any{"Duration": formatDuration(estimateSuiteDuration(s, m.historyStats))}), width-4))
 	parts := []string{title, summary, etaLine, "", field, "", startBtn, help}
@@ -616,16 +841,21 @@ func viewSuiteConfigCompact(m Model, title string) string {
 	return strings.Join(parts, "\n")
 }
 
-func suiteFieldPreset(s suiteConfigState, width int, focus bool) string {
+func configCardPreset(s configState, width int, focus bool) string {
 	t := theme.Active
 
 	var pills []string
 	for i, id := range s.presetIDs {
 		label := id
-		if id == "custom" {
-			label = i18n.T("tui.suiteConfig.customPreset")
-		} else if spec, ok := suite.LookupPreset(id); ok {
-			label = spec.LocalizedName()
+		switch id {
+		case configPresetHardware:
+			label = i18n.T("tui.config.hardwarePreset")
+		case configPresetCustom:
+			label = i18n.T("tui.config.customPreset")
+		default:
+			if spec, ok := suite.LookupPreset(id); ok {
+				label = spec.LocalizedName()
+			}
 		}
 		var st lipgloss.Style
 		switch {
@@ -645,7 +875,7 @@ func suiteFieldPreset(s suiteConfigState, width int, focus bool) string {
 		accent = t.BorderFocus
 	}
 	return comp.Card{
-		Title:   i18n.T("tui.suiteConfig.preset"),
+		Title:   i18n.T("tui.config.preset"),
 		Body:    body,
 		Accent:  accent,
 		Width:   width,
@@ -653,7 +883,7 @@ func suiteFieldPreset(s suiteConfigState, width int, focus bool) string {
 	}.Render()
 }
 
-func suiteFieldSections(s suiteConfigState, width int, focus bool) string {
+func configCardSections(s configState, width int, focus bool) string {
 	t := theme.Active
 	var pills []string
 	for i, id := range s.sectionIDs {
@@ -675,10 +905,10 @@ func suiteFieldSections(s suiteConfigState, width int, focus bool) string {
 	}
 	body := strings.Join(pills, " ")
 	if !s.sections.AnyEnabled() {
-		body += "\n" + lipgloss.NewStyle().Foreground(t.Danger).Italic(true).Render(i18n.T("tui.suiteConfig.needOneSection"))
+		body += "\n" + lipgloss.NewStyle().Foreground(t.Danger).Italic(true).Render(i18n.T("tui.config.needOneSection"))
 	}
 	return comp.Card{
-		Title:   i18n.T("tui.suiteConfig.sections"),
+		Title:   i18n.T("tui.config.sections"),
 		Body:    body,
 		Accent:  t.Accent,
 		Width:   width,
@@ -686,16 +916,16 @@ func suiteFieldSections(s suiteConfigState, width int, focus bool) string {
 	}.Render()
 }
 
-func suiteFieldRuntime(s suiteConfigState, width int, focus bool) string {
+func configCardRuntime(s configState, width int, focus bool) string {
 	t := theme.Active
 	timeout := 5 * time.Minute
 	if s.timeoutIndex >= 0 && s.timeoutIndex < len(s.timeouts) {
 		timeout = s.timeouts[s.timeoutIndex]
 	}
 	values := []string{
-		i18n.Tf("tui.suiteConfig.iterations", map[string]any{"Count": s.iterations}),
-		i18n.Tf("tui.suiteConfig.ipVersion", map[string]any{"Version": s.ipVersion}),
-		i18n.Tf("tui.suiteConfig.timeout", map[string]any{"Timeout": timeout.String()}),
+		i18n.Tf("tui.config.iterations", map[string]any{"Count": s.iterations}),
+		i18n.Tf("tui.config.ipVersion", map[string]any{"Version": s.ipVersion}),
+		i18n.Tf("tui.config.timeout", map[string]any{"Timeout": timeout.String()}),
 	}
 	pills := make([]string, 0, len(values))
 	for i, value := range values {
@@ -707,10 +937,10 @@ func suiteFieldRuntime(s suiteConfigState, width int, focus bool) string {
 		}
 		pills = append(pills, style.Render(value))
 	}
-	return comp.Card{Title: i18n.T("tui.suiteConfig.runtime"), Body: strings.Join(pills, " "), Accent: t.Primary, Width: width, Focused: focus}.Render()
+	return comp.Card{Title: i18n.T("tui.config.runtime"), Body: strings.Join(pills, " "), Accent: t.Primary, Width: width, Focused: focus}.Render()
 }
 
-func suiteFieldHardware(s suiteConfigState, width int, focus bool) string {
+func configCardHardware(s configState, width int, focus bool) string {
 	t := theme.Active
 	pills := make([]string, 0, len(s.hardwareIDs))
 	for i, id := range s.hardwareIDs {
@@ -727,10 +957,73 @@ func suiteFieldHardware(s suiteConfigState, width int, focus bool) string {
 		}
 		pills = append(pills, style.Render(icon+" "+id))
 	}
-	return comp.Card{Title: i18n.T("tui.suiteConfig.hardwareTools"), Body: strings.Join(pills, " "), Accent: t.Warning, Width: width, Focused: focus}.Render()
+	return comp.Card{Title: i18n.T("tui.config.hardwareTools"), Body: strings.Join(pills, " "), Accent: t.Warning, Width: width, Focused: focus}.Render()
 }
 
-func suiteFieldSpeed(s suiteConfigState, width int, focus bool) string {
+func configCardFilter(s configState, width int, focus bool) string {
+	t := theme.Active
+	var cells []string
+	for i, chip := range configFilterChips {
+		style := lipgloss.NewStyle().Padding(0, 1).Foreground(t.Subtle)
+		if i == s.filterChip {
+			style = style.Foreground(t.Fg).Bold(true).Background(t.Surface)
+		}
+		cells = append(cells, style.Render(i18n.T(chip.labelKey)))
+	}
+	body := strings.Join(cells, " ") + "\n"
+	if s.filterChip == configFilterChipCustom {
+		text := s.filterText
+		if text == "" {
+			text = i18n.T("tui.config.filterCustomHint")
+		}
+		style := lipgloss.NewStyle().Foreground(t.Fg)
+		if text == "" {
+			style = lipgloss.NewStyle().Foreground(t.Muted).Italic(true)
+		}
+		body += "\n" + style.Render(text) + "▏"
+	}
+	return comp.Card{
+		Title:   i18n.T("tui.config.filter"),
+		Body:    body,
+		Accent:  t.CategorySystem,
+		Width:   width,
+		Focused: focus,
+	}.Render()
+}
+
+func configCardPreflight(s configState, width int) string {
+	t := theme.Active
+	title := i18n.T("tui.config.preflight")
+	accent := t.CategorySystem
+	if !s.missingOK {
+		return comp.Card{
+			Title:  title,
+			Body:   lipgloss.NewStyle().Foreground(t.Muted).Italic(true).Render(i18n.T("tui.config.preflightPending")),
+			Accent: accent,
+			Width:  width,
+		}.Render()
+	}
+	if len(s.missing) == 0 {
+		return comp.Card{
+			Title:  title,
+			Body:   lipgloss.NewStyle().Foreground(t.Success).Render("✓ " + i18n.T("tui.config.missingNone")),
+			Accent: accent,
+			Width:  width,
+		}.Render()
+	}
+	missing := append([]string(nil), s.missing...)
+	sort.Strings(missing)
+	body := lipgloss.NewStyle().Foreground(t.Warning).Render("! "+i18n.T("tui.config.missingTools")) + "\n" +
+		strings.Join(missing, ", ")
+	return comp.Card{
+		Title:  title,
+		Body:   body,
+		Accent: t.Warning,
+		Width:  width,
+	}.Render()
+}
+
+func configCardSpeed(s configState, width int, focus bool) string {
 	t := theme.Active
 	var pills []string
 	for i, id := range s.speedIDs {
@@ -752,7 +1045,7 @@ func suiteFieldSpeed(s suiteConfigState, width int, focus bool) string {
 	}
 	body := strings.Join(pills, " ")
 	return comp.Card{
-		Title:   i18n.T("tui.suiteConfig.speedProviders"),
+		Title:   i18n.T("tui.config.speedProviders"),
 		Body:    body,
 		Accent:  t.Secondary,
 		Width:   width,
@@ -760,7 +1053,7 @@ func suiteFieldSpeed(s suiteConfigState, width int, focus bool) string {
 	}.Render()
 }
 
-func suiteFieldRoute(s suiteConfigState, width int, focus bool) string {
+func configCardRoute(s configState, width int, focus bool) string {
 	t := theme.Active
 	var pills []string
 	for i, id := range s.routeIDs {
@@ -782,7 +1075,7 @@ func suiteFieldRoute(s suiteConfigState, width int, focus bool) string {
 	}
 	body := strings.Join(pills, " ")
 	return comp.Card{
-		Title:   i18n.T("tui.suiteConfig.routePresets"),
+		Title:   i18n.T("tui.config.routePresets"),
 		Body:    body,
 		Accent:  t.Info,
 		Width:   width,
@@ -790,7 +1083,7 @@ func suiteFieldRoute(s suiteConfigState, width int, focus bool) string {
 	}.Render()
 }
 
-func suiteFieldMediaSets(s suiteConfigState, width int, focus bool) string {
+func configCardMediaSets(s configState, width int, focus bool) string {
 	t := theme.Active
 	var pills []string
 	for i, id := range s.mediaIDs {
@@ -812,7 +1105,7 @@ func suiteFieldMediaSets(s suiteConfigState, width int, focus bool) string {
 	}
 	body := strings.Join(pills, " ")
 	return comp.Card{
-		Title:   i18n.T("tui.suiteConfig.mediaSets"),
+		Title:   i18n.T("tui.config.mediaSets"),
 		Body:    body,
 		Accent:  t.Primary,
 		Width:   width,
@@ -820,7 +1113,7 @@ func suiteFieldMediaSets(s suiteConfigState, width int, focus bool) string {
 	}.Render()
 }
 
-func suiteFieldIPSources(s suiteConfigState, width int, focus bool) string {
+func configCardIPSources(s configState, width int, focus bool) string {
 	t := theme.Active
 	var pills []string
 	for i, id := range s.ipSourceIDs {
@@ -842,7 +1135,7 @@ func suiteFieldIPSources(s suiteConfigState, width int, focus bool) string {
 	}
 	body := strings.Join(pills, " ")
 	return comp.Card{
-		Title:   i18n.T("tui.suiteConfig.ipSources"),
+		Title:   i18n.T("tui.config.ipSources"),
 		Body:    body,
 		Accent:  t.Warning,
 		Width:   width,
@@ -850,12 +1143,12 @@ func suiteFieldIPSources(s suiteConfigState, width int, focus bool) string {
 	}.Render()
 }
 
-func suiteFieldAdvanced(s suiteConfigState, width int, focus bool) string {
+func configCardAdvanced(s configState, width int, focus bool) string {
 	t := theme.Active
 	values := []string{
-		i18n.Tf("tui.suiteConfig.iperf", map[string]any{"Value": firstStr(strings.TrimSpace(s.iperfHost), "-")}),
-		i18n.Tf("tui.suiteConfig.catalog", map[string]any{"Value": firstStr(strings.TrimSpace(s.catalogSource), nodecatalog.SourceEmbedded)}),
-		i18n.Tf("tui.suiteConfig.revision", map[string]any{"Value": firstStr(strings.TrimSpace(s.catalogRevision), i18n.T("tui.suiteConfig.latestSelected"))}),
+		i18n.Tf("tui.config.iperf", map[string]any{"Value": firstStr(strings.TrimSpace(s.iperfHost), "-")}),
+		i18n.Tf("tui.config.catalog", map[string]any{"Value": firstStr(strings.TrimSpace(s.catalogSource), nodecatalog.SourceEmbedded)}),
+		i18n.Tf("tui.config.revision", map[string]any{"Value": firstStr(strings.TrimSpace(s.catalogRevision), i18n.T("tui.config.latestSelected"))}),
 	}
 	lines := make([]string, 0, len(values))
 	for i, value := range values {
@@ -868,18 +1161,18 @@ func suiteFieldAdvanced(s suiteConfigState, width int, focus bool) string {
 		}
 		lines = append(lines, style.Render(value))
 	}
-	return comp.Card{Title: i18n.T("tui.suiteConfig.provenance"), Body: strings.Join(lines, "\n"), Accent: t.Info, Width: width, Focused: focus}.Render()
+	return comp.Card{Title: i18n.T("tui.config.provenance"), Body: strings.Join(lines, "\n"), Accent: t.Info, Width: width, Focused: focus}.Render()
 }
 
-func suiteStartButton(s suiteConfigState, width int, focus bool) string {
+func configStartButton(s configState, width int, focus bool) string {
 	t := theme.Active
 	enabled := s.sections.AnyEnabled()
-	label := i18n.T("tui.suiteConfig.start")
+	label := i18n.T("tui.config.start")
 	var btn lipgloss.Style
 	switch {
 	case !enabled:
 		btn = lipgloss.NewStyle().Foreground(t.Muted).Background(t.Subtle).Padding(0, 4).Bold(true)
-		label = i18n.T("tui.suiteConfig.startDisabled")
+		label = i18n.T("tui.config.startDisabled")
 	case focus:
 		btn = lipgloss.NewStyle().Foreground(t.Bg).Background(t.Success).Padding(0, 4).Bold(true)
 	default:

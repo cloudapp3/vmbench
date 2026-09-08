@@ -1,16 +1,10 @@
 # TUI surface: menus, hints, modals, tables, suite config and results.
 
-[tui.menu.runHardware]
-other = "Run Hardware Benchmark"
+[tui.menu.benchmark]
+other = "Run Benchmark"
 
-[tui.menu.runHardwareDesc]
-other = "Tool-defined single/multi CPU, memory, and disk tests"
-
-[tui.menu.runSuite]
-other = "Run Suite (VPS Composite)"
-
-[tui.menu.runSuiteDesc]
-other = "ECS-style: hardware + net + IP + media"
+[tui.menu.benchmarkDesc]
+other = "Hardware-first, with optional VPS suite sections"
 
 [tui.menu.compare]
 other = "Compare Reports"
@@ -117,8 +111,6 @@ other = "Hardware Benchmark Running"
 other = "Benchmark Results"
 [tui.help.sec.compare]
 other = "Compare Reports"
-[tui.help.sec.suiteConfig]
-other = "Suite Config"
 [tui.help.sec.suiteRunning]
 other = "Suite Running"
 [tui.help.sec.suiteResults]
@@ -362,44 +354,8 @@ other = "view record"
 [tui.hint.manual]
 other = "manual paths"
 
-[tui.runConfig.title]
-other = "▶ Hardware Benchmark Config"
-[tui.runConfig.description]
-other = "Choose iterations, tools, and a workload filter before running the external-tool benchmark."
-[tui.runConfig.iterations]
-other = "Iterations"
-[tui.runConfig.tools]
-other = "Hardware Tools"
-[tui.runConfig.filter]
-other = "Filter"
-[tui.runConfig.filterAll]
-other = "All"
-[tui.runConfig.filterCPU]
-other = "CPU"
-[tui.runConfig.filterDisk]
-other = "Disk"
-[tui.runConfig.filterMemory]
-other = "Memory"
-[tui.runConfig.filterCustom]
-other = "Custom"
-[tui.runConfig.filterCustomHint]
-other = "type a regex, e.g. sysbench|fio"
-[tui.runConfig.preflight]
-other = "Tool Preflight"
-[tui.runConfig.preflightPending]
-other = "checking…"
-[tui.runConfig.missingTools]
-other = "missing tools (their workloads will report structured errors):"
-[tui.runConfig.missingNone]
-other = "all selected tools found"
-[tui.runConfig.start]
-other = "Start Benchmark"
-[tui.runConfig.startDisabled]
-other = "Nothing selected"
-[tui.runConfig.plannedWorkloads]
-other = "{{.Count}} workloads planned"
-[tui.help.sec.runConfig]
-other = "Hardware Benchmark Config"
+[tui.help.sec.config]
+other = "Benchmark Configuration"
 
 [tui.compare.title]
 other = "⇄ Compare Reports"
@@ -470,85 +426,121 @@ other = "running..."
 [tui.suiteRunning.complete]
 other = "suite complete"
 
-[tui.suiteConfig.title]
-other = "◈ Suite Configuration"
+[tui.config.title]
+other = "◈ Benchmark Configuration"
 
-[tui.suiteConfig.description]
-other = "VPS evidence suite — host, identity, route, latency, speed, reachability, IP, mail, media"
+[tui.config.description]
+other = "Hardware-first benchmark — enable suite sections for VPS network evidence"
 
-[tui.suiteConfig.helpFull]
+[tui.config.helpFull]
 other = "  ↑↓ field   ←→ choose   space toggle   enter start   esc back"
 
-[tui.suiteConfig.helpCompact]
+[tui.config.helpCompact]
 other = "↑↓ field  ←→ choose  space toggle  enter next/start  esc back"
 
-[tui.suiteConfig.summary]
+[tui.config.summary]
 other = "{{.Preset}}  |  {{.Sections}} sections  |  IP {{.IP}}  |  {{.Iterations}} iterations"
 
-[tui.suiteConfig.ready]
+[tui.config.ready]
 other = "Ready"
 
-[tui.suiteConfig.readyBody]
+[tui.config.readyBody]
 other = "{{.Count}} sections selected  ·  press enter to run"
 
-[tui.suiteConfig.customPreset]
+[tui.config.hardwarePreset]
+other = "Hardware Only"
+
+[tui.config.customPreset]
 other = "Custom"
 
-[tui.suiteConfig.preset]
+[tui.config.preset]
 other = "Preset"
 
-[tui.suiteConfig.sections]
+[tui.config.sections]
 other = "Sections"
 
-[tui.suiteConfig.needOneSection]
+[tui.config.needOneSection]
 other = "at least one section required"
 
-[tui.suiteConfig.runtime]
+[tui.config.runtime]
 other = "Runtime"
 
-[tui.suiteConfig.iterations]
+[tui.config.iterations]
 other = "Iterations {{.Count}}"
 
-[tui.suiteConfig.ipVersion]
+[tui.config.ipVersion]
 other = "IP {{.Version}}"
 
-[tui.suiteConfig.timeout]
+[tui.config.timeout]
 other = "Timeout {{.Timeout}}"
 
-[tui.suiteConfig.hardwareTools]
+[tui.config.hardwareTools]
 other = "Hardware Tools"
 
-[tui.suiteConfig.speedProviders]
+[tui.config.filter]
+other = "Workload Filter"
+
+[tui.config.filterAll]
+other = "All"
+
+[tui.config.filterCPU]
+other = "CPU"
+
+[tui.config.filterDisk]
+other = "Disk"
+
+[tui.config.filterMemory]
+other = "Memory"
+
+[tui.config.filterCustom]
+other = "Custom"
+
+[tui.config.filterCustomHint]
+other = "type a regex, e.g. sysbench|fio"
+
+[tui.config.preflight]
+other = "Tool Preflight"
+
+[tui.config.preflightPending]
+other = "checking…"
+
+[tui.config.missingTools]
+other = "missing tools (their workloads will report structured errors):"
+
+[tui.config.missingNone]
+other = "all selected tools found"
+
+[tui.config.speedProviders]
 other = "Speed Providers"
 
-[tui.suiteConfig.routePresets]
+[tui.config.routePresets]
 other = "China Route Presets"
 
-[tui.suiteConfig.mediaSets]
+[tui.config.mediaSets]
 other = "Media Sets"
 
-[tui.suiteConfig.ipSources]
+[tui.config.ipSources]
 other = "IP Quality Sources"
 
-[tui.suiteConfig.provenance]
+[tui.config.provenance]
 other = "Network Provenance"
 
-[tui.suiteConfig.iperf]
+[tui.config.iperf]
 other = "iperf: {{.Value}}"
 
-[tui.suiteConfig.catalog]
+[tui.config.catalog]
 other = "catalog: {{.Value}}"
 
-[tui.suiteConfig.revision]
+[tui.config.revision]
 other = "revision: {{.Value}}"
 
-[tui.suiteConfig.latestSelected]
+[tui.config.latestSelected]
 other = "latest selected"
 
-[tui.suiteConfig.start]
-other = "▶ Start Suite"
+[tui.config.start]
+other = "▶ Start Benchmark"
 
-[tui.suiteConfig.startDisabled]
+[tui.config.startDisabled]
 other = "▶ Start (disabled)"
 
 [tui.suiteResults.title]

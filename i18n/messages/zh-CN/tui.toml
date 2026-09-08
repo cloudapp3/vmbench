@@ -1,16 +1,10 @@
 # TUI 界面: 菜单、按键提示、弹窗、表格、suite 配置与结果。
 
-[tui.menu.runHardware]
-other = "运行硬件基准测试"
+[tui.menu.benchmark]
+other = "运行评测"
 
-[tui.menu.runHardwareDesc]
-other = "外部工具驱动的 CPU/内存/磁盘测试"
-
-[tui.menu.runSuite]
-other = "运行综合测试 (VPS Suite)"
-
-[tui.menu.runSuiteDesc]
-other = "ECS 风格: 硬件 + 网络 + IP + 流媒体"
+[tui.menu.benchmarkDesc]
+other = "以硬件为主,可选 VPS 套件 section"
 
 [tui.menu.compare]
 other = "对比报告"
@@ -117,8 +111,6 @@ other = "硬件跑分进行中"
 other = "跑分结果"
 [tui.help.sec.compare]
 other = "报告对比"
-[tui.help.sec.suiteConfig]
-other = "Suite 配置"
 [tui.help.sec.suiteRunning]
 other = "Suite 进行中"
 [tui.help.sec.suiteResults]
@@ -362,44 +354,8 @@ other = "查看记录"
 [tui.hint.manual]
 other = "手动路径"
 
-[tui.runConfig.title]
-other = "▶ 硬件跑分配置"
-[tui.runConfig.description]
-other = "运行外部工具跑分前,选择迭代次数、工具与 workload 过滤。"
-[tui.runConfig.iterations]
-other = "迭代次数"
-[tui.runConfig.tools]
-other = "硬件工具"
-[tui.runConfig.filter]
-other = "过滤"
-[tui.runConfig.filterAll]
-other = "全部"
-[tui.runConfig.filterCPU]
-other = "CPU"
-[tui.runConfig.filterDisk]
-other = "磁盘"
-[tui.runConfig.filterMemory]
-other = "内存"
-[tui.runConfig.filterCustom]
-other = "自定义"
-[tui.runConfig.filterCustomHint]
-other = "输入正则,如 sysbench|fio"
-[tui.runConfig.preflight]
-other = "工具预检"
-[tui.runConfig.preflightPending]
-other = "检查中…"
-[tui.runConfig.missingTools]
-other = "缺失工具(对应 workload 将报结构化错误):"
-[tui.runConfig.missingNone]
-other = "所选工具均已就绪"
-[tui.runConfig.start]
-other = "开始跑分"
-[tui.runConfig.startDisabled]
-other = "未选择任何项"
-[tui.runConfig.plannedWorkloads]
-other = "计划运行 {{.Count}} 个 workload"
-[tui.help.sec.runConfig]
-other = "硬件跑分配置"
+[tui.help.sec.config]
+other = "评测配置"
 
 [tui.compare.title]
 other = "⇄ 对比报告"
@@ -470,85 +426,121 @@ other = "运行中..."
 [tui.suiteRunning.complete]
 other = "综合测试完成"
 
-[tui.suiteConfig.title]
-other = "◈ 综合测试配置"
+[tui.config.title]
+other = "◈ 评测配置"
 
-[tui.suiteConfig.description]
-other = "VPS 证据套件 — 主机、身份、回程、延迟、测速、可达性、IP、邮件、流媒体"
+[tui.config.description]
+other = "以硬件跑分为主 — 可启用套件 section 采集 VPS 网络证据"
 
-[tui.suiteConfig.helpFull]
+[tui.config.helpFull]
 other = "  ↑↓ 字段   ←→ 选择   空格 勾选   回车 开始   esc 返回"
 
-[tui.suiteConfig.helpCompact]
+[tui.config.helpCompact]
 other = "↑↓ 字段  ←→ 选择  空格 勾选  回车 下一步/开始  esc 返回"
 
-[tui.suiteConfig.summary]
+[tui.config.summary]
 other = "{{.Preset}}  |  {{.Sections}} 个 section  |  IP {{.IP}}  |  {{.Iterations}} 次迭代"
 
-[tui.suiteConfig.ready]
+[tui.config.ready]
 other = "就绪"
 
-[tui.suiteConfig.readyBody]
+[tui.config.readyBody]
 other = "已选 {{.Count}} 个 section  ·  按回车运行"
 
-[tui.suiteConfig.customPreset]
+[tui.config.hardwarePreset]
+other = "仅硬件"
+
+[tui.config.customPreset]
 other = "自定义"
 
-[tui.suiteConfig.preset]
+[tui.config.preset]
 other = "预设"
 
-[tui.suiteConfig.sections]
+[tui.config.sections]
 other = "Section 选择"
 
-[tui.suiteConfig.needOneSection]
+[tui.config.needOneSection]
 other = "至少需要选择一个 section"
 
-[tui.suiteConfig.runtime]
+[tui.config.runtime]
 other = "运行参数"
 
-[tui.suiteConfig.iterations]
+[tui.config.iterations]
 other = "迭代 {{.Count}}"
 
-[tui.suiteConfig.ipVersion]
+[tui.config.ipVersion]
 other = "IP {{.Version}}"
 
-[tui.suiteConfig.timeout]
+[tui.config.timeout]
 other = "超时 {{.Timeout}}"
 
-[tui.suiteConfig.hardwareTools]
+[tui.config.hardwareTools]
 other = "硬件测试工具"
 
-[tui.suiteConfig.speedProviders]
+[tui.config.filter]
+other = "Workload 过滤"
+
+[tui.config.filterAll]
+other = "全部"
+
+[tui.config.filterCPU]
+other = "CPU"
+
+[tui.config.filterDisk]
+other = "磁盘"
+
+[tui.config.filterMemory]
+other = "内存"
+
+[tui.config.filterCustom]
+other = "自定义"
+
+[tui.config.filterCustomHint]
+other = "输入正则,如 sysbench|fio"
+
+[tui.config.preflight]
+other = "工具预检"
+
+[tui.config.preflightPending]
+other = "检查中…"
+
+[tui.config.missingTools]
+other = "缺失工具(对应 workload 将报结构化错误):"
+
+[tui.config.missingNone]
+other = "所选工具均已就绪"
+
+[tui.config.speedProviders]
 other = "测速提供方"
 
-[tui.suiteConfig.routePresets]
+[tui.config.routePresets]
 other = "国内回程预设"
 
-[tui.suiteConfig.mediaSets]
+[tui.config.mediaSets]
 other = "流媒体集合"
 
-[tui.suiteConfig.ipSources]
+[tui.config.ipSources]
 other = "IP 质量来源"
 
-[tui.suiteConfig.provenance]
+[tui.config.provenance]
 other = "网络目录来源"
 
-[tui.suiteConfig.iperf]
+[tui.config.iperf]
 other = "iperf: {{.Value}}"
 
-[tui.suiteConfig.catalog]
+[tui.config.catalog]
 other = "目录: {{.Value}}"
 
-[tui.suiteConfig.revision]
+[tui.config.revision]
 other = "版本: {{.Value}}"
 
-[tui.suiteConfig.latestSelected]
+[tui.config.latestSelected]
 other = "使用最新版"
 
-[tui.suiteConfig.start]
-other = "▶ 开始综合测试"
+[tui.config.start]
+other = "▶ 开始评测"
 
-[tui.suiteConfig.startDisabled]
+[tui.config.startDisabled]
 other = "▶ 开始 (未就绪)"
 
 [tui.suiteResults.title]

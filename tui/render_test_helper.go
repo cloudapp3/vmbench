@@ -38,8 +38,12 @@ func WithPageForRender(m Model, name string) Model {
 		m.page = pageResults
 	case "compare":
 		m.page = pageCompare
-	case "suite-config":
-		m.page = pageSuiteConfig
+	case "config":
+		m.page = pageConfig
+	case "config-quick":
+		m.page = pageConfig
+		m.config.preset = 2 // first real preset (quick)
+		m.config.applyPreset()
 	case "suite-running":
 		m.page = pageSuiteRunning
 		m.suiteSections = []suiteSection{
@@ -57,8 +61,6 @@ func WithPageForRender(m Model, name string) Model {
 	case "help":
 		m.helpFrom = pageDashboard
 		m.page = pageHelp
-	case "run-config":
-		m.page = pageRunConfig
 	case "compare-picker":
 		m.page = pageComparePicker
 		m.picker.records = []history.Record{

@@ -1,12 +1,36 @@
 package tui
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/tui/comp"
 )
+
+func TestNewSuiteSectionsIncludesNetworkEvidence(t *testing.T) {
+	sections := newSuiteSections(suite.SectionSelector{NetworkInfo: true, Reachability: true})
+	if len(sections) != 2 || sections[0].id != suite.SectionNetworkInfo || sections[1].id != suite.SectionReachability {
+		t.Fatalf("newSuiteSections() = %+v", sections)
+	}
+}
+
+func TestStartSuiteLandsOnSuiteRunningPage(t *testing.T) {
+	m := NewModel("", "")
+	norm, err := suite.NormalizeOptions(suite.Options{Sections: suite.SectionSelector{Hardware: true, Speed: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, _ := startSuite(m, norm)
+	um := updated.(Model)
+	if um.page != pageSuiteRunning || um.runKind != "suite" {
+		t.Fatalf("startSuite page=%d runKind=%q, want pageSuiteRunning/suite", um.page, um.runKind)
+	}
+	if !slices.Contains(m.config.presetIDs, configPresetHardware) {
+		t.Fatalf("preset IDs = %v, want hardware pseudo-preset", m.config.presetIDs)
+	}
+}
 
 func TestUpdateSuiteEventPreservesPartialStatus(t *testing.T) {
 	m := NewModel("", "")

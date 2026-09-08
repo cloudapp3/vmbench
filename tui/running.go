@@ -28,6 +28,12 @@ func startBenchmark(m Model, opts vmbench.Options) (tea.Model, tea.Cmd) {
 	m.workloadDoneAt = nil
 	m.runSamplesDone = 0
 	m.runSamplesTotal = 0
+	// Land on the running page: without this the hardware path stayed on the
+	// config page until the run finished, making the progress view and the
+	// cancel modal unreachable.
+	m.page = pageRunning
+	m.runKind = "run"
+	m.engine = "external"
 
 	// Prefill from the exact definition set the runner will execute (tools
 	// + filter), so the running page never shows waiting ghost rows for

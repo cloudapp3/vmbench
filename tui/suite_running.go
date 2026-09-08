@@ -16,6 +16,7 @@ import (
 )
 
 type suiteEventMsg struct{ event suite.Event }
+type suiteStartMsg struct{ opts suite.Options }
 type suiteDoneMsg struct{ report suite.SuiteReport }
 
 type suiteSection struct {
@@ -59,6 +60,7 @@ func startSuite(m Model, opts suite.Options) (tea.Model, tea.Cmd) {
 	m.eventLog = m.eventLog[:0]
 	m.startedAt = time.Now()
 	m.page = pageSuiteRunning
+	m.runKind = "suite"
 
 	return m, tea.Batch(
 		runSuiteCmd(ctx, opts, m.suiteEventCh),
