@@ -178,7 +178,9 @@ func Install(ctx context.Context, options Options, release Release) (Result, err
 	}
 	staged, err := extractBinary(archivePath, filepath.Dir(dest), mode, goos)
 	if err != nil {
-		return Result{}, err
+		// The staging temp file lives next to dest, so an unwritable install
+		// directory surfaces here rather than in replaceBinary.
+		return Result{}, wrapReplaceError(err)
 	}
 	defer func() { _ = os.Remove(staged) }()
 	if err := replaceBinary(staged, dest, goos); err != nil {
