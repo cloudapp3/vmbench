@@ -50,7 +50,7 @@ jobs:
           go run ./cmd/vmbench version
           go run ./cmd/vmbench list
           go run ./cmd/vmbench sysinfo --json
-          go run ./cmd/vmbench run --filter 'SHA|AES' --iterations 1 --quiet --json /tmp/vmbench-smoke.json
+          go run ./cmd/vmbench --filter 'SHA|AES' --iterations 1 --quiet --json /tmp/vmbench-smoke.json
 
   cross-build:
     needs:
