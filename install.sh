@@ -639,24 +639,42 @@ vmbench_data_dir() {
   esac
 }
 
-# remove_data_dir removes the vmbench-owned data directory. The directory is
-# exclusively created and populated by vmbench, but guards still refuse
-# anything that is not a regular directory (symlinks, files, "/", $HOME).
-remove_data_dir() {
+# vmbench_config_dir mirrors tui.LoadConfig: the platform directory holding
+# the TUI preferences file (config.json). Prints an empty string on Darwin,
+# where the config shares the data directory above.
+vmbench_config_dir() {
+  case "$(uname -s)" in
+    Linux)
+      if [ -n "${XDG_CONFIG_HOME:-}" ]; then
+        printf '%s\n' "${XDG_CONFIG_HOME%/}/vmbench"
+      else
+        printf '%s\n' "${HOME:-}/.config/vmbench"
+      fi
+      ;;
+    *)
+      printf '%s\n' ""
+      ;;
+  esac
+}
+
+# remove_vmbench_dir removes a vmbench-owned directory (data or config). The
+# directory is exclusively created and populated by vmbench, but guards still
+# refuse anything that is not a regular directory (symlinks, files, "/", $HOME).
+remove_vmbench_dir() {
   local dir="$1"
 
   [ -n "$dir" ] || return 0
   case "$dir" in
     /*) ;;
     *)
-      log "warning: refusing to remove non-absolute vmbench data directory: $dir"
+      log "warning: refusing to remove non-absolute vmbench directory: $dir"
       return 1
       ;;
   esac
   [ "$dir" != "/" ] || { log "warning: refusing to remove /"; return 1; }
   [ "${dir%/}" != "${HOME:-}" ] || { log "warning: refusing to remove HOME: $dir"; return 1; }
   if [ -L "$dir" ] || { [ -e "$dir" ] && [ ! -d "$dir" ]; }; then
-    log "warning: refusing to remove non-directory vmbench data path: $dir"
+    log "warning: refusing to remove non-directory vmbench path: $dir"
     return 1
   fi
   [ -d "$dir" ] || return 0
@@ -721,12 +739,19 @@ do_uninstall() {
   log "vmbench binary not found (or too old for self-uninstall) at ${TARGET:-<none>}; cleaning up via shell."
 
   DATA_DIR="$(vmbench_data_dir)"
+  CONFIG_DIR="$(vmbench_config_dir)"
+  if [ -n "$CONFIG_DIR" ] && [ "$CONFIG_DIR" = "$DATA_DIR" ]; then
+    CONFIG_DIR=""
+  fi
 
   # Build the removal plan (only entries that exist).
   PLAN=()
   if [ -n "$TARGET" ] && [ -x "$TARGET" ]; then PLAN+=("$TARGET"); fi
   if [ -n "$DATA_DIR" ] && { [ -e "$DATA_DIR" ] || [ -L "$DATA_DIR" ]; }; then
     PLAN+=("$DATA_DIR")
+  fi
+  if [ -n "$CONFIG_DIR" ] && { [ -e "$CONFIG_DIR" ] || [ -L "$CONFIG_DIR" ]; }; then
+    PLAN+=("$CONFIG_DIR")
   fi
 
   if [ "${#PLAN[@]}" -eq 0 ]; then
@@ -759,10 +784,17 @@ do_uninstall() {
 
   for t in "${PLAN[@]}"; do
     if [ "$t" = "$DATA_DIR" ]; then
-      if remove_data_dir "$t"; then
+      if remove_vmbench_dir "$t"; then
         log "removed vmbench data directory $t"
       else
         log "warning: could not remove vmbench data directory $t"
+      fi
+      continue
+    elif [ "$t" = "$CONFIG_DIR" ]; then
+      if remove_vmbench_dir "$t"; then
+        log "removed vmbench config directory $t"
+      else
+        log "warning: could not remove vmbench config directory $t"
       fi
       continue
     elif [ -d "$t" ] && [ ! -L "$t" ]; then

@@ -314,6 +314,14 @@ func TestInstallScriptFallbackUninstallPreservesFilesWhenSystemdStopFails(t *tes
 	t.Setenv("FAKE_SYSTEMCTL_LOG", systemctlLog)
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local", "share"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	configPath := filepath.Join(home, ".config", "vmbench", "config.json")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("{\"lang\":\"en\"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	writeExecutable(t, filepath.Join(fixture.fakeBin, "uname"), "#!/bin/sh\nprintf 'Linux\\n'\n")
 	writeExecutable(t, filepath.Join(fixture.fakeBin, "systemctl"), `#!/bin/sh
 set -eu
@@ -330,7 +338,7 @@ esac
 		!strings.Contains(out, "vmbench binary and data files were left in place") {
 		t.Fatalf("fallback uninstall did not fail closed:\n%s", out)
 	}
-	for _, path := range []string{binaryPath, historyPath} {
+	for _, path := range []string{binaryPath, historyPath, configPath} {
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("%s changed after failed systemd stop: %v", path, err)
 		}
@@ -360,6 +368,15 @@ func TestInstallScriptFallbackUninstallAllowsAbsentInactiveSystemdService(t *tes
 	t.Setenv("FAKE_SYSTEMCTL_LOG", systemctlLog)
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local", "share"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	configDir := filepath.Join(home, ".config", "vmbench")
+	configPath := filepath.Join(configDir, "config.json")
+	if err := os.MkdirAll(configDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte("{\"lang\":\"en\"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	writeExecutable(t, filepath.Join(fixture.fakeBin, "uname"), "#!/bin/sh\nprintf 'Linux\\n'\n")
 	writeExecutable(t, filepath.Join(fixture.fakeBin, "systemctl"), `#!/bin/sh
 set -eu
@@ -373,10 +390,11 @@ exit 1
 
 	out := runInstallScriptArgs(t, fixture, true, "--uninstall", "--dir", installDir)
 	if !strings.Contains(out, "vmbench uninstalled") ||
-		!strings.Contains(out, "removed vmbench data directory "+dataDir) {
+		!strings.Contains(out, "removed vmbench data directory "+dataDir) ||
+		!strings.Contains(out, "removed vmbench config directory "+configDir) {
 		t.Fatalf("fallback uninstall did not complete:\n%s", out)
 	}
-	for _, path := range []string{binaryPath, historyPath, dataDir} {
+	for _, path := range []string{binaryPath, historyPath, dataDir, configDir, configPath} {
 		if _, err := os.Lstat(path); !os.IsNotExist(err) {
 			t.Fatalf("fallback uninstall left %s behind: %v", path, err)
 		}
