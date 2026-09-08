@@ -22,9 +22,8 @@ VMBENCH_BIN_DIR="$(
 )" && export PATH="$VMBENCH_BIN_DIR:$PATH"
 
 vmbench                          # interactive TUI (default)
-vmbench run                      # hardware benchmark via external tools
-vmbench suite                    # VPS scenario suite, one command
-vmbench suite --preset quick     # fast overview: hardware + network info + speed + IP quality
+vmbench --json report.json       # hardware benchmark via external tools (default selection)
+vmbench --preset quick           # fast overview: hardware + network info + speed + IP quality
 vmbench compare a.json b.json    # auto-detect and compare reports
 vmbench update                   # self-update from GitHub Releases
 ```
@@ -52,7 +51,7 @@ Other installer flags: `--version vX.Y.Z` pins a release, `--no-modify-path` kee
 curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash -s -- --uninstall
 ```
 
-Removes the binary, the platform data directory (`~/.local/share/vmbench` on Linux, `~/Library/Application Support/vmbench` on macOS) including all locally stored benchmark history, any manually created `vmbench` systemd/launchd unit, and the installer-owned `# vmbench user install` PATH entries from `.zshrc`/`.bashrc`/`.profile`. Hand-written PATH lines and reports under a custom `VMBENCH_HISTORY_DIR` are preserved. Use `sudo bash -s -- --uninstall` for a root-owned system installation.
+Removes the binary, the platform data directory (`~/.local/share/vmbench` on Linux, `~/Library/Application Support/vmbench` on macOS) including all locally stored benchmark history, the TUI preferences directory (`~/.config/vmbench` on Linux; on macOS it lives inside the data directory), any manually created `vmbench` systemd/launchd unit, and the installer-owned `# vmbench user install` PATH entries from `.zshrc`/`.bashrc`/`.profile`. Hand-written PATH lines and reports under a custom `VMBENCH_HISTORY_DIR` are preserved. Use `sudo bash -s -- --uninstall` for a root-owned system installation.
 
 Windows: download `vmbench-<version>-windows-<arch>.zip` from [Releases](https://github.com/cloudapp3/vmbench/releases) (WinSAT provides the default hardware probes).
 
@@ -71,9 +70,8 @@ Downloads are SHA-256 verified against the release `checksums.txt`, then atomica
 
 | Command | Description |
 |---------|-------------|
-| `vmbench` | Launch interactive TUI (default) |
-| `vmbench run [flags]` | Run external hardware benchmarks (hardware only; network diagnostics live in `suite`) |
-| `vmbench suite [flags]` | Run the VPS composite suite |
+| `vmbench` | Interactive TUI (no flags) — or run the benchmark when flags are present |
+| `vmbench [flags]` | Run the benchmark: hardware only by default, suite sections via preset / only / skip |
 | `vmbench nodes <command>` | List / verify / update / health-check the versioned node catalog |
 | `vmbench mcp serve [--transport stdio]` | Expose vmbench tools to LLM clients via MCP stdio |
 | `vmbench list` | List available workloads |
@@ -85,30 +83,30 @@ Downloads are SHA-256 verified against the release `checksums.txt`, then atomica
 
 ## Common Flags
 
-| Flag | Applies to | Default | Description |
-|------|-----------|---------|-------------|
-| `--iterations` | run, suite | 3 | Iterations per hardware workload (1-9) |
-| `--filter` | run | all | Regex to select workloads |
-| `--hardware-tool` | run, suite | platform default | sysbench, openssl, fio, dd, stream, mbw, geekbench, winsat, or all |
-| `--preset` | suite | — | Scenario preset: `quick`, `website`, `proxy`, `mail` |
-| `--only` / `--skip` | suite | — | Select or skip sections |
-| `--ip-version` | suite | v4 | `v4`, `v6`, or `dual` |
-| `--speed-provider` | suite | cloudflare | cloudflare, speedtest_net, speedtest_cn, china_isp, speedtest_isp, iperf3 |
-| `--ip-quality-source` | suite | builtin | builtin; opt-in `securitycheck` (external 18-database binary) |
-| `--media-set` | suite | all | `globe`, `tw`, `hk`, `jp`, `kr`, `na`, `sa`, `eu`, `afr`, `sea`, `oce`, `ai`, or combinations |
-| `--node-catalog` | suite | embedded | `embedded`, `auto`, or a JSON path |
-| `--node-revision` | suite | — | Pin an exact catalog revision; fails before probes start on mismatch |
-| `--iperf-host` | suite | — | iperf3 server for the iperf3 speed provider |
-| `--json` / `--html` | run, suite | — | Write JSON / HTML report to file |
-| `--quiet` | run, suite | false | Suppress progress output |
-| `--save-history` | run, suite | false | Save the report to local history (`--history-tag` to label) |
-| `--lang` | all | auto | `en` or `zh-CN` (also `VMBENCH_LANG`) |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--iterations` | 3 | Iterations per hardware workload (1-9) |
+| `--filter` | all | Regex to select workloads |
+| `--hardware-tool` | platform default | sysbench, openssl, fio, dd, stream, mbw, geekbench, winsat, or all |
+| `--preset` | — | Scenario preset: `quick`, `website`, `proxy`, `mail` |
+| `--only` / `--skip` | — | Select or skip sections |
+| `--ip-version` | v4 | `v4`, `v6`, or `dual` |
+| `--speed-provider` | cloudflare | cloudflare, speedtest_net, speedtest_cn, china_isp, speedtest_isp, iperf3 |
+| `--ip-quality-source` | builtin | builtin; opt-in `securitycheck` (external 18-database binary) |
+| `--media-set` | all | `globe`, `tw`, `hk`, `jp`, `kr`, `na`, `sa`, `eu`, `afr`, `sea`, `oce`, `ai`, or combinations |
+| `--node-catalog` | embedded | `embedded`, `auto`, or a JSON path |
+| `--node-revision` | — | Pin an exact catalog revision; fails before probes start on mismatch |
+| `--iperf-host` | — | iperf3 server for the iperf3 speed provider |
+| `--json` / `--html` | — | Write JSON / HTML report to file |
+| `--quiet` | false | Suppress progress output |
+| `--save-history` | false | Save the report to local history (`--history-tag` to label) |
+| `--lang` | auto | `en` or `zh-CN` (also `VMBENCH_LANG`) |
 
-`run` is hardware-only; all network diagnostics live in `vmbench suite`. Full flag tables: `vmbench <command> --help` or the [capability reference](docs/capabilities.md).
+Without `--preset` / `--only` / `--skip` the run is hardware-only; network sections are opt-in via a preset or explicit selection. When the effective selection is exactly the `hardware` section the output is a benchmark (run-kind) report — identical to pre-v0.8.0 `vmbench run` — otherwise a composite suite report. Full flag tables: `vmbench --help` or the [capability reference](docs/capabilities.md).
 
 ## VPS Suite
 
-`vmbench suite` keeps the YABS-style one-command experience with ECS-style modular sections:
+The suite keeps the YABS-style one-command experience with ECS-style modular sections:
 
 | Section | Purpose |
 |---------|---------|
@@ -125,13 +123,13 @@ Downloads are SHA-256 verified against the release `checksums.txt`, then atomica
 Presets: `quick` (hardware, network_info, speed, ip_quality) · `website` (+ route, ping, reachability, mail) · `proxy` (network focus + media) · `mail`.
 
 ```bash
-vmbench suite --preset proxy --ip-version dual
-vmbench suite --only ping,mail
-vmbench suite --route-presets gz,bj,sh,cd,cernet,cstnet
-vmbench suite --speed-provider china_isp
-vmbench suite --media-set jp,kr
-vmbench suite --only hardware --hardware-tool geekbench
-vmbench suite --node-catalog auto --save-history --history-tag weekly
+vmbench --preset proxy --ip-version dual
+vmbench --only ping,mail
+vmbench --route-presets gz,bj,sh,cd,cernet,cstnet
+vmbench --speed-provider china_isp
+vmbench --media-set jp,kr
+vmbench --only hardware --hardware-tool geekbench
+vmbench --node-catalog auto --save-history --history-tag weekly
 ```
 
 Suite succeeds only when every enabled section ends `status=ok`; enabled empty / skipped / partial / error states all fail the run. Reports keep the resolved node catalog source/revision and selected node IDs.
@@ -140,9 +138,9 @@ Suite succeeds only when every enabled section ends `status=ok`; enabled empty /
 
 Launch with `vmbench` (no arguments):
 
-- **Dashboard** with benchmark / suite / compare / sysinfo entry points; mouse clicks and wheel scrolling everywhere
-- **Run Config**: iterations, hardware tools, and a workload filter with live planned-workload count and missing-tool preflight
-- **Suite Config**: the same normalized fields as CLI/MCP, with a planned-duration summary and `1-9` section jumps
+- **Dashboard** with benchmark / compare / sysinfo entry points; mouse clicks and wheel scrolling everywhere
+- **Config**: one page for the same normalized fields as CLI/MCP — preset pills lead with Hardware Only (the CLI default) plus Custom and the suite presets; section toggles reveal tool, filter, speed, route, media, and IP-source cards on demand, with a live planned-duration summary, missing-tool preflight, and `1-9` section jumps
+- **Running**: one progress page for both kinds — workload grid for hardware runs, section grid for suite runs, cancel modal included
 - **Results**: cards / grouped / flat views; `d` opens per-workload detail with metrics, samples, errors, and raw tool output
 - **Compare picker**: browse history, view a record, or compare two — benchmark deltas in-TUI, suite via the same output as the CLI
 - **Themes**: press `t` on Dashboard to cycle; the choice is saved locally

@@ -31,20 +31,18 @@ VMBENCH_BIN_DIR="$(
 # 默认进入 TUI
 vmbench
 
-# CLI 测评
-vmbench run
-vmbench run --json report.json --html report.html
-vmbench run --filter 'sysbench|fio|OpenSSL'
-vmbench run --hardware-tool sysbench,openssl,fio,dd
+# CLI 硬件测评（不带 preset/only/skip 时只跑 hardware）
+vmbench --json report.json --html report.html
+vmbench --filter 'sysbench|fio|OpenSSL'
+vmbench --hardware-tool sysbench,openssl,fio,dd
 
-# VPS 综合测评
-vmbench suite
-vmbench suite --preset quick
-vmbench suite --preset website --json suite.json --html suite.html
-vmbench suite --only ping,mail
-vmbench suite --only hardware --hardware-tool dd,stream,mbw
-vmbench suite --node-catalog auto --node-revision 2026-07-13.1 --save-history
-vmbench suite --quiet --json suite.json
+# VPS 综合测评（preset 或 only/skip 选择 section）
+vmbench --preset quick
+vmbench --preset website --json suite.json --html suite.html
+vmbench --only ping,mail
+vmbench --only hardware --hardware-tool dd,stream,mbw
+vmbench --node-catalog auto --node-revision 2026-07-13.1 --save-history
+vmbench --quiet --json suite.json
 
 # 报告对比
 vmbench compare a.json b.json
@@ -63,11 +61,11 @@ vmbench nodes health --node-catalog auto --ip-family v6
 curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash -s -- --uninstall
 ```
 
-会移除二进制、平台数据目录（Linux `~/.local/share/vmbench`，macOS `~/Library/Application Support/vmbench`，含全部本地历史报告）、手动创建的 `vmbench` systemd/launchd unit，以及安装脚本自己写入的 `# vmbench user install` PATH 条目。手写的 PATH 行与自定义 `VMBENCH_HISTORY_DIR` 下的报告会保留；root 系统级安装请用 `sudo bash -s -- --uninstall`。
+会移除二进制、平台数据目录（Linux `~/.local/share/vmbench`，macOS `~/Library/Application Support/vmbench`，含全部本地历史报告）、TUI 偏好配置目录（Linux `~/.config/vmbench`；macOS 上位于数据目录之内）、手动创建的 `vmbench` systemd/launchd unit，以及安装脚本自己写入的 `# vmbench user install` PATH 条目。手写的 PATH 行与自定义 `VMBENCH_HISTORY_DIR` 下的报告会保留；root 系统级安装请用 `sudo bash -s -- --uninstall`。
 
 其他安装方式（固定版本、自定义目录、Windows、`go install`、源码构建）：源码方式可用 `go install github.com/cloudapp3/vmbench/cmd/vmbench@latest`，或本地构建 `go build -o vmbench ./cmd/vmbench`（项目验证脚本 `./sh/build.sh` 使用 CGO_ENABLED=0，输出到临时目录，可用 `VMBENCH_OUTPUT_DIR` 覆盖）；完整说明见英文 README 的 Install 一节。
 
-`vmbench run` 是硬件专用命令，只编排外部工具硬件基准；路由、测速、IP 质量等全部网络诊断由 `vmbench suite` 提供。workload 始终串行隔离执行，线程数与队列深度由外部工具参数定义。
+`vmbench` 一个命令同时覆盖硬件基准与 VPS 综合测评：不带 `--preset` / `--only` / `--skip` 时只编排外部工具硬件基准（等价 v0.7.0 的 `vmbench run`），preset 或 `--only` 选择网络 section 后走综合测评（原 `vmbench suite`）；路由、测速、IP 质量等网络诊断都在同一命令面上。workload 始终串行隔离执行，线程数与队列深度由外部工具参数定义。
 
 ## 界面语言
 
@@ -76,9 +74,9 @@ CLI、TUI 与 console/HTML 报告标签支持英文与简体中文；新增语�
 选择优先级：`--lang` 参数（所有子命令）> `VMBENCH_LANG` 环境变量 > TUI 配置文件（`~/.config/vmbench/config.json`）的 `lang` 字段 > 系统 locale（`zh*` 自动归一到 `zh-CN`）> 英文；未知取值回退英文并提示一次。
 
 ```bash
-vmbench --help                      # 跟随系统 locale
-VMBENCH_LANG=zh-CN vmbench suite    # 强制中文
-vmbench tui --lang en               # 单次指定英文
+vmbench --help                       # 跟随系统 locale
+VMBENCH_LANG=zh-CN vmbench --help    # 强制中文
+vmbench tui --lang en                # 单次指定英文
 ```
 
 JSON 字段名、状态枚举 token（`ok`/`fail`/...）、suite section ID、workload 名称（与 `--filter` 匹配耦合）以及适配器错误信息在任何语言下保持英文；翻译只发生在渲染层。
@@ -106,10 +104,10 @@ TCP Ping 将连接成功和 TCP RST/refused 都视为收到目标响应，计入
 常用参数：
 
 ```bash
-vmbench suite --preset quick|website|proxy|mail
-vmbench suite --only ping,mail
-vmbench suite --skip media
-vmbench suite --ip-version v4|v6|dual
+vmbench --preset quick|website|proxy|mail
+vmbench --only ping,mail
+vmbench --skip media
+vmbench --ip-version v4|v6|dual
 ```
 
 网络节点来自版本化 catalog。`--node-catalog` 支持 `embedded`、`auto` 或 JSON 路径；`--node-revision` 固定精确 revision，不匹配时在 probe 前失败。`auto` 只使用已验证缓存并可回退 embedded，不在测评时隐式下载。`vmbench nodes verify/update` 使用调用方显式提供的 Ed25519 公钥和 detached signature；`nodes health` 进行有界可用性检查。
@@ -124,12 +122,11 @@ vmbench
 
 Dashboard 支持：
 
-- 运行串行隔离的外部工具硬件测评（无独立 Multi-Core 入口）；启动前先进入配置页选 iterations / 硬件工具 / workload 过滤，实时显示计划 workload 数与缺失工具预检
-- 运行 VPS suite
-- 配置与 CLI/MCP 相同的 iterations/timeout/IP version/tools/providers/iperf/sections/route/catalog source/revision；配置页含摘要卡（计划 workload 数、按历史均值估算的总时长），`1-9` 数字键快切 section
+- 单一"运行评测"入口：先进入统一配置页——preset 胶囊首位是"仅硬件"（与 CLI 默认一致）+ Custom + quick/website/proxy/mail，9 个 section 开关与硬件工具 / workload 过滤 / speed / route / media / IP 来源等细节卡片按开关状态按需展开，实时显示计划 workload 数与缺失工具预检，`1-9` 数字键快切 section
+- 配置与 CLI/MCP 相同的 iterations/timeout/IP version/tools/providers/iperf/sections/route/catalog source/revision；配置页含摘要卡（计划 workload 数、按历史均值估算的总时长）；启动时若生效 section 恰好只有 hardware 则产出 run 报告，否则产出 suite 报告（与 CLI 同一规则）
 - 打开系统信息
 - 比较报告：从历史记录选两条（或手输路径），run 报告出 delta 表，suite 报告用与 CLI 相同的 textgrid 对比，也可查看单条历史记录
-- Running 页显示迭代迷你条、采样进度与完成后按墙钟外推的 ETA；Results 三视图（卡片/分组/平铺）+ `d` 进单 workload 详情（指标/采样/错误/原始输出）
+- Running 页按 runKind 分流：硬件基准显示迭代迷你条、采样进度与完成后按墙钟外推的 ETA，suite 显示 section 网格与已耗时；Results 三视图（卡片/分组/平铺）+ `d` 进单 workload 详情（指标/采样/错误/原始输出）
 - 全页滚动（`PgUp/PgDn`、`Home/End`、鼠标滚轮）、`?` 帮助页、Dashboard 菜单支持鼠标点击
 - 按 `t` 循环切换 8 种颜色主题，退出后持久化到本地配置
 
@@ -145,7 +142,7 @@ Dashboard 支持：
 - `geekbench`：可选 CPU upstream score，不默认跑，不作为 vmbench 总分
 - `winsat`：Windows CPU / 内存 / 磁盘（Windows 默认，也可显式选择）
 
-`run` 和启用 hardware 的 `suite` 会在执行前提示当前 filter 会命中的缺失工具，Linux 还会输出已知 Debian/Ubuntu 安装命令。未被 filter 选中的 adapter 不产生误导提示；实际缺失的工具不会触发进程内 fallback 或被静默跳过，而是进入结构化 `error` 字段。官方源码和 release 包默认不内置第三方二进制工具；Linux 本地 fallback 只从解析后的 vmbench 可执行文件相邻 `binaries/` 或同目录加载，例如 `<exe-dir>/binaries/sysbench_x64`，不会搜索当前工作目录。
+硬件测评（默认硬件选择或 suite 组合里启用 hardware）会在执行前提示当前 filter 会命中的缺失工具，Linux 还会输出已知 Debian/Ubuntu 安装命令。未被 filter 选中的 adapter 不产生误导提示；实际缺失的工具不会触发进程内 fallback 或被静默跳过，而是进入结构化 `error` 字段。官方源码和 release 包默认不内置第三方二进制工具；Linux 本地 fallback 只从解析后的 vmbench 可执行文件相邻 `binaries/` 或同目录加载，例如 `<exe-dir>/binaries/sysbench_x64`，不会搜索当前工作目录。
 
 ## 报告与网络失败语义
 
@@ -157,7 +154,7 @@ Dashboard 支持：
 - IP Quality 只有在元数据、公网 IPv4、DNSBL 和 Port 25 探测均得到确定结论时才生成 0-100 风险 score，不确定时 fail-closed 并保留 error/detail。
 - Suite JSON 使用 schema-v2 envelope，包含 report/app/system/time/config/catalog provenance，并保留旧 v1 字段；Route 包含 `resolved_target/destination_reached/status`，Ping 包含 `connection_state`。Suite HTML 展示硬件 workload、网络身份、完整 route hops、各网络 section 明细和 error。
 - `vmbench compare` 自动识别 benchmark/Suite，支持两份以上报告；Suite 只有 unit、protocol、provider、target/node 和所需 catalog revision 兼容时才计算 delta。Route 还必须显式包含 `status=ok` 与 `destination_reached=true`，旧报告缺少到达证据时不计算 delta。
-- CLI 的 `--json` / `--html` 使用同目录临时文件、fsync、rename 原子导出，Unix mode 为 `0600`。`run` / `suite --save-history [--history-tag TAG]` 可写入原子本地历史（Unix 目录 `0700`、文件 `0600`）；`history add/list/show/delete/compare --last N` 管理和比较同类型报告。
+- CLI 的 `--json` / `--html` 使用同目录临时文件、fsync、rename 原子导出，Unix mode 为 `0600`。`--save-history [--history-tag TAG]` 可写入原子本地历史（Unix 目录 `0700`、文件 `0600`）；`history add/list/show/delete/compare --last N` 管理和比较同类型报告。
 
 ## 文档
 

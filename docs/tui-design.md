@@ -5,12 +5,14 @@
 ## 页面结构
 
 ```text
-Dashboard -> RunConfig -> Running -> Results -> ResultDetail
-Dashboard -> SuiteConfig -> SuiteRunning -> SuiteResults
+Dashboard -> Config -> Running(run) -> Results -> ResultDetail
+Dashboard -> Config -> Running(suite) -> SuiteResults
 Dashboard -> ComparePicker -> Compare
 Dashboard -> System Info
 任意页 -> Help（? 切换，Esc 返回来源页）
 ```
+
+v0.8.0 起 run/suite 合并为单一配置页与单一运行页：启动时按报告种类规则分流——生效 section 恰好只有 hardware 走 run 路径（run 报告），否则走 suite 路径（suite 报告），与 CLI/MCP 共用同一规则（`suite.SectionSelector.HardwareOnly`）。
 
 `vmbench mcp serve` 是给大模型客户端使用的后台 stdio server，不进入 TUI 页面路由。
 
@@ -35,13 +37,12 @@ Dashboard -> System Info
 - 当前版本
 - CPU / Memory / OS / GPU 摘要（GPU 可用时）
 - Go 主线入口菜单：
-  - Run Hardware Benchmark（进入 RunConfig 页）
-  - Run Suite (VPS Composite)
+  - Run Benchmark（进入统一 Config 页）
   - Compare Reports（进入 ComparePicker 页）
   - System Info
   - Quit
 
-说明：Go TUI 已移除误导性的独立 Multi-Core 入口。硬件 workload 串行执行，CPU 线程数和磁盘队列深度由外部工具参数定义；默认工具按平台选择，Linux 为 sysbench/OpenSSL/fio，macOS 为 OpenSSL，Windows 为 WinSAT。sysbench 拆出 memory read/write/latency，fio 拆出 4K random read/write Q1/Q32 与 1M sequential read/write Q1/Q8。CLI/Suite 可通过 `--hardware-tool` 显式选择其他 adapter；CLI 会在开始前提示当前 filter 涉及的缺失工具，TUI/报告继续展示结构化错误，不提供进程内 benchmark fallback。可选 dd read 只有 Linux 能以 direct I/O 运行，其他平台 fail-closed 并提示改用 fio。
+说明：Go TUI 已移除误导性的独立 Multi-Core 入口。硬件 workload 串行执行，CPU 线程数和磁盘队列深度由外部工具参数定义；默认工具按平台选择，Linux 为 sysbench/OpenSSL/fio，macOS 为 OpenSSL，Windows 为 WinSAT。sysbench 拆出 memory read/write/latency，fio 拆出 4K random read/write Q1/Q32 与 1M sequential read/write Q1/Q8。CLI/TUI 可通过 `--hardware-tool` 显式选择其他 adapter；CLI 会在开始前提示当前 filter 涉及的缺失工具，TUI/报告继续展示结构化错误，不提供进程内 benchmark fallback。可选 dd read 只有 Linux 能以 direct I/O 运行，其他平台 fail-closed 并提示改用 fio。
 
 按键：
 
@@ -50,31 +51,38 @@ Dashboard -> System Info
 - `t`：循环切换主题（鼠标点击主题行等效）
 - `q`：退出
 
-## RunConfig
+## Config
 
-硬件跑分前的配置页（`tui/run_config.go`），取代旧的"直接开跑"。Start 时构造与 CLI 相同的 `vmbench.Options`（`Scope=hardware, Mode=single, Engine=external`）并经 `NormalizeOptions` 校验。
+统一配置页（`tui/config_page.go`），v0.8.0 起取代旧的 RunConfig/SuiteConfig 双页。字段序：preset → sections → runtime → hardware tools → filter → speed providers → route presets → media sets → IP sources → advanced → start；按 section 开关状态按需展开（hardware tools 与 filter 仅在 hardware 开启时出现，speed 仅在 speed 开启时出现，以此类推），焦点自动吸附最近可见字段，tab 顺序永不落在隐藏卡片上。
 
-字段：
-
-- Iterations：1-9，默认 3
+- Preset：胶囊首位是"仅硬件"（Hardware Only，与 CLI 默认一致），随后 Custom 与 quick/website/proxy/mail；切换 preset 同步 section 集合
+- Sections：9 个 section 开关（`1-9` 数字键快切并自动切到 Custom preset）
+- Runtime：iterations（1-9，默认 3）、timeout、IP version
 - Hardware Tools：多选，默认平台推荐集合；决定 workload 集合
 - Filter：All / CPU / Disk / Memory / Custom（Custom 为正则手输，语义与 CLI `--filter` 一致，匹配 workload Name/Category）
-- Preflight：进入页面异步检查所选工具缺失情况，warning 卡非阻塞（对齐 CLI 行为）
-- Start：按钮行；无可运行 workload 时置灰并提示
+- Speed Providers / Route Presets / Media Sets / IP Sources：suite 细节选项（media `all` 与地区互斥，`securitycheck` opt-in）
+- Advanced：iperf hosts、catalog source/revision
+- Preflight：工具/过滤/section/preset 变化后异步检查所选工具缺失情况，warning 卡非阻塞（对齐 CLI 行为）
+- Start：按钮行；没有启用 section 时置灰并提示
 
-页面顶部实时显示 "N workloads planned"——该计数镜像 runner 的工具×过滤逻辑，Running 页预填的 workload 列表来自同一来源，不会出现永远 waiting 的幽灵行。
+页面顶部实时显示 "N workloads planned"——该计数镜像 runner 的工具×过滤逻辑，Running 页预填的 workload 列表来自同一来源，不会出现永远 waiting 的幽灵行。摘要卡（`tui/suite_summary.go`）显示启用 section 数、节点目录规模、计划 workload 数和预计总时长（优先历史均值，无历史退回静态粗估；经 `catalogStatsMsg` / `historyStatsMsg` 异步加载，View 无 IO）。
+
+TUI 不维护另一套隐式默认值，而是构造与 CLI/MCP 相同的规范化配置：Start 时 hardware-only 选择构造 `vmbench.Options` 并经 `NormalizeOptions` 校验（run 报告），其余构造 `suite.Options` 并经 `suite.NormalizeOptions` 校验（suite 报告）。
 
 按键：
 
-- `↑↓` / `Tab`：字段间移动
-- `←→`：调节当前字段（iterations 增减、tools 光标移动、filter chip 轮换）
-- `spc` / `x`：切换工具选中
-- `Enter`：开始运行（聚焦 Start 时）；Custom filter 聚焦时确认输入
+- `↑↓` / `Tab`：字段间移动（仅可见字段）
+- `←→`：取值切换（iterations 增减、tools 光标移动、filter chip 轮换）
+- `spc` / `x`：多选切换
+- `1-9`：跳到对应 section 并把 preset 切到 Custom（Advanced 文本字段聚焦时忽略）
+- `Enter`：推进到下一字段（聚焦 Start 时启动）
 - `Esc`：返回 Dashboard
 
 ## Running
 
-展示：
+单一运行页（v0.8.0 起，suite 运行页已并入）：按 `Model.runKind` 分流渲染。
+
+run 路径（硬件基准）展示：
 
 - 当前阶段与 ETA（首个 workload 完成后显示 `~xx left`，按已完成 workload 墙钟均值外推）
 - 采样进度（`n/m samples`，来自 `EventSuiteProgress`）
@@ -82,6 +90,8 @@ Dashboard -> System Info
 - workload 完成后的原始 metric
 
 Go runner 始终串行执行 workload；进度总数按各 workload 的实际迭代次数计算。硬件 workload 使用配置的迭代数，网络 workload 限制为一次真实探测。旧的 `multi/all` mode 不会产生第二轮结果或并发不同 workload。
+
+suite 路径展示 9 个 section 的卡片网格（start/done/fail/skip/partial 状态与已耗时），事件写入共享的 event log viewport。两种路径共用取消 modal（文案按 runKind 选择）。
 
 Go TUI 使用 spinner、progress bar、event log viewport 和取消 modal 展示执行状态。
 
@@ -92,10 +102,12 @@ Go TUI 使用 spinner、progress bar、event log viewport 和取消 modal 展示
 - done
 - fail
 - skip
+- partial（suite section，独立样式并计入终态非成功数量）
 
 按键：
 
 - `Esc`：取消确认
+- `Tab`：切换 event log 显示
 - `q`：退出
 
 ## Results
@@ -144,24 +156,9 @@ Go TUI 支持交互式视图切换：
 - `Esc` / `Enter` / `d`：返回 Results（光标保留）
 - `q`：退出
 
-## SuiteConfig 与 SuiteResults
+## SuiteResults
 
-Go SuiteConfig 初始选择 `quick` preset，并实际启用 `hardware,network_info,speed,ip_quality`；speed provider 默认只选 Cloudflare。用户切换 preset 后，section 集合同步更新。
-
-配置页顶部有摘要卡（`tui/suite_summary.go`）：启用 section 数、节点目录规模、计划 workload 数和预计总时长。预计时长优先用历史均值（history 中近 10 条 suite 记录各 section 的 `FinishTime-StartedTime` 均值，`n=k history`），无历史时退回静态粗估（`~rough`，hardware 部分随 iterations 缩放）。摘要数据经 `catalogStatsMsg` / `historyStatsMsg` 异步加载，View 无 IO。
-
-TUI 不维护另一套隐式默认值，而是构造与 CLI/MCP 相同的规范化 Suite 配置。可配置字段覆盖：preset/sections、iterations、timeout、IP version、hardware tools、speed providers（含 `china_isp` / `speedtest_isp` 三网 provider）、iperf hosts、route selection、media sets（默认 `all`，与地区选择互斥：选 `all` 清空地区、选任一地区取消 `all`）、IP quality sources（默认 `builtin`，`securitycheck` 为 opt-in 多选）、catalog source 和 catalog revision。catalog source 支持 `embedded` / `auto` / 显式 path；revision pin 不匹配时停在运行前错误状态。
-
-SuiteConfig 按键（除全局）：
-
-- `↑↓`：字段导航
-- `←→`：取值切换
-- `spc` / `x`：多选切换
-- `1-9`：跳到对应 section 并把 preset 切到 Custom（Advanced 文本字段聚焦时忽略）
-- `Enter`：启动 Suite
-- `Esc`：返回 Dashboard
-
-Go TUI 在终端低于 40 行时使用紧凑 Suite 布局：Config 只展开当前聚焦字段，Running 与 Results 对每个 section 使用单行状态摘要；在 `80x24` 下页面宽高均受终端边界约束，字段导航、启动和取消仍可操作。更高终端继续显示完整卡片与详细结果。
+Go TUI 在终端低于 40 行时使用紧凑布局：Config 只展开当前聚焦字段，Running 与 SuiteResults 对每个 section 使用单行状态摘要；在 `80x24` 下页面宽高均受终端边界约束，字段导航、启动和取消仍可操作。更高终端继续显示完整卡片与详细结果。
 
 Go 主线覆盖 `hardware / network_info / route / ping / speed / ip_quality / reachability / mail / media` 九个 section。Network Info 展示虚拟化、公网 IP、ASN/provider 和 NAT 证据；Reachability 展示 website/Telegram 的 protocol/latency/status/error。所有这些状态都不会折算为 benchmark 总分。Suite 只有所有 enabled section 都是 `ok` 时成功；enabled 的空状态、`skipped`、`partial`、`error` 均表示失败，disabled section 才只发 skip event。Running 页保留 `PARTIAL` 独立样式但将它计入终态非成功数量，不伪装成 `ERROR` 或成功；网络 section timeout/cancel 也会显示为结构化 `error` message。
 
@@ -208,6 +205,6 @@ Compare/ComparePicker 按键：`Esc` 返回上一级（Compare -> Picker -> Dash
 ## 工程约束
 
 - View() 纯函数无 IO：所有异步工作走 Cmd -> Msg（sysinfo、history 列表、catalog 统计、compare 加载、单条记录查看），Compare 页不再在渲染路径上读盘。
-- 文本输入态（SuiteConfig Advanced、RunConfig Custom filter、Picker 手输）抑制全局单键绑定 `?`/`q`，避免按键被路由进输入框或误退出（`textEntryActive()`）。
+- 文本输入态（Config 页 Advanced 与 Custom filter、Picker 手输）抑制全局单键绑定 `?`/`q`，避免按键被路由进输入框或误退出（`textEntryActive()`）。
 - footer 提示与帮助页共用 `helpFor()` 注册表，新增页面需同时补两处 i18n key（en/zh-CN 双语 parity 测试强制）。
 - 渲染边界测试：每页在 80x24 的 en 与 zh-CN 下 `assertRenderBounds`（高度不超视口、每行显示宽度不超终端宽）。

@@ -1,12 +1,26 @@
 # VMBench Changelog
 
-## Unreleased
+## v0.8.0（2026-09-08）
+
+### run/suite 合并进根命令（BREAKING）
+
+- **跑测评不再需要二级命令**：`run` / `suite` 子命令删除，全部基准 flag（合并后 23 个，名称不变）提升到根级。迁移示例：
+  - `vmbench run` → `vmbench`
+  - `vmbench run --filter 'SHA|AES' --json r.json` → `vmbench --filter 'SHA|AES' --json r.json`
+  - `vmbench suite --preset quick` → `vmbench --preset quick`
+  - `vmbench suite --only ping,mail` → `vmbench --only ping,mail`
+- **默认只跑 hardware**：非交互调用不带 `--preset` / `--only` / `--skip` 时只跑硬件基准（兼容旧 `vmbench run`）；网络 section 需要 preset 或 `--only` 显式选择。`vmbench --lang zh-CN`（唯一显式 flag 是 `--lang`）打开对应语言的 TUI 而不开跑基准。
+- **报告种类规则**（一条规则三处复用，CLI / TUI / MCP 共用）：解析 preset/only/skip 后，生效 section 恰好只有 `hardware` → 走 run 路径（`vmbench.RunCore` → run 报告 / KindRun），否则走 suite 路径（`suite.Run` → suite 报告 / KindSuite）。run 报告与旧 `vmbench run` 字节级兼容，history / compare 可与旧 run 记录配对。**语义变化**：旧 `vmbench suite --only hardware` 产出 KindSuite，新 `vmbench --only hardware` 产出 KindRun——依赖 report kind 的 history / compare 流程需要注意；`--preset` 等多 section 组合不受影响。
+- **旧命令入口**：`vmbench run` / `vmbench suite` 现在输出迁移提示（指向根级用法与 `--help`）并以 exit 2 退出，不做 flag 转发。根命令新增拒绝多余位置参数（旧 run/suite 静默忽略）。
+- **TUI 统一配置页**：Dashboard 的 run/suite 两个入口合并为一个"运行评测"，进入单一配置页——preset 胶囊首位是"仅硬件"（与 CLI 默认一致）+ Custom + 4 个 suite preset，9 个 section 开关与硬件工具 / workload 过滤 / speed / route / media / IP 来源等细节卡片按开关状态按需展开，焦点自动吸附可见字段；启动时按报告种类规则分流。**顺带修复 bug**：旧硬件配置页启动后从不切换页面，进度视图与取消弹窗实际不可达。
+- **TUI 单一运行页**：Suite 运行页并入统一运行页，按 runKind 分流渲染 workload 网格（run）或 section 网格（suite）；取消弹窗按 kind 选文案；结果页保持分开（run 报告与 suite 报告形状不同）。TUI 偏好文件删除死字段 `last_mode` / `last_engine`（旧 config.json 的多余 key 读取时被忽略）。
+- **MCP 合并**：`vmbench_run` 暴露完整基准面（preset / only / skip / 硬件工具 / catalog 选项等 17 参数并集），用同一报告种类规则分流；`vmbench_suite` 保留为弃用别名——路由到同一 handler，schema 完全一致，Title 标记 Deprecated，计划 v0.9.0 删除。
 
 ### install.sh 对齐 vmflow 安装器（PATH 处理 / --system / --uninstall）
 
 - **PATH 处理**：安装目录自动选择改为复用已有安装（`~/.local/bin`、`~/bin`、`/usr/local/bin`）→ root 用 `/usr/local/bin` → 普通用户优先已在 `PATH` 中的 `~/.local/bin`/`~/bin`；自动装到主目录且该目录不在 `PATH` 时，向 `.zshrc`/`.bashrc`/`.profile` 幂等追加 `# vmbench user install` + `export PATH=...` 块并打印 reload 命令。此前装到不在 PATH 的目录（如 `--dir /opt/bin`）只会打印绝对路径提示，随后必然 `command not found`。显式 `--dir`/`VMBENCH_INSTALL_DIR` 绝不改启动文件，只打印 PATH 警告与精确的 export 提示；`--no-modify-path`/`VMBENCH_NO_MODIFY_PATH` 可整体关闭启动文件修改。
 - **`--system`**：系统级安装到 `/usr/local/bin`（或显式 `--dir`）。root 直接安装；非 root 先验证 sudo（`VMBENCH_SUDO` 可指定绝对路径）再下载，sudo 仅用于目标目录检查（test/mkdir 固定绝对路径）与 `/usr/bin/install` 写入。
-- **`--uninstall`**：优先委托 `vmbench uninstall` 子命令（向前兼容）；否则 shell 兜底——定位二进制（--dir → PATH → 常见目录）、stop/verify 手动创建的 `vmbench` systemd/launchd unit（stop 失败即 fail-closed，不动任何文件）、删除二进制与平台数据目录（Linux `${XDG_DATA_HOME:-~/.local/share}/vmbench`，macOS `~/Library/Application Support/vmbench`，含本地历史报告；拒绝符号链接/非目录路径），并从启动文件精确移除自己写入的 PATH 块（awk 逐块匹配，用户手写行与其他安装的块保留）。终端交互确认；`curl | bash` 管道下跳过确认。
+- **`--uninstall`**：优先委托 `vmbench uninstall` 子命令（向前兼容）；否则 shell 兜底——定位二进制（--dir → PATH → 常见目录）、stop/verify 手动创建的 `vmbench` systemd/launchd unit（stop 失败即 fail-closed，不动任何文件）、删除二进制与平台数据目录（Linux `${XDG_DATA_HOME:-~/.local/share}/vmbench`，macOS `~/Library/Application Support/vmbench`，含本地历史报告）、TUI 偏好配置目录（Linux `${XDG_CONFIG_HOME:-~/.config}/vmbench`，macOS 与数据目录同级；拒绝符号链接/非目录路径），并从启动文件精确移除自己写入的 PATH 块（awk 逐块匹配，用户手写行与其他安装的块保留）。终端交互确认；`curl | bash` 管道下跳过确认。
 - **加固**（与 vmflow 同款）：`tar --no-same-owner`（root 解压不恢复归档 uid/gid）；目标路径为符号链接/非普通文件时拒绝覆盖；`--version`/`--dir` 值校验（含 `=` 形式与 env 变量，全部在任何下载动作之前）。
 - README / zh-CN README 同步：Quick Start 换成 `--print-install-dir` + `export PATH` 一行式；Install 节重写目录选择与新 flags；新增 Uninstall 节。install_test.go 从 2 个测试扩到 21 个（fake curl / fake uid / fake sudo fixture；PATH、--system、目录复用、参数校验、卸载全覆盖）。
 

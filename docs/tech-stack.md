@@ -62,8 +62,7 @@ cmd/vmbench/mcp.go
      -> initialize / ping / tools/list / tools/call
         -> vmbench_capabilities
         -> vmbench_sysinfo  -> sysinfo.Collect
-        -> vmbench_run      -> vmbench.RunCore
-        -> vmbench_suite    -> suite.Run
+        -> vmbench_run      -> vmbench.RunCore | suite.Run（按 section 集合分流）
 ```
 
 实现约束：
@@ -72,9 +71,9 @@ cmd/vmbench/mcp.go
 - stdout 只写 JSON-RPC response；stderr 用于 server 诊断。
 - tool input schema 使用 enum 限定 section、preset、hardware tool 和 speed provider。
 - CLI、TUI、MCP 复用同一 Suite 参数归一化/校验契约；各入口按场景暴露字段子集，TUI 覆盖 iterations、timeout、hardware tools、speed providers（含三网 provider）、iperf hosts、IP version、sections、route selection、media sets、IP quality sources、`catalog_source`、`catalog_revision`，CLI/MCP 另可传 filter 等自动化参数。
-- Go TUI 在低于 40 行时为 SuiteConfig、SuiteRunning、SuiteResults 切换紧凑布局；`80x24` 下使用当前字段卡或逐 section 单行摘要，并保持完整卡片布局用于更高终端。
+- Go TUI 在低于 40 行时为 Config、Running、SuiteResults 切换紧凑布局；`80x24` 下使用当前字段卡或逐 section 单行摘要，并保持完整卡片布局用于更高终端。
 - catalog source 只接受 `embedded`、`auto` 或显式路径；revision pin 在探测前校验。
-- MCP 默认 `iterations=1`，`vmbench_run` 默认 `scope=hardware`，`vmbench_suite` 默认只跑 `hardware`。
+- MCP 默认 `iterations=1`，不带 section 参数时 `vmbench_run` 只跑 `hardware`（与 CLI 默认一致）。
 - 省略 `timeout_ms` 时默认 5 分钟；显式非正或超出 15 分钟上限的 iterations/timeout、非法 regex，以及混入未知值的 section/provider/tool/route preset 数组都会使整个 tool call 校验失败，不启动测量。
 - `Server` 内部有运行互斥锁，同一时刻只允许一个 benchmark。
 - tool 返回 MCP `content` 文本摘要和 `structuredContent` 结构化报告。测量失败时仍保留完整 `structuredContent.report`，并设置 `isError=true`；参数校验失败只返回错误文本和 `isError=true`。
@@ -117,8 +116,8 @@ Runner 行为：
 
 - workload 始终串行、隔离执行，不并发不同 benchmark，也不修改进程级 `GOMAXPROCS`、GC 或线程绑定状态。线程数和队列深度由 sysbench/fio/OpenSSL/WinSAT 各自参数定义。
 - 硬件 workload 使用请求的 1-9 次迭代并聚合中位数；`bench/netio` workload 通过 `IterationLimiter` 限制为一次真实探测（suite 场景），并在结果中记录实际 `iterations: 1`。
-- `vmbench run` 是硬件专用命令，只注册外部工具硬件 workload；网络诊断（route/speed/IP 质量等）全部由 `vmbench suite` 提供。
-- CLI 对非法 filter/iteration/tool 直接返回参数错误；没有 workload 命中或任一 workload 失败时，`run` 返回退出码 1。
+- `vmbench` 根命令统一承载硬件基准与综合测评：不带 `--preset`/`--only`/`--skip` 只注册外部工具硬件 workload（run 报告），选择网络 section 后走 `suite.Run`（suite 报告）；网络诊断（route/speed/IP 质量等）都在同一命令面上。
+- CLI 对非法 filter/iteration/tool 直接返回参数错误；没有 workload 命中或任一 workload 失败时，run 路径返回退出码 1。
 - `OnWorkloadStart` 在每个 workload 的首个 sample 进入前同步触发，`OnWorkloadDone` 在该 workload 返回后立即触发；`RunCore` 据此逐项发射 `suite_start` 与 `suite_done` / `suite_fail`，不等待整批结束。同名 workload 也会逐项发射，不按名称去重。
 
 ## Hardware 外部工具模型
@@ -194,11 +193,11 @@ media
 对应 CLI：
 
 ```bash
-vmbench suite --preset quick|website|proxy|mail
-vmbench suite --only ping,mail
-vmbench suite --skip media
-vmbench suite --ip-version v4|v6|dual
-vmbench suite --quiet --json suite.json
+vmbench --preset quick|website|proxy|mail
+vmbench --only ping,mail
+vmbench --skip media
+vmbench --ip-version v4|v6|dual
+vmbench --quiet --json suite.json
 ```
 
 CLI 默认通过 `suite.Options.OnEvent` 把 `section.start`、完成/失败状态和 `suite.done` 实时写到 stderr，因此 JSON/HTML 输出路径和 stdout console 内容不受进度文本污染；`--quiet` 只关闭这条进度流。

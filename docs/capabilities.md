@@ -114,8 +114,7 @@ vmbench 是一款**跨平台 VPS 基准测试工具**，使用 Go 编写，面�
 
 ```
 vmbench                                      # 启动 TUI（默认行为）
-vmbench run [flags]                          # 运行硬件基准测试
-vmbench suite [flags]                        # 运行 VPS 综合测评
+vmbench [flags]                              # 运行基准测试：默认仅 hardware，preset/only/skip 选择网络 section
 vmbench list                                 # 列出可用 workload
 vmbench sysinfo [--json]                     # 显示系统信息
 vmbench compare <a.json> <b.json> [...]      # 自动识别并对比 benchmark/Suite
@@ -126,43 +125,35 @@ vmbench update [--check] [--version TAG]     # 从 GitHub Releases 自升级
 vmbench version                              # 显示版本号
 ```
 
-### `run` 命令参数
+v0.8.0 起 `run` / `suite` 子命令合并进根命令。报告种类规则：解析 preset/only/skip 后，生效 section 恰好只有 `hardware` → 产出 benchmark（run 报告，与 v0.7.0 的 `vmbench run` 字节级兼容）；否则产出 suite 报告。唯一显式 flag 是 `--lang` 时打开对应语言的 TUI 而不开跑基准；多余位置参数会被拒绝。
+
+### 基准参数（根命令）
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `--iterations` | `3` | 每个 workload 的迭代次数（1-9） |
+| `--iterations` | `3` | hardware workload 迭代次数（1-9） |
 | `--filter` | （全部） | 正则表达式过滤 workload |
 | `--disk-path` | 系统临时目录 | 磁盘测试使用的临时目录 |
-| `--timeout` | `5m` | 单个 workload 超时时间 |
+| `--timeout` | `5m` | 单个 hardware workload 超时；网络 section 各自派生 timeout |
+| `--preset` | （仅 hardware） | 场景预设：`quick` / `website` / `proxy` / `mail` |
+| `--only` | （仅 hardware） | 只运行指定 section（逗号分隔） |
+| `--skip` | （无） | 跳过指定 section |
 | `--hardware-tool` | 平台相关 | Linux: sysbench,openssl,fio；macOS: openssl；Windows: winsat |
+| `--speed-provider` | `cloudflare` | 速度测试提供商（逗号分隔） |
+| `--ip-version` | `v4` | IP 版本：`v4` / `v6` / `dual` |
+| `--media-set` | `all` | 流媒体解锁检测范围（地区代码组合，`all` 与地区互斥） |
+| `--ip-quality-source` | `builtin` | IP 质量数据源；`securitycheck` 为 opt-in 外部二进制 |
+| `--route-presets` | `gz,bj,sh,cd,cernet,cstnet` | 广州、北京、上海、成都、教育网、科技网 |
+| `--node-catalog` | `embedded` | `embedded` / `auto` / 显式 JSON path |
+| `--node-revision` | （空） | pin 精确 catalog revision，不匹配时不启动 probe |
+| `--node-cache` | 用户 cache | `auto` source 的 cache path override |
+| `--iperf-host` | （空） | iperf3 服务器地址（逗号分隔多个；`--speed-provider iperf3` 时必填） |
 | `--json` | （空） | 输出 JSON 报告到文件 |
 | `--html` | （空） | 输出 HTML 报告到文件 |
 | `--quiet` | `false` | 静默模式，抑制进度输出 |
 | `--save-history` | `false` | 原子保存到本地历史（Unix mode `0700/0600`） |
 | `--history-tag` | （空） | 可选历史标签，要求 `--save-history` |
-
-### `suite` 命令参数
-
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `--iterations` | `3` | hardware workload 迭代次数（1-9） |
-| `--timeout` | `5m` | 每个网络 section 的 timeout；hardware 按 workload 应用 |
-| `--preset` | （全部 section） | 场景预设：`quick` / `website` / `proxy` / `mail` |
-| `--only` | （全部） | 只运行指定 section（逗号分隔） |
-| `--skip` | （无） | 跳过指定 section |
-| `--speed-provider` | `cloudflare` | 速度测试提供商（逗号分隔） |
-| `--ip-version` | `v4` | IP 版本：`v4` / `v6` / `dual` |
-| `--route-presets` | `gz,bj,sh,cd,cernet,cstnet` | 广州、北京、上海、成都、教育网、科技网 |
-| `--node-catalog` | `embedded` | `embedded` / `auto` / 显式 JSON path |
-| `--node-revision` | （空） | pin 精确 catalog revision，不匹配时不启动 probe |
-| `--node-cache` | 用户 cache | `auto` source 的 cache path override |
-| `--hardware-tool` | 平台相关 | 同 run 命令 |
-| `--iperf-host` | （空） | iperf3 服务器地址（逗号分隔多个；`--speed-provider iperf3` 时必填） |
-| `--json` | （空） | 同 run 命令 |
-| `--html` | （空） | 同 run 命令 |
-| `--quiet` | `false` | 抑制写到 stderr 的 Suite section 进度 |
-| `--save-history` | `false` | 保存 Suite v2 JSON 到本地历史 |
-| `--history-tag` | （空） | 可选历史标签 |
+| `--lang` | 自动 | `en` / `zh-CN`（也可用 `VMBENCH_LANG`）；所有子命令通用 |
 
 ### `nodes` 与 `history` 子命令
 
@@ -197,35 +188,35 @@ vmbench version                              # 显示版本号
 ### 使用示例
 
 ```bash
-# 基础硬件测试（默认 3 次迭代，工具集按平台选择）
-vmbench run
+# 基础硬件测试（默认 3 次迭代，工具集按平台选择；不带 section 参数 = 仅 hardware）
+vmbench --json report.json
 
 # 只跑 CPU 相关的 workload
-vmbench run --filter 'sysbench|OpenSSL'
+vmbench --filter 'sysbench|OpenSSL'
 
 # 扩展工具集
-vmbench run --hardware-tool sysbench,openssl,fio,dd,stream,mbw
+vmbench --hardware-tool sysbench,openssl,fio,dd,stream,mbw
 
 # 快速测评（1 次迭代）并输出 JSON + HTML
-vmbench run --iterations 1 --json report.json --html report.html
+vmbench --iterations 1 --json report.json --html report.html
 
 # 快速场景预设
-vmbench suite --preset quick
+vmbench --preset quick
 
 # 建站场景预设，双栈
-vmbench suite --preset website --ip-version dual
+vmbench --preset website --ip-version dual
 
 # 固定节点 revision，保存本次证据
-vmbench suite --node-catalog auto --node-revision 2026-07-13.1 --save-history --history-tag weekly
+vmbench --node-catalog auto --node-revision 2026-07-13.1 --save-history --history-tag weekly
 
 # 只测速度和 IP 质量
-vmbench suite --only speed,ip_quality
+vmbench --only speed,ip_quality
 
 # 多个速度提供商
-vmbench suite --speed-provider cloudflare,speedtest_net
+vmbench --speed-provider cloudflare,speedtest_net
 
 # 使用 iperf3 测速
-vmbench suite --speed-provider iperf3 --iperf-host 1.2.3.4
+vmbench --speed-provider iperf3 --iperf-host 1.2.3.4
 
 # 对比 benchmark 或 Suite 报告，以及最近 N 份同类型历史
 vmbench compare report-a.json report-b.json report-c.json
@@ -241,7 +232,7 @@ vmbench sysinfo
 vmbench sysinfo --json
 ```
 
-`run` 只做硬件基准，网络诊断全部由 `vmbench suite` 提供。非法 regex/iteration/tool 返回退出码 2，没有 workload 命中或任一 workload 失败返回退出码 1。`run` 和启用 hardware 的 `suite` 在执行前按 Definition Name/Category filter 检查本次实际涉及的外部命令，缺失时先写 stderr 提示，Linux 同时给出已知 Debian/Ubuntu 安装命令；受影响 workload 仍执行失败并写入结构化 error，不会静默跳过。
+不带 `--preset` / `--only` / `--skip` 时只做硬件基准；网络诊断通过 preset 或 `--only` 在同一命令面上选择。非法 regex/iteration/tool 返回退出码 2，没有 workload 命中或任一 workload 失败返回退出码 1（run 报告路径）。硬件测评在执行前按 Definition Name/Category filter 检查本次实际涉及的外部命令，缺失时先写 stderr 提示，Linux 同时给出已知 Debian/Ubuntu 安装命令；受影响 workload 仍执行失败并写入结构化 error，不会静默跳过。
 
 ### 自升级（`vmbench update`）
 
@@ -264,7 +255,7 @@ CLI、TUI 和 Console/HTML 报告标签已本地化为英文和简体中文；�
 
 ```bash
 VMBENCH_LANG=zh-CN vmbench --help
-vmbench suite --lang zh-CN
+vmbench --lang zh-CN
 vmbench tui --lang en
 ```
 
@@ -610,7 +601,7 @@ vmbench history compare --last 3
 - **latency**：越低越好（绿色 = 更低延迟）
 - **throughput**：越高越好（绿色 = 更高吞吐）
 
-命令先识别 report kind，benchmark 与 Suite 不能混合。Benchmark Compare 忽略带 error 的 metric，将 `ms avg` 按 latency 处理，不跨不兼容 throughput 单位计算 delta，并对迭代次数、mode、scope、硬件工具/iperf host 选择和重复 workload 给出可比性警告。
+命令先识别 report kind，benchmark 与 Suite 不能混合。注意 v0.8.0 起根命令 `--only hardware` 产出 benchmark（run）报告，而旧 `vmbench suite --only hardware` 产出的是 suite 报告——这两类历史记录之间不能混合对比。Benchmark Compare 忽略带 error 的 metric，将 `ms avg` 按 latency 处理，不跨不兼容 throughput 单位计算 delta，并对迭代次数、mode、scope、硬件工具/iperf host 选择和重复 workload 给出可比性警告。
 
 Suite Compare 对齐两份或更多 Suite v1/v2 JSON 的 raw metrics。Route/Ping 结果记录实际 `probe_protocol/probe_tool`，并显式保留成功的零值 Ping 指标。只有 unit、实际 protocol/IP family、provider/probe tool、target/node identity，以及节点型证据所需的 catalog revision 都兼容时才输出 delta；HTTP status 等分类码不参与百分比 delta。不兼容时仍显示各报告值，但 delta 留空并给出 reason/warning。Route 指标还要求逐项显式为 `status=ok` 且 `destination_reached=true`；旧报告没有到达证据时不参与 delta。Route hop count 等中性证据只用于对照，不解释成性能提升。Mail 只有 `status=open` 的连接延迟进入比较；`refused/timeout/error` 耗时不作为成功 latency。未知扩展 section 继续按通用 raw-metric 规则提取，不套用 IP Quality 的端口状态门禁。
 
@@ -663,9 +654,9 @@ vmbench          # 直接启动 TUI（无参数时的默认行为）
 
 ```
 Dashboard（主菜单）
-├── → Hardware Benchmark → Running → Results
-├── → Suite → SuiteConfig → SuiteRunning → SuiteResults
-├── → Compare（加载两份 benchmark JSON；Suite Compare 走 CLI/history）
+├── → Run Benchmark → Config → Running(run) → Results
+│                          └→ Running(suite) → SuiteResults
+├── → Compare（ComparePicker：历史选两条 / 查看单条 / 手输路径）
 └── → System Info（查看系统信息）
 ```
 
@@ -679,12 +670,18 @@ Dashboard（主菜单）
 - 按 `t` 切换主题，选择自动保存到本地配置
 - 显示当前主题名称
 
-#### Hardware Benchmark（Running + Results）
+#### Run Benchmark → Config（统一配置页）
 
-- 选择后进入 Running 页面，实时显示每个 workload 的执行进度
-- Go TUI 不提供独立 Multi-Core 入口；workload 串行执行，线程数和队列深度由外部工具参数定义
-- 进度信息：当前 workload 名称、迭代进度、状态（ok/error）
-- 完成后自动跳转 Results 页面
+- preset 胶囊首位是"仅硬件"（与 CLI 默认一致），随后 Custom 与 quick/website/proxy/mail；`1-9` 数字键快切 section 并自动切到 Custom preset
+- 9 个 section 开关与细节卡片（hardware tools / filter / speed / route / media / IP sources / advanced）按开关状态按需展开，焦点自动吸附可见字段
+- 与 CLI/MCP 共用 iterations/timeout/IP version/tools/providers/iperf/sections/route/catalog source/revision 归一化模型
+- 摘要卡实时显示启用 section 数、计划 workload 数与预计总时长（优先历史均值）；工具缺失预检 warning 卡非阻塞
+
+#### Running（单一运行页，按 runKind 分流）
+
+- run 路径：实时显示每个 workload 的执行进度——当前 workload 名称、迭代迷你条、采样进度、已耗时与完成后按墙钟外推的 ETA；完成后自动跳转 Results 页面
+- suite 路径：实时显示 section 执行状态（start/done/fail/skip/partial）与已耗时；完成后自动跳转 SuiteResults 页面
+- `Esc` 触发取消确认弹窗（文案按 runKind 选择）
 
 #### Results
 
@@ -695,16 +692,14 @@ Dashboard（主菜单）
 - 每项显示：名称、分类、median time、throughput、latency、detail/error
 - 按 `s` 保存为 JSON 文件
 
-#### Suite（SuiteConfig → SuiteRunning → SuiteResults）
+#### SuiteResults
 
-- **SuiteConfig**：初始实际应用 Quick preset（hardware/network_info/speed/ip_quality），speed provider 默认只选 Cloudflare；与 CLI/MCP 共用 iterations/timeout/IP version/tools/providers/iperf/sections/route/catalog source/revision 归一化模型
-- **SuiteRunning**：实时显示 section 执行状态（start/done/fail/skip）
-- **SuiteResults**：展示各 section 结果摘要和详细数据
+- 展示各 section 结果摘要和详细数据
 
 #### Compare
 
-- 加载两份 benchmark JSON 报告并按 workload 并排展示
-- Suite JSON 使用 `vmbench compare` 或 `history compare --last N`；当前不进入 TUI Compare 页面
+- 入口先进入 ComparePicker：历史记录列表（最新在前）`spc` 标记 A/B，`c` 对比，`v` 查看单条（run → Results、suite → SuiteResults），`m` 手输路径
+- benchmark 报告在 TUI 内并排展示 delta；suite 报告用与 CLI 相同的 textgrid 对比
 - 颜色编码：绿色 = 改善，红色 = 退化
 
 ### 键盘快捷键
@@ -830,18 +825,7 @@ vmbench mcp serve --transport stdio
 
 #### `vmbench_run`
 
-运行硬件基准测试：
-
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `iterations` | int | 1 | 迭代次数（1-9） |
-| `filter` | string | "" | workload 过滤正则 |
-| `hardware_tools` | enum[] | 平台相关 | Linux sysbench/OpenSSL/fio；macOS OpenSSL；Windows WinSAT |
-| `timeout_ms` | int | 300000 | 超时毫秒（最大 900000） |
-
-#### `vmbench_suite`
-
-运行 VPS 综合测评：
+运行基准测试（v0.8.0 起合并原 `vmbench_run`/`vmbench_suite` 两个工具）：不带 section 参数时只跑 hardware（返回 run 报告），`preset` / `only` / `skip` 选择网络 section 后返回 suite 报告：
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -852,12 +836,18 @@ vmbench mcp serve --transport stdio
 | `only` | enum[] | [] | 指定 section |
 | `skip` | enum[] | [] | 跳过 section |
 | `ip_version` | enum | "v4" | IP 版本 |
-| `hardware_tools` | enum[] | 平台相关 | 硬件工具 |
+| `hardware_tools` | enum[] | 平台相关 | Linux sysbench/OpenSSL/fio；macOS OpenSSL；Windows WinSAT |
 | `speed_providers` | enum[] | ["cloudflare"] | 速度提供商 |
 | `route_presets` | enum[] | ["gz","bj","sh","cd","cernet","cstnet"] | 路由/线路预设 |
 | `iperf_hosts` | string[] | [] | iperf3 服务器 |
+| `media_sets` | enum[] | ["all"] | 流媒体解锁检测范围 |
+| `ip_quality_sources` | enum[] | ["builtin"] | IP 质量数据源（`securitycheck` opt-in） |
 | `catalog_source` | string | "embedded" | embedded / auto / 显式 path |
 | `catalog_revision` | string | "" | 精确 revision pin |
+
+#### `vmbench_suite`（弃用别名）
+
+与 `vmbench_run` 路由到同一 handler、schema 完全一致，仅 Title 标记 `Deprecated: use vmbench_run`；计划 v0.9.0 删除。
 
 ### 安全边界
 
@@ -869,7 +859,7 @@ vmbench mcp serve --transport stdio
 | 迭代上限 | `iterations` 最大 9 |
 | 超时上限 | `timeout_ms` 最大 15 分钟（900000ms） |
 | 互斥运行 | Server 内部互斥锁，同一时间只允许一个 benchmark |
-| 默认保守 | `vmbench_run` 只跑硬件基准，`vmbench_suite` 默认只跑 hardware |
+| 默认保守 | `vmbench_run` 不带 section 参数时只跑 hardware |
 | 网络显式开启 | suite 通过 preset 或 only 显式启用 |
 | stdout 专用 | stdout 只写 JSON-RPC response，诊断信息写 stderr |
 | 原始指标 | 返回原始指标和结构化错误，不输出总分/等级 |
@@ -1247,7 +1237,7 @@ type Options struct {
 | `section.skip` | section 未启用 |
 | `suite.done` | 全部 section 完成 |
 
-`vmbench suite` 默认把 section 生命周期通过 `OnEvent` 实时打印到 stderr，不污染 stdout；`--quiet` 不安装该 CLI 进度回调。TUI 继续订阅同一事件模型绘制进度页。
+suite 路径默认把 section 生命周期通过 `OnEvent` 实时打印到 stderr，不污染 stdout；`--quiet` 不安装该 CLI 进度回调。TUI 继续订阅同一事件模型绘制进度页。
 
 ### Event 结构
 

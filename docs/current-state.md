@@ -24,7 +24,7 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 ### 1. Runner / workload 调度
 
 - workload 始终串行、隔离执行，不并发不同 benchmark，也不修改进程级 runtime/GC/线程状态
-- `vmbench run` 是硬件专用命令，只注册外部工具硬件 workload；网络诊断全部由 `vmbench suite` 提供
+- `vmbench` 根命令同时覆盖硬件基准与综合测评：不带 `--preset`/`--only`/`--skip` 只注册外部工具硬件 workload（run 报告），preset 或 `--only` 选择网络 section 后走综合测评（suite 报告）；网络诊断在同一命令面上提供
 - 硬件 workload 使用请求的 1-9 次迭代；suite 内的网络探测最多执行一次真实探测并记录实际 `iterations=1`
 - workload start event 在首个 sample 前逐项同步发射，done/fail 在当前 workload 返回后立即发射；同名 workload 也不会合并
 - CLI 对非法参数返回退出码 2；没有 workload 命中或任一 workload 失败时返回退出码 1
@@ -76,11 +76,9 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 - 首批 tools：
   - `vmbench_capabilities`
   - `vmbench_sysinfo`
-  - `vmbench_run`
-  - `vmbench_suite`
+  - `vmbench_run`（完整基准面：hardware/suite 由 section 参数分流，`vmbench_suite` 为弃用别名）
 - 默认安全策略：
-  - `vmbench_run` 只跑硬件基准，不提供网络参数
-  - `vmbench_suite` 默认只跑 `hardware`
+  - `vmbench_run` 不带 section 参数时只跑 `hardware`
   - `iterations` 默认 1，最大 9
   - `timeout_ms` 最大 15 分钟
 - MCP 严格区分省略值与显式非法值：非法 iterations/timeout/regex 或混入未知项的枚举数组直接拒绝，不启动测量
@@ -90,8 +88,8 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 ### 5. TUI / 报告
 
 - 8 套主题，支持本地持久化
-- Dashboard / Running / Results / Compare / SuiteConfig / SuiteRunning / SuiteResults
-- Go TUI 只保留 Hardware Benchmark 入口，不再提供独立 Multi-Core 入口；SuiteConfig 默认实际应用包含 `network_info` 的 Quick sections 和 Cloudflare provider，并使用与 CLI/MCP 相同的 catalog/config 模型
+- Dashboard / Config / Running / Results / SuiteResults / Compare / ComparePicker / ResultDetail / Help
+- Go TUI 只有单一"运行评测"入口与统一配置页（不再分 RunConfig/SuiteConfig 两页，也没有独立 Multi-Core 入口）：preset 胶囊首位是"仅硬件"（与 CLI 默认一致），section 开关按需展开细节卡片，启动时按 section 集合分流 run/suite 报告，并使用与 CLI/MCP 相同的 catalog/config 模型；运行页按 runKind 分流 workload 网格与 section 网格
 - Results 只展示原始时间、吞吐、延迟、detail/error
 - benchmark JSON 使用 schema v2；`run` 报告固定 `scope=hardware`、`extensions=false`，不再输出 iperf hosts 与 catalog provenance；旧版本网络报告的这些字段仍可被 compare/history 解析
 - 结果保留实际 iterations 与 `samples_ms`；processed 字段仅在明确为累计 bytes/ops 且 sample 语义一致时出现

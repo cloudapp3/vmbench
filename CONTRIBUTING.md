@@ -45,7 +45,7 @@ go build -o vmbench ./cmd/vmbench
 
 ./vmbench list
 ./vmbench sysinfo --json
-./vmbench run --filter 'SHA|AES' --iterations 1 --quiet --json /tmp/vmbench.json
+./vmbench --filter 'SHA|AES' --iterations 1 --quiet --json /tmp/vmbench.json
 ```
 
 Notes:

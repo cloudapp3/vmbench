@@ -69,17 +69,15 @@ CLI / TUI / 报告标签支持英文与简体中文（`--lang`、`VMBENCH_LANG`�
 ## 使用方式
 
 ```bash
-vmbench run
-vmbench run --filter 'sysbench|fio|OpenSSL'
-vmbench run --hardware-tool sysbench,openssl,fio,dd
-vmbench run --json report.json
-vmbench suite
-vmbench suite --preset quick
-vmbench suite --preset website
-vmbench suite --only ping,mail
-vmbench suite --ip-version dual
-vmbench suite --quiet --json suite.json
-vmbench suite --node-catalog auto --node-revision 2026-07-13.1 --save-history
+vmbench --json report.json
+vmbench --filter 'sysbench|fio|OpenSSL'
+vmbench --hardware-tool sysbench,openssl,fio,dd
+vmbench --preset quick
+vmbench --preset website
+vmbench --only ping,mail
+vmbench --ip-version dual
+vmbench --quiet --json suite.json
+vmbench --node-catalog auto --node-revision 2026-07-13.1 --save-history
 vmbench mcp serve --transport stdio
 vmbench compare a.json b.json
 vmbench history compare --last 3
@@ -87,11 +85,11 @@ vmbench nodes list --node-catalog embedded
 vmbench nodes health --node-catalog auto --ip-family v6
 ```
 
-`vmbench run` 是硬件专用命令：只编排 sysbench / fio / OpenSSL / WinSAT 等外部工具的硬件基准，网络诊断（route、speed、IP 质量等）全部由 `vmbench suite` 提供。所有 workload 串行隔离执行，线程数和队列深度由适配器定义；报告固定 `scope=hardware`、`extensions=false`。`run` 和启用 hardware 的 `suite` 会在执行前检查当前 filter 实际涉及的工具是否可解析，但缺失工具不会被静默跳过。
+`vmbench` 一个命令覆盖硬件基准与综合测评：不带 `--preset` / `--only` / `--skip` 时只编排 sysbench / fio / OpenSSL / WinSAT 等外部工具的硬件基准（run 报告，固定 `scope=hardware`、`extensions=false`），preset 或 `--only` 选择网络 section 后走综合测评（suite 报告），网络诊断（route、speed、IP 质量等）都在同一命令面上。所有 workload 串行隔离执行，线程数和队列深度由适配器定义。硬件测评会在执行前检查当前 filter 实际涉及的工具是否可解析，但缺失工具不会被静默跳过。
 
 ## Suite 场景预设
 
-`vmbench suite` 默认执行完整 VPS 测评。`--preset` 用于按 VPS 使用场景选择 section，让新用户保持一键体验，也让自动化任务可以稳定复用同一组维度。
+不带 section 参数时默认只跑 hardware（等价 v0.7.0 的 `vmbench run`）；`--preset` 用于按 VPS 使用场景选择 section，让新用户保持一键体验，也让自动化任务可以稳定复用同一组维度。
 
 | Preset | 使用场景 | Sections |
 |---|---|---|
@@ -103,20 +101,20 @@ vmbench nodes health --node-catalog auto --ip-family v6
 预设只是 section 选择，不改变输出模型，也不产生综合分。仍可用：
 
 ```bash
-vmbench suite --preset proxy --ip-version dual
-vmbench suite --preset website --skip media
-vmbench suite --only ping,mail
+vmbench --preset proxy --ip-version dual
+vmbench --preset website --skip media
+vmbench --only ping,mail
 ```
 
 速度测试也支持 provider 选择：
 
 ```bash
-vmbench suite --speed-provider cloudflare,speedtest_net
-vmbench suite --speed-provider china_isp
-vmbench suite --speed-provider speedtest_isp
-vmbench suite --speed-provider iperf3 --iperf-host 1.2.3.4
-vmbench suite --only hardware --hardware-tool dd,stream,mbw
-vmbench suite --only hardware --hardware-tool geekbench
+vmbench --speed-provider cloudflare,speedtest_net
+vmbench --speed-provider china_isp
+vmbench --speed-provider speedtest_isp
+vmbench --speed-provider iperf3 --iperf-host 1.2.3.4
+vmbench --only hardware --hardware-tool dd,stream,mbw
+vmbench --only hardware --hardware-tool geekbench
 ```
 
 `speed` section 的输出会按 provider 分组展示下载、上传、延迟、状态和错误信息，便于区分 Cloudflare / Ookla / speedtest.cn / iperf3 的失败原因。`china_isp` 使用版本化 catalog 中的 `isp_download` 节点（speedtest.cn 直连端点，数据来自 MIT 的 speedtest.cn-CN-ID），按电信/联通/移动顺序下载，同运营商节点依次 fallback；`speedtest_isp` 将 Ookla `speedtest` CLI 固定到按运营商的 speedtest.net 节点 ID（数据来自 MIT 的 speedtest.net-CN-ID），需要本机安装 speedtest CLI。流媒体与 IP 质量可分别用 `--media-set jp,kr` 与 `--ip-quality-source builtin,securitycheck` 收敛范围（securityCheck 二进制需自行安装，缺失时记录 `unavailable` 而不影响 section）。
@@ -146,7 +144,7 @@ vmbench nodes health --node-catalog auto --kind route --ip-family v6 --json
 
 更新流程要求显式 Ed25519 公钥，先验证 detached signature 和严格 schema，再原子替换缓存；Unix 文件 mode 为 `0600`。签名、revision 或 schema 不满足时 fail-closed，不启动探测也不覆盖旧缓存。
 
-`vmbench run` / `vmbench suite` 可用 `--save-history [--history-tag TAG]` 保存；也可用 `history add/list/show/delete` 管理已有 JSON，`history compare --last N` 比较最近 N 份同类型报告。CLI 的 `--json` / `--html` 导出和 history 都先写同目录临时文件、sync 后 rename；Unix 导出/历史文件 mode 为 `0600`，其他平台仍应依赖系统 ACL 保护。报告可能包含 hostname、公网 IP 和 route hops，任何未来 upload/share 都必须显式授权并支持脱敏。Route/Ping 报告区分 catalog protocol 与实际 `probe_protocol/probe_tool`；Suite Compare 只有在 unit、实际 protocol/IP family、provider/probe tool、target/node 以及需要时 catalog revision 全部兼容时才计算 delta。不兼容值仍展示，但明确给出 reason。Route 还必须显式为 `status=ok` 且 `destination_reached=true`，旧报告没有到达证据时不计算 delta。Mail 只比较 `status=open` 的成功连接延迟，拒绝、超时和错误耗时不参与 latency delta。
+`vmbench` 可用 `--save-history [--history-tag TAG]` 保存报告；也可用 `history add/list/show/delete` 管理已有 JSON，`history compare --last N` 比较最近 N 份同类型报告。CLI 的 `--json` / `--html` 导出和 history 都先写同目录临时文件、sync 后 rename；Unix 导出/历史文件 mode 为 `0600`，其他平台仍应依赖系统 ACL 保护。报告可能包含 hostname、公网 IP 和 route hops，任何未来 upload/share 都必须显式授权并支持脱敏。Route/Ping 报告区分 catalog protocol 与实际 `probe_protocol/probe_tool`；Suite Compare 只有在 unit、实际 protocol/IP family、provider/probe tool、target/node 以及需要时 catalog revision 全部兼容时才计算 delta。不兼容值仍展示，但明确给出 reason。Route 还必须显式为 `status=ok` 且 `destination_reached=true`，旧报告没有到达证据时不计算 delta。Mail 只比较 `status=open` 的成功连接延迟，拒绝、超时和错误耗时不参与 latency delta。
 
 ## 自升级
 
@@ -162,8 +160,8 @@ vmbench nodes health --node-catalog auto --kind route --ip-family v6 --json
 |---|---|
 | `vmbench_capabilities` | 输出版本、suite sections、presets、hardware tools、speed providers、workload 列表 |
 | `vmbench_sysinfo` | 输出当前主机系统信息和 warning |
-| `vmbench_run` | 运行硬件基准；MCP 默认 `iterations=1`，网络诊断在 `vmbench_suite` |
-| `vmbench_suite` | 运行 VPS suite；MCP 默认只跑 `hardware`，网络 section 必须通过 preset 或 `only` 显式开启 |
+| `vmbench_run` | 运行基准（MCP 默认 `iterations=1`；不带 section 参数只跑 hardware，preset/only/skip 选择网络 section 后返回 suite 报告） |
+| `vmbench_suite` | 弃用别名：与 `vmbench_run` 完全同 schema、同 handler，计划 v0.9.0 删除 |
 
 MCP 输出仍然遵守 vmbench 的产品原则：只返回原始指标和结构化诊断，不输出 benchmark 总分、等级或 category score。IP Quality 的风险评分属于业务诊断，不是 benchmark 总分。
 
