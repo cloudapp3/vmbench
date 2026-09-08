@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -186,10 +185,10 @@ func (s *Server) callTool(ctx context.Context, name string, raw json.RawMessage)
 		return okToolResult("vmbench capabilities", capabilitiesPayload()), nil
 	case "vmbench_sysinfo":
 		return s.toolSysinfo(ctx, raw)
-	case "vmbench_run":
-		return s.toolRun(ctx, raw)
-	case "vmbench_suite":
-		return s.toolSuite(ctx, raw)
+	case "vmbench_run", "vmbench_suite":
+		// vmbench_suite is a deprecated alias kept for older clients (v0.9.0
+		// candidate for removal); both names run the merged benchmark tool.
+		return s.toolBench(ctx, raw)
 	default:
 		return errorToolResult("unknown tool: " + name), nil
 	}
@@ -208,79 +207,14 @@ func (s *Server) toolSysinfo(ctx context.Context, raw json.RawMessage) (toolResu
 	return okToolResult(formatSysinfoSummary(info, warnings), payload), nil
 }
 
-type runArgs struct {
-	Iterations    json.RawMessage `json:"iterations,omitempty"`
-	Filter        string          `json:"filter,omitempty"`
-	DiskPath      string          `json:"disk_path,omitempty"`
-	TimeoutMS     json.RawMessage `json:"timeout_ms,omitempty"`
-	HardwareTools []string        `json:"hardware_tools,omitempty"`
-}
+const (
+	benchKindRun   = "run"
+	benchKindSuite = "suite"
+)
 
-func (s *Server) toolRun(ctx context.Context, raw json.RawMessage) (toolResult, error) {
-	var args runArgs
-	if err := decodeToolArgs(raw, &args); err != nil {
-		return errorToolResult(err.Error()), nil
-	}
-	norm, warnings := normalizeRunArgs(args)
-	if len(warnings) > 0 {
-		return errorToolResult(strings.Join(warnings, "; ")), nil
-	}
-	if ok := s.tryAcquireRun(); !ok {
-		return errorToolResult("another vmbench benchmark is already running"), nil
-	}
-	defer s.releaseRun()
-
-	runCtx, cancel := context.WithTimeout(ctx, norm.Timeout)
-	defer cancel()
-	report := vmbench.RunCore(runCtx, vmbench.Options{
-		DiskPath:      norm.DiskPath,
-		Timeout:       norm.Timeout,
-		Iterations:    norm.Iterations,
-		Filter:        norm.Filter,
-		Engine:        "external",
-		HardwareTools: norm.HardwareTools,
-	})
-	payload := map[string]any{"report": report}
-	result := okToolResult(formatRunSummary(report), payload)
-	result.IsError = gbreport.HasFailures(report)
-	return result, nil
-}
-
-type normalizedRunArgs struct {
-	Iterations    int
-	Filter        string
-	DiskPath      string
-	Timeout       time.Duration
-	HardwareTools []string
-}
-
-func normalizeRunArgs(args runArgs) (normalizedRunArgs, []string) {
-	warnings := make([]string, 0, 4)
-	iterations, iterationError := normalizeIterations(args.Iterations)
-	appendValidationError(&warnings, iterationError)
-	timeout, timeoutError := normalizeTimeoutMillis(args.TimeoutMS, 5*time.Minute)
-	appendValidationError(&warnings, timeoutError)
-	norm, err := vmbench.NormalizeOptions(vmbench.Options{
-		Iterations:    iterations,
-		Filter:        strings.TrimSpace(args.Filter),
-		Engine:        "external",
-		DiskPath:      strings.TrimSpace(args.DiskPath),
-		Timeout:       timeout,
-		HardwareTools: cleanList(args.HardwareTools),
-	})
-	if err != nil {
-		warnings = append(warnings, err.Error())
-	}
-	return normalizedRunArgs{
-		Iterations:    norm.Iterations,
-		Filter:        norm.Filter,
-		DiskPath:      norm.DiskPath,
-		Timeout:       norm.Timeout,
-		HardwareTools: norm.HardwareTools,
-	}, warnings
-}
-
-type suiteArgs struct {
+// benchArgs carries the unified vmbench_run tool arguments, also accepted by
+// the deprecated vmbench_suite alias.
+type benchArgs struct {
 	Iterations       json.RawMessage `json:"iterations,omitempty"`
 	Filter           string          `json:"filter,omitempty"`
 	DiskPath         string          `json:"disk_path,omitempty"`
@@ -300,12 +234,20 @@ type suiteArgs struct {
 	CatalogCachePath string          `json:"catalog_cache_path,omitempty"`
 }
 
-func (s *Server) toolSuite(ctx context.Context, raw json.RawMessage) (toolResult, error) {
-	var args suiteArgs
+// benchPlan is the normalized execution plan. A hardware-only selection runs
+// the bare hardware benchmark (run report); anything else runs the suite.
+type benchPlan struct {
+	Kind  string
+	Run   vmbench.Options
+	Suite suite.Options
+}
+
+func (s *Server) toolBench(ctx context.Context, raw json.RawMessage) (toolResult, error) {
+	var args benchArgs
 	if err := decodeToolArgs(raw, &args); err != nil {
 		return errorToolResult(err.Error()), nil
 	}
-	opts, warnings := normalizeSuiteArgs(args)
+	plan, warnings := normalizeBenchArgs(args)
 	if len(warnings) > 0 {
 		return errorToolResult(strings.Join(warnings, "; ")), nil
 	}
@@ -314,14 +256,24 @@ func (s *Server) toolSuite(ctx context.Context, raw json.RawMessage) (toolResult
 	}
 	defer s.releaseRun()
 
-	report := suite.Run(ctx, opts)
+	if plan.Kind == benchKindRun {
+		runCtx, cancel := context.WithTimeout(ctx, plan.Run.Timeout)
+		defer cancel()
+		report := vmbench.RunCore(runCtx, plan.Run)
+		payload := map[string]any{"report": report}
+		result := okToolResult(formatRunSummary(report), payload)
+		result.IsError = gbreport.HasFailures(report)
+		return result, nil
+	}
+
+	report := suite.Run(ctx, plan.Suite)
 	payload := map[string]any{"report": report}
 	result := okToolResult(formatSuiteSummary(report), payload)
 	result.IsError = report.HasFailures()
 	return result, nil
 }
 
-func normalizeSuiteArgs(args suiteArgs) (suite.Options, []string) {
+func normalizeBenchArgs(args benchArgs) (benchPlan, []string) {
 	warnings := make([]string, 0, 6)
 	iterations, iterationError := normalizeIterations(args.Iterations)
 	appendValidationError(&warnings, iterationError)
@@ -348,6 +300,36 @@ func normalizeSuiteArgs(args suiteArgs) (suite.Options, []string) {
 		warnings = append(warnings, "at least one suite section must remain enabled")
 	}
 
+	// Shared field validation independent of the execution kind, so an
+	// invalid value in a currently unused parameter still surfaces.
+	if err := suite.ValidateOptions(suite.Options{
+		Filter:         strings.TrimSpace(args.Filter),
+		RoutePresets:   cleanList(args.RoutePresets),
+		SpeedProviders: cleanList(args.SpeedProviders),
+		HardwareTools:  cleanList(args.HardwareTools),
+		Sections:       sections,
+		IPVersion:      strings.TrimSpace(args.IPVersion),
+		MediaSet:       strings.TrimSpace(args.MediaSet),
+		IPSources:      cleanList(args.IPSources),
+	}); err != nil {
+		warnings = append(warnings, err.Error())
+	}
+
+	if sections.HardwareOnly() {
+		norm, err := vmbench.NormalizeOptions(vmbench.Options{
+			Iterations:    iterations,
+			Filter:        strings.TrimSpace(args.Filter),
+			Engine:        "external",
+			DiskPath:      strings.TrimSpace(args.DiskPath),
+			Timeout:       timeout,
+			HardwareTools: cleanList(args.HardwareTools),
+		})
+		if err != nil {
+			warnings = append(warnings, err.Error())
+		}
+		return benchPlan{Kind: benchKindRun, Run: norm}, dedupeStrings(warnings)
+	}
+
 	norm, err := suite.NormalizeOptions(suite.Options{
 		Iterations:       iterations,
 		Filter:           strings.TrimSpace(args.Filter),
@@ -369,7 +351,22 @@ func normalizeSuiteArgs(args suiteArgs) (suite.Options, []string) {
 	if err != nil {
 		warnings = append(warnings, err.Error())
 	}
-	return norm, warnings
+	return benchPlan{Kind: benchKindSuite, Suite: norm}, dedupeStrings(warnings)
+}
+
+// dedupeStrings removes repeated warning strings while preserving order; the
+// shared validation and the per-kind normalization can report the same issue.
+func dedupeStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }
 
 func selectorFromNames(names []string, enable bool, warnings *[]string) suite.SectionSelector {
@@ -383,10 +380,6 @@ func applySectionNames(base suite.SectionSelector, names []string, enable bool, 
 		return base
 	}
 	return sections
-}
-
-func normalizeSectionName(raw string) string {
-	return suite.NormalizeSectionName(raw)
 }
 
 func (s *Server) tryAcquireRun() bool {
@@ -508,41 +501,41 @@ func toolSpecs() []toolSpec {
 		},
 		{
 			Name:        "vmbench_run",
-			Title:       "VMBench raw benchmark run",
-			Description: "Run vmbench hardware workloads and return raw metrics. Defaults to one iteration and no synthetic scoring; network diagnostics live in vmbench_suite.",
-			InputSchema: objectSchema(map[string]any{
-				"iterations":     map[string]any{"type": "integer", "minimum": 1, "maximum": maxIterations, "description": "Iterations per workload. Default 1 for MCP."},
-				"filter":         map[string]any{"type": "string", "description": "Regex matched against workload name or category."},
-				"disk_path":      map[string]any{"type": "string", "description": "Temp directory for disk workloads."},
-				"timeout_ms":     map[string]any{"type": "integer", "minimum": 1, "maximum": maxTimeout.Milliseconds(), "description": "Overall tool timeout in milliseconds."},
-				"hardware_tools": enumArraySchema(catalog.HardwareToolIDs(), "External hardware tools; use capabilities for metadata."),
-			}, nil),
+			Title:       "VMBench benchmark",
+			Description: "Run vmbench benchmarks and return raw metrics. Defaults to hardware only (returns a run report); pass preset/only/skip to run suite sections (returns a suite report). Default one iteration, no synthetic scoring.",
+			InputSchema: benchInputSchema(),
 		},
 		{
 			Name:        "vmbench_suite",
-			Title:       "VMBench VPS suite",
-			Description: "Run VPS suite sections. Defaults to hardware only so network diagnostics are opt-in unless a preset/only list requests them.",
-			InputSchema: objectSchema(map[string]any{
-				"iterations":         map[string]any{"type": "integer", "minimum": 1, "maximum": maxIterations, "description": "Iterations for hardware workloads. Default 1 for MCP."},
-				"filter":             map[string]any{"type": "string", "description": "Regex matched against hardware workload name or category."},
-				"disk_path":          map[string]any{"type": "string", "description": "Temp directory for disk workloads."},
-				"timeout_ms":         map[string]any{"type": "integer", "minimum": 1, "maximum": maxTimeout.Milliseconds(), "description": "Per-section timeout in milliseconds; hardware applies it per workload."},
-				"preset":             map[string]any{"type": "string", "enum": suite.PresetIDs(), "description": "Scenario preset. Enables its sections."},
-				"only":               enumArraySchema(suite.SectionIDs(), "Run only these suite sections."),
-				"skip":               enumArraySchema(suite.SectionIDs(), "Skip these suite sections."),
-				"route_presets":      enumArraySchema(routePresetIDs(), "Route/ping preset IDs."),
-				"speed_providers":    enumArraySchema(suite.SpeedProviderIDs(), "Speed providers."),
-				"hardware_tools":     enumArraySchema(catalog.HardwareToolIDs(), "External hardware tools."),
-				"iperf_hosts":        stringArraySchema("iperf3 hosts; adds iperf3 speed provider when speed is enabled."),
-				"ip_version":         map[string]any{"type": "string", "enum": []string{"v4", "v6", "dual"}, "description": "Network IP version."},
-				"media_set":          map[string]any{"type": "string", "enum": suite.MediaSets(), "description": "Media unlock set. Default all (full platform list)."},
-				"ip_sources":         enumArraySchema(suite.IPSourceIDs(), "IP quality evidence sources. securitycheck requires the external binary."),
-				"catalog_source":     map[string]any{"type": "string", "description": "Node catalog source: embedded, auto, or a local JSON path."},
-				"catalog_revision":   map[string]any{"type": "string", "description": "Require an exact node catalog revision before Suite sections start."},
-				"catalog_cache_path": map[string]any{"type": "string", "description": "Optional cache path used with catalog_source=auto."},
-			}, nil),
+			Title:       "VMBench VPS suite (Deprecated: use vmbench_run)",
+			Description: "Deprecated: use vmbench_run. Run VPS suite sections; defaults to hardware only so network diagnostics are opt-in unless a preset/only list requests them.",
+			InputSchema: benchInputSchema(),
 		},
 	}
+}
+
+// benchInputSchema builds the shared schema for vmbench_run and its
+// deprecated vmbench_suite alias.
+func benchInputSchema() map[string]any {
+	return objectSchema(map[string]any{
+		"iterations":         map[string]any{"type": "integer", "minimum": 1, "maximum": maxIterations, "description": "Iterations per workload. Default 1 for MCP."},
+		"filter":             map[string]any{"type": "string", "description": "Regex matched against workload name or category."},
+		"disk_path":          map[string]any{"type": "string", "description": "Temp directory for disk workloads."},
+		"timeout_ms":         map[string]any{"type": "integer", "minimum": 1, "maximum": maxTimeout.Milliseconds(), "description": "Per-section timeout in milliseconds; hardware applies it per workload."},
+		"preset":             map[string]any{"type": "string", "enum": suite.PresetIDs(), "description": "Scenario preset. Enables its sections."},
+		"only":               enumArraySchema(suite.SectionIDs(), "Run only these suite sections."),
+		"skip":               enumArraySchema(suite.SectionIDs(), "Skip these suite sections."),
+		"route_presets":      enumArraySchema(routePresetIDs(), "Route/ping preset IDs."),
+		"speed_providers":    enumArraySchema(suite.SpeedProviderIDs(), "Speed providers."),
+		"hardware_tools":     enumArraySchema(catalog.HardwareToolIDs(), "External hardware tools."),
+		"iperf_hosts":        stringArraySchema("iperf3 hosts; adds iperf3 speed provider when speed is enabled."),
+		"ip_version":         map[string]any{"type": "string", "enum": []string{"v4", "v6", "dual"}, "description": "Network IP version."},
+		"media_set":          map[string]any{"type": "string", "enum": suite.MediaSets(), "description": "Media unlock set. Default all (full platform list)."},
+		"ip_sources":         enumArraySchema(suite.IPSourceIDs(), "IP quality evidence sources. securitycheck requires the external binary."),
+		"catalog_source":     map[string]any{"type": "string", "description": "Node catalog source: embedded, auto, or a local JSON path."},
+		"catalog_revision":   map[string]any{"type": "string", "description": "Require an exact node catalog revision before Suite sections start."},
+		"catalog_cache_path": map[string]any{"type": "string", "description": "Optional cache path used with catalog_source=auto."},
+	}, nil)
 }
 
 func objectSchema(properties map[string]any, required []string) map[string]any {
@@ -613,29 +606,10 @@ func normalizeTimeoutMillis(raw json.RawMessage, fallback time.Duration) (time.D
 	return time.Duration(value) * time.Millisecond, ""
 }
 
-func validateFilter(filter string) string {
-	if filter == "" {
-		return ""
-	}
-	if _, err := regexp.Compile(filter); err != nil {
-		return "invalid filter regex: " + err.Error()
-	}
-	return ""
-}
-
 func appendValidationError(warnings *[]string, message string) {
 	if strings.TrimSpace(message) != "" {
 		*warnings = append(*warnings, message)
 	}
-}
-
-func firstInvalidValue(raw []string, normalize func([]string) []string) string {
-	for _, value := range cleanList(raw) {
-		if len(normalize([]string{value})) == 0 {
-			return value
-		}
-	}
-	return ""
 }
 
 func cleanList(in []string) []string {

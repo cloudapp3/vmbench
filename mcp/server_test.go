@@ -1,7 +1,9 @@
 package mcp
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -9,8 +11,8 @@ import (
 	"github.com/cloudapp3/vmbench/suite"
 )
 
-func TestNormalizeRunArgsRejectsInvalidValues(t *testing.T) {
-	_, warnings := normalizeRunArgs(runArgs{
+func TestNormalizeBenchArgsRejectsInvalidValues(t *testing.T) {
+	_, warnings := normalizeBenchArgs(benchArgs{
 		Iterations:    json.RawMessage("0"),
 		TimeoutMS:     json.RawMessage("-1"),
 		Filter:        "[",
@@ -24,8 +26,8 @@ func TestNormalizeRunArgsRejectsInvalidValues(t *testing.T) {
 	}
 }
 
-func TestNormalizeSuiteArgsRejectsInvalidValues(t *testing.T) {
-	_, warnings := normalizeSuiteArgs(suiteArgs{
+func TestNormalizeBenchArgsRejectsInvalidSectionValues(t *testing.T) {
+	_, warnings := normalizeBenchArgs(benchArgs{
 		Iterations:     json.RawMessage("1"),
 		TimeoutMS:      json.RawMessage("1000"),
 		Filter:         "(",
@@ -38,6 +40,29 @@ func TestNormalizeSuiteArgsRejectsInvalidValues(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("warnings = %v, want %q", warnings, want)
 		}
+	}
+}
+
+func TestNormalizeBenchArgsSelectsKind(t *testing.T) {
+	defaultPlan, warnings := normalizeBenchArgs(benchArgs{Iterations: json.RawMessage("1")})
+	if len(warnings) != 0 {
+		t.Fatalf("default warnings = %v", warnings)
+	}
+	if defaultPlan.Kind != benchKindRun {
+		t.Fatalf("default kind = %q, want %q", defaultPlan.Kind, benchKindRun)
+	}
+	if defaultPlan.Run.Iterations != 1 || defaultPlan.Run.Engine != "external" {
+		t.Fatalf("default run options = %+v", defaultPlan.Run)
+	}
+
+	hardwareOnly, _ := normalizeBenchArgs(benchArgs{Only: []string{"hardware"}})
+	if hardwareOnly.Kind != benchKindRun {
+		t.Fatalf("only=hardware kind = %q, want %q", hardwareOnly.Kind, benchKindRun)
+	}
+
+	presetPlan, _ := normalizeBenchArgs(benchArgs{Preset: "quick"})
+	if presetPlan.Kind != benchKindSuite {
+		t.Fatalf("preset=quick kind = %q, want %q", presetPlan.Kind, benchKindSuite)
 	}
 }
 
@@ -70,24 +95,18 @@ func TestFormatRunSummaryCountsMissingResultAsFailure(t *testing.T) {
 }
 
 func TestNormalizeArgsRejectExplicitNullNumbers(t *testing.T) {
-	_, runWarnings := normalizeRunArgs(runArgs{
+	_, warnings := normalizeBenchArgs(benchArgs{
 		Iterations: json.RawMessage("null"),
 		TimeoutMS:  json.RawMessage("null"),
 	})
-	joined := strings.Join(runWarnings, "\n")
+	joined := strings.Join(warnings, "\n")
 	if !strings.Contains(joined, "iterations must be an integer") || !strings.Contains(joined, "timeout_ms must be an integer") {
-		t.Fatalf("run warnings = %v, want null numeric validation errors", runWarnings)
-	}
-
-	_, suiteWarnings := normalizeSuiteArgs(suiteArgs{Iterations: json.RawMessage("null"), TimeoutMS: json.RawMessage("null")})
-	joined = strings.Join(suiteWarnings, "\n")
-	if !strings.Contains(joined, "iterations must be an integer") || !strings.Contains(joined, "timeout_ms must be an integer") {
-		t.Fatalf("suite warnings = %v, want null numeric validation errors", suiteWarnings)
+		t.Fatalf("warnings = %v, want null numeric validation errors", warnings)
 	}
 }
 
-func TestNormalizeSuiteArgsUsesCanonicalSectionsAndCatalog(t *testing.T) {
-	identityOnly, warnings := normalizeSuiteArgs(suiteArgs{
+func TestNormalizeBenchArgsUsesCanonicalSectionsAndCatalog(t *testing.T) {
+	identityOnly, warnings := normalizeBenchArgs(benchArgs{
 		Iterations: json.RawMessage("1"),
 		Only:       []string{"identity", "telegram"},
 		IPVersion:  "dual",
@@ -95,14 +114,17 @@ func TestNormalizeSuiteArgsUsesCanonicalSectionsAndCatalog(t *testing.T) {
 	if len(warnings) != 0 {
 		t.Fatalf("identity warnings = %v", warnings)
 	}
-	if !identityOnly.Sections.NetworkInfo || !identityOnly.Sections.Reachability || identityOnly.Sections.Speed {
-		t.Fatalf("identity sections = %+v", identityOnly.Sections)
+	if identityOnly.Kind != benchKindSuite {
+		t.Fatalf("identity kind = %q, want %q", identityOnly.Kind, benchKindSuite)
 	}
-	if identityOnly.CatalogRevision != "" || identityOnly.ResolvedCatalog != nil {
-		t.Fatalf("non-node suite retained catalog: %+v", identityOnly)
+	if !identityOnly.Suite.Sections.NetworkInfo || !identityOnly.Suite.Sections.Reachability || identityOnly.Suite.Sections.Speed {
+		t.Fatalf("identity sections = %+v", identityOnly.Suite.Sections)
+	}
+	if identityOnly.Suite.CatalogRevision != "" || identityOnly.Suite.ResolvedCatalog != nil {
+		t.Fatalf("non-node suite retained catalog: %+v", identityOnly.Suite)
 	}
 
-	pingOnly, warnings := normalizeSuiteArgs(suiteArgs{
+	pingOnly, warnings := normalizeBenchArgs(benchArgs{
 		Iterations:   json.RawMessage("1"),
 		Only:         []string{"ping"},
 		RoutePresets: []string{"cd", "cernet", "cstnet"},
@@ -111,34 +133,66 @@ func TestNormalizeSuiteArgsUsesCanonicalSectionsAndCatalog(t *testing.T) {
 	if len(warnings) != 0 {
 		t.Fatalf("ping warnings = %v", warnings)
 	}
-	if pingOnly.ResolvedCatalog == nil || pingOnly.CatalogRevision == "" || len(pingOnly.NodeIDs) == 0 {
-		t.Fatalf("ping catalog provenance = %+v", pingOnly)
+	if pingOnly.Suite.ResolvedCatalog == nil || pingOnly.Suite.CatalogRevision == "" || len(pingOnly.Suite.NodeIDs) == 0 {
+		t.Fatalf("ping catalog provenance = %+v", pingOnly.Suite)
 	}
 }
 
-func TestNormalizeSuiteArgsRejectCatalogRevisionMismatch(t *testing.T) {
-	_, suiteWarnings := normalizeSuiteArgs(suiteArgs{
+func TestNormalizeBenchArgsRejectCatalogRevisionMismatch(t *testing.T) {
+	_, warnings := normalizeBenchArgs(benchArgs{
 		Iterations:      json.RawMessage("1"),
 		Only:            []string{"ping"},
 		CatalogRevision: "missing-revision",
 	})
-	if !strings.Contains(strings.Join(suiteWarnings, "\n"), "pinned revision") {
-		t.Fatalf("suite warnings = %v", suiteWarnings)
+	if !strings.Contains(strings.Join(warnings, "\n"), "pinned revision") {
+		t.Fatalf("warnings = %v", warnings)
 	}
 }
 
-func TestToolSpecsExposeCatalogAndNetworkEvidence(t *testing.T) {
-	var suiteSchema map[string]any
-	for _, spec := range toolSpecs() {
-		if spec.Name == "vmbench_suite" {
-			suiteSchema = spec.InputSchema
-			break
+func TestCallToolRoutesSuiteAliasToBench(t *testing.T) {
+	s := &Server{}
+	for _, name := range []string{"vmbench_run", "vmbench_suite"} {
+		res, err := s.callTool(context.Background(), name, json.RawMessage(`{"iterations":0}`))
+		if err != nil {
+			t.Fatalf("callTool(%s) error = %v", name, err)
+		}
+		if !res.IsError || !strings.Contains(res.Content[0].Text, "iterations") {
+			t.Fatalf("callTool(%s) = %+v, want iterations validation error", name, res)
 		}
 	}
-	properties, _ := suiteSchema["properties"].(map[string]any)
-	for _, key := range []string{"catalog_source", "catalog_revision", "catalog_cache_path"} {
+}
+
+func TestToolSpecsExposeMergedSchemaWithDeprecatedAlias(t *testing.T) {
+	schemas := map[string]map[string]any{}
+	titles := map[string]string{}
+	for _, spec := range toolSpecs() {
+		schemas[spec.Name] = spec.InputSchema
+		titles[spec.Name] = spec.Title
+	}
+	runSchema, ok := schemas["vmbench_run"]
+	if !ok {
+		t.Fatal("vmbench_run spec missing")
+	}
+	if !strings.Contains(titles["vmbench_suite"], "Deprecated") {
+		t.Fatalf("vmbench_suite title = %q, want deprecated marker", titles["vmbench_suite"])
+	}
+	// The deprecated alias must expose the identical schema.
+	aliasJSON, err := json.Marshal(schemas["vmbench_suite"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	runJSON, err := json.Marshal(runSchema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(aliasJSON) != string(runJSON) {
+		t.Fatalf("vmbench_suite schema differs from vmbench_run:\n%s\n%s", aliasJSON, runJSON)
+	}
+
+	properties, _ := runSchema["properties"].(map[string]any)
+	for _, key := range []string{"catalog_source", "catalog_revision", "catalog_cache_path", "preset", "only", "skip"} {
 		if _, ok := properties[key]; !ok {
-			t.Fatalf("suite MCP schema missing %q: %#v", key, properties)
+			t.Fatalf("vmbench_run schema missing %q: %s", key, formatProperties(properties))
 		}
 	}
 	only, _ := properties["only"].(map[string]any)
@@ -147,11 +201,19 @@ func TestToolSpecsExposeCatalogAndNetworkEvidence(t *testing.T) {
 	joined := strings.Join(enum, ",")
 	for _, section := range []string{"network_info", "reachability"} {
 		if !strings.Contains(joined, section) {
-			t.Fatalf("suite MCP section enum = %v, want %q", enum, section)
+			t.Fatalf("section enum = %v, want %q", enum, section)
 		}
 	}
 	payload := capabilitiesPayload()
 	if _, ok := payload["node_catalog"]; !ok {
 		t.Fatalf("capabilities missing node_catalog: %#v", payload)
 	}
+}
+
+func formatProperties(properties map[string]any) string {
+	keys := make([]string, 0, len(properties))
+	for key := range properties {
+		keys = append(keys, key)
+	}
+	return fmt.Sprintf("properties %v", keys)
 }
