@@ -1315,11 +1315,8 @@ GOOS=windows GOARCH=amd64 go build -ldflags "..." -o vmbench-windows-amd64 ./cmd
 ### 一键安装
 
 ```bash
-# 安装最新版本
+# 安装最新版本（默认）
 curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash
-
-# 安装指定版本
-curl -fsSL ... | bash -s -- --version v0.1.0
 
 # 自定义安装目录
 curl -fsSL ... | bash -s -- --dir /opt/bin

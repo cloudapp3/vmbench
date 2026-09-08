@@ -28,12 +28,9 @@ vmbench update                   # self-update from GitHub Releases
 
 ## Install
 
-The one-liner above downloads the release archive for your OS/arch, verifies its SHA-256 against `checksums.txt`, and installs to the first writable directory among `/usr/local/bin`, `~/.local/bin`, and `~/bin`.
+The one-liner above installs the **latest release** for your OS/arch, verifies its SHA-256 against `checksums.txt`, and installs to the first writable directory among `/usr/local/bin`, `~/.local/bin`, and `~/bin`.
 
 ```bash
-# Specific release tag
-curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash -s -- --version v0.1.0
-
 # Custom directory
 curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash -s -- --dir /opt/bin
 
