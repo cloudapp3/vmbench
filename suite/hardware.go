@@ -17,9 +17,7 @@ func runHardwareSection(ctx context.Context, opts Options, report *SuiteReport) 
 		Timeout:       opts.Timeout,
 		Iterations:    opts.Iterations,
 		Filter:        opts.Filter,
-		Mode:          "single",
 		Engine:        "external",
-		Scope:         vmbench.ScopeHardware,
 		HardwareTools: append([]string(nil), opts.HardwareTools...),
 	})
 	section.Report = &result

@@ -15,8 +15,6 @@ import (
 	"time"
 
 	"github.com/cloudapp3/vmbench/bench"
-	"github.com/cloudapp3/vmbench/bench/netio"
-	"github.com/cloudapp3/vmbench/nodecatalog"
 )
 
 // Definition describes a workload without instantiating its heavy data payloads.
@@ -36,9 +34,7 @@ type HardwareToolSpec struct {
 }
 
 const (
-	ScopeAll      = "all"
 	ScopeHardware = "hardware"
-	ScopeNetwork  = "network"
 )
 
 const (
@@ -109,63 +105,6 @@ var hardwareToolSpecs = map[string]HardwareToolSpec{
 		Name:        "WinSAT",
 		Description: "Optional Windows System Assessment Tool CPU/memory/disk probes.",
 	},
-}
-
-// DefinitionsForEngine returns workloads based on the engine selection.
-func DefinitionsForEngine(engine, diskPath string, iperfHosts []string) []Definition {
-	return DefinitionsForScope(engine, ScopeAll, diskPath, iperfHosts)
-}
-
-// DefinitionsForScope returns workloads based on engine and high-level scope.
-//
-// Hardware measurements are external-tool based. Legacy engine values such as
-// "native" and "full" are accepted for API compatibility, but they no longer
-// register in-process CPU/memory/disk benchmark workloads.
-func DefinitionsForScope(engine, scope, diskPath string, iperfHosts []string) []Definition {
-	return DefinitionsForScopeWithHardwareTools(engine, scope, diskPath, iperfHosts, nil)
-}
-
-// DefinitionsForScopeWithHardwareTools returns workloads for a scope using the
-// selected external hardware tools. Empty hardwareTools selects the default set.
-func DefinitionsForScopeWithHardwareTools(engine, scope, diskPath string, iperfHosts []string, hardwareTools []string) []Definition {
-	switch strings.ToLower(strings.TrimSpace(scope)) {
-	case ScopeHardware:
-		return ExternalHardwareDefinitionsForTools(diskPath, hardwareTools)
-	case ScopeNetwork:
-		return NetworkDefinitions(iperfHosts)
-	case ScopeAll:
-		all := ExternalHardwareDefinitionsForTools(diskPath, hardwareTools)
-		all = append(all, NetworkDefinitions(iperfHosts)...)
-		_ = engine
-		return all
-	default:
-		return ExternalHardwareDefinitionsForTools(diskPath, hardwareTools)
-	}
-}
-
-// NativeDefinitions is retained for API compatibility.
-//
-// Deprecated: hardware benchmark workloads are external-tool based; this
-// function returns the same external definitions as DefaultDefinitions.
-func NativeDefinitions(diskPath string) []Definition {
-	defs := ExternalHardwareDefinitionsForTools(diskPath, nil)
-	defs = append(defs, NetworkDefinitions(nil)...)
-	return defs
-}
-
-// NativeHardwareDefinitions is retained for API compatibility.
-//
-// Deprecated: hardware benchmark workloads are external-tool based; this
-// function returns ExternalHardwareDefinitions.
-func NativeHardwareDefinitions(diskPath string) []Definition {
-	return ExternalHardwareDefinitionsForTools(diskPath, nil)
-}
-
-// ExternalDefinitions returns workloads that wrap external tools plus network diagnostics.
-func ExternalDefinitions(diskPath string, iperfHosts []string) []Definition {
-	defs := ExternalHardwareDefinitionsForTools(diskPath, nil)
-	defs = append(defs, NetworkDefinitions(iperfHosts)...)
-	return defs
 }
 
 // ExternalHardwareDefinitions returns hardware workloads that wrap external
@@ -445,76 +384,11 @@ func normalizeHardwareToolID(value string) string {
 	}
 }
 
-// NetworkDefinitions returns network diagnostics and speed tests.
-func NetworkDefinitions(iperfHosts []string) []Definition {
-	manifest, err := nodecatalog.Embedded()
-	if err != nil {
-		return nil
-	}
-	return NetworkDefinitionsWithManifest(iperfHosts, manifest, "v4")
-}
-
-// NetworkDefinitionsWithManifest returns network workloads pinned to one
-// validated catalog snapshot. No workload falls back to embedded nodes.
-func NetworkDefinitionsWithManifest(iperfHosts []string, manifest nodecatalog.Manifest, ipFamily string) []Definition {
-	nodes := netio.SpeedNodesFromManifest(manifest)
-	defs := make([]Definition, 0, len(nodes)+6+len(iperfHosts))
-	for _, node := range nodes {
-		n := node
-		defs = append(defs, Definition{
-			Name:        fmt.Sprintf("Net Download (%s)", n.Name),
-			Category:    bench.CategoryNetwork,
-			Description: fmt.Sprintf("HTTP download from %s [%s]", n.Name, n.Region),
-			Factory:     func(string) bench.Workload { return netio.NewDownloadWorkload(n) },
-		})
-	}
-	defs = append(defs,
-		Definition{Name: "Net Ping", Category: bench.CategoryNetwork, Description: "TCP latency / jitter / packet loss to versioned nodes", Factory: func(string) bench.Workload {
-			return netio.NewPingWorkloadWithManifest(manifest, ipFamily)
-		}},
-		Definition{Name: "Net Multi-Thread Download", Category: bench.CategoryNetwork, Description: "Concurrent download (4 threads, Cloudflare)", Factory: func(string) bench.Workload { return netio.NewMultiDownloadWorkload() }},
-		Definition{Name: "Net Upload", Category: bench.CategoryNetwork, Description: "Upload speed via Cloudflare (50MB)", Factory: func(string) bench.Workload { return netio.NewUploadWorkload() }},
-		Definition{Name: "Net Streaming Unlock", Category: bench.CategoryNetwork, Description: "UnlockTests streaming / AI platform unlock detection", Factory: func(string) bench.Workload { return netio.NewStreamingUnlockWorkload() }},
-		Definition{Name: "Net Traceroute", Category: bench.CategoryNetwork, Description: "TCP traceroute to versioned China carrier, CERNET, and CSTNET targets", Factory: func(string) bench.Workload {
-			return netio.NewTracerouteWorkloadWithManifest(manifest, ipFamily)
-		}},
-		Definition{Name: "Net IP Quality", Category: bench.CategoryNetwork, Description: "IP reputation / DNSBL / mail port detection", Factory: func(string) bench.Workload { return netio.NewIPQualityWorkload() }},
-	)
-	for _, host := range iperfHosts {
-		h := host
-		defs = append(defs, Definition{
-			Name:        "Network Bandwidth (iperf3)",
-			Category:    bench.CategoryNetwork,
-			Description: "iperf3 TCP to " + h,
-			Factory:     func(string) bench.Workload { return netio.NewIperfWorkload(h, 10) },
-		})
-	}
-	return defs
-}
-
-// DefaultDefinitions returns the default external-tool catalog (for list command).
-func DefaultDefinitions(includeExtensions bool) []Definition {
-	defs := ExternalHardwareDefinitionsForTools("", nil)
-	if includeExtensions {
-		defs = append(defs, NetworkDefinitions(nil)...)
-	}
-	return defs
-}
-
-// DefaultWorkloads instantiates the default external-tool workload registry.
-func DefaultWorkloads(diskPath string, includeExtensions bool, filter *regexp.Regexp) []bench.Workload {
-	defs := ExternalHardwareDefinitionsForTools(diskPath, nil)
-	if includeExtensions {
-		defs = append(defs, NetworkDefinitions(nil)...)
-	}
-	out := make([]bench.Workload, 0, len(defs))
-	for _, def := range defs {
-		if filter != nil && !filter.MatchString(def.Name) && !filter.MatchString(def.Category) {
-			continue
-		}
-		out = append(out, def.Factory(diskPath))
-	}
-	return out
+// DefaultDefinitions returns the external hardware workload catalog (for the
+// list command and MCP capabilities). Network diagnostics are not run-scope
+// workloads anymore; they live in the suite sections.
+func DefaultDefinitions() []Definition {
+	return ExternalHardwareDefinitionsForTools("", nil)
 }
 
 // --- helpers ---

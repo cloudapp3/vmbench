@@ -77,6 +77,8 @@ func run(args []string) int {
 		return runCompare(args[1:])
 	case "history":
 		return runHistory(args[1:])
+	case "update":
+		return runUpdate(args[1:])
 	case "version", "--version", "-v":
 		fmt.Printf("vmbench %s\n", vmbench.Version)
 		return 0
@@ -104,6 +106,7 @@ func printUsage(w io.Writer) {
 		"  vmbench sysinfo   [--json]            " + i18n.T("cli.usage.cmdSysinfo"),
 		"  vmbench compare   <a.json> <b.json>   " + i18n.T("cli.usage.cmdCompare"),
 		"  vmbench history   <command>           " + i18n.T("cli.usage.cmdHistory"),
+		"  vmbench update   [flags]              " + i18n.T("cli.usage.cmdUpdate"),
 		"  vmbench version                       " + i18n.T("cli.usage.cmdVersion"),
 		"",
 		i18n.T("cli.usage.detailHint"),
@@ -116,22 +119,16 @@ func runBench(args []string) int {
 	registerLangFlag(fs)
 
 	var (
-		iterations      int
-		filter          string
-		diskPath        string
-		timeout         time.Duration
-		jsonOut         string
-		htmlOut         string
-		quiet           bool
-		mode            string
-		scope           string
-		iperfHost       string
-		hardwareTool    string
-		saveHistory     bool
-		historyTag      string
-		catalogSource   string
-		catalogRevision string
-		catalogCache    string
+		iterations   int
+		filter       string
+		diskPath     string
+		timeout      time.Duration
+		jsonOut      string
+		htmlOut      string
+		quiet        bool
+		hardwareTool string
+		saveHistory  bool
+		historyTag   string
 	)
 
 	fs.IntVar(&iterations, "iterations", 3, i18n.T("cli.flag.iterationsRun"))
@@ -141,15 +138,9 @@ func runBench(args []string) int {
 	fs.StringVar(&jsonOut, "json", "", i18n.T("cli.flag.jsonRun"))
 	fs.StringVar(&htmlOut, "html", "", i18n.T("cli.flag.htmlRun"))
 	fs.BoolVar(&quiet, "quiet", false, i18n.T("cli.flag.quietRun"))
-	fs.StringVar(&mode, "mode", "single", i18n.T("cli.flag.mode"))
-	fs.StringVar(&scope, "scope", vmbench.ScopeHardware, i18n.T("cli.flag.scope"))
-	fs.StringVar(&iperfHost, "iperf-host", "", i18n.T("cli.flag.iperfHostRun"))
 	fs.StringVar(&hardwareTool, "hardware-tool", "", i18n.T("cli.flag.hardwareTool"))
 	fs.BoolVar(&saveHistory, "save-history", false, i18n.T("cli.flag.saveHistory"))
 	fs.StringVar(&historyTag, "history-tag", "", i18n.T("cli.flag.historyTag"))
-	fs.StringVar(&catalogSource, "node-catalog", nodecatalog.SourceEmbedded, i18n.T("cli.flag.nodeCatalog"))
-	fs.StringVar(&catalogRevision, "node-revision", "", i18n.T("cli.flag.nodeRevision"))
-	fs.StringVar(&catalogCache, "node-cache", "", i18n.T("cli.flag.nodeCache"))
 
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, strings.Join([]string{
@@ -185,23 +176,6 @@ func runBench(args []string) int {
 			return 2
 		}
 	}
-	mode = strings.ToLower(strings.TrimSpace(mode))
-	switch mode {
-	case "single", "multi", "all":
-	default:
-		fmt.Fprintln(os.Stderr, i18n.T("cli.error.badMode"))
-		return 2
-	}
-	scope = strings.ToLower(strings.TrimSpace(scope))
-	switch scope {
-	case vmbench.ScopeHardware, vmbench.ScopeNetwork, vmbench.ScopeAll:
-	default:
-		fmt.Fprintln(os.Stderr, i18n.T("cli.error.badScope"))
-		return 2
-	}
-	if scope == vmbench.ScopeNetwork || scope == vmbench.ScopeAll {
-		fmt.Fprintln(os.Stderr, i18n.T("cli.notice.networkScopeTransfer"))
-	}
 	if strings.TrimSpace(historyTag) != "" && !saveHistory {
 		fmt.Fprintln(os.Stderr, i18n.T("cli.error.historyTagRequiresSave"))
 		return 2
@@ -217,27 +191,19 @@ func runBench(args []string) int {
 	}
 
 	runOptions, err := vmbench.NormalizeOptions(vmbench.Options{
-		DiskPath:         diskPath,
-		Timeout:          timeout,
-		Iterations:       iterations,
-		Filter:           filter,
-		Mode:             mode,
-		Engine:           "external",
-		Scope:            scope,
-		IperfHosts:       parseHosts(iperfHost),
-		HardwareTools:    hardwareTools,
-		OnEvent:          progressPrinter(!quiet),
-		CatalogSource:    catalogSource,
-		CatalogRevision:  catalogRevision,
-		CatalogCachePath: catalogCache,
+		DiskPath:      diskPath,
+		Timeout:       timeout,
+		Iterations:    iterations,
+		Filter:        filter,
+		Engine:        "external",
+		HardwareTools: hardwareTools,
+		OnEvent:       progressPrinter(!quiet),
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 2
 	}
-	if runOptions.Scope == vmbench.ScopeHardware || runOptions.Scope == vmbench.ScopeAll {
-		printHardwareToolPreflight(os.Stderr, runOptions.HardwareTools, filterRE)
-	}
+	printHardwareToolPreflight(os.Stderr, runOptions.HardwareTools, filterRE)
 	report := vmbench.RunCore(context.Background(), runOptions)
 	if saveHistory {
 		record, err := saveHistoryReport(report, historyTag)
@@ -296,20 +262,11 @@ func runSuite(args []string) int {
 		ipVersion       string
 		mediaSet        string
 		ipSource        string
-		noHardware      bool
-		noRoute         bool
-		noPing          bool
-		noSpeed         bool
-		noIP            bool
-		noMail          bool
-		noMedia         bool
 		saveHistory     bool
 		historyTag      string
 		catalogSource   string
 		catalogRevision string
 		catalogCache    string
-		noNetworkInfo   bool
-		noReachability  bool
 		quiet           bool
 	)
 
@@ -329,15 +286,6 @@ func runSuite(args []string) int {
 	fs.StringVar(&ipVersion, "ip-version", "v4", i18n.T("cli.flag.ipVersion"))
 	fs.StringVar(&mediaSet, "media-set", "all", i18n.T("cli.flag.mediaSet"))
 	fs.StringVar(&ipSource, "ip-quality-source", "builtin", i18n.T("cli.flag.ipQualitySource"))
-	fs.BoolVar(&noHardware, "no-hardware", false, i18n.T("cli.flag.noHardware"))
-	fs.BoolVar(&noNetworkInfo, "no-network-info", false, i18n.T("cli.flag.noNetworkInfo"))
-	fs.BoolVar(&noRoute, "no-route", false, i18n.T("cli.flag.noRoute"))
-	fs.BoolVar(&noPing, "no-ping", false, i18n.T("cli.flag.noPing"))
-	fs.BoolVar(&noSpeed, "no-speed", false, i18n.T("cli.flag.noSpeed"))
-	fs.BoolVar(&noIP, "no-ip", false, i18n.T("cli.flag.noIP"))
-	fs.BoolVar(&noMail, "no-mail", false, i18n.T("cli.flag.noMail"))
-	fs.BoolVar(&noMedia, "no-media", false, i18n.T("cli.flag.noMedia"))
-	fs.BoolVar(&noReachability, "no-reachability", false, i18n.T("cli.flag.noReachability"))
 	fs.BoolVar(&saveHistory, "save-history", false, i18n.T("cli.flag.saveHistory"))
 	fs.StringVar(&historyTag, "history-tag", "", i18n.T("cli.flag.historyTag"))
 	fs.BoolVar(&quiet, "quiet", false, i18n.T("cli.flag.quietSuite"))
@@ -469,33 +417,6 @@ func runSuite(args []string) int {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 2
 		}
-	}
-	if noHardware {
-		sections.Hardware = false
-	}
-	if noNetworkInfo {
-		sections.NetworkInfo = false
-	}
-	if noRoute {
-		sections.Route = false
-	}
-	if noPing {
-		sections.Ping = false
-	}
-	if noSpeed {
-		sections.Speed = false
-	}
-	if noIP {
-		sections.IPQuality = false
-	}
-	if noMail {
-		sections.Mail = false
-	}
-	if noMedia {
-		sections.Media = false
-	}
-	if noReachability {
-		sections.Reachability = false
 	}
 	if !sections.AnyEnabled() {
 		fmt.Fprintln(os.Stderr, i18n.T("cli.error.noSectionsEnabled"))
@@ -714,7 +635,7 @@ func runList(args []string) int {
 		return 2
 	}
 
-	defs := catalog.DefaultDefinitions(true)
+	defs := catalog.DefaultDefinitions()
 	tw := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
 	fmt.Fprintln(tw, strings.Join([]string{i18n.T("cli.list.workload"), i18n.T("cli.list.category"), i18n.T("cli.list.description")}, "\t"))
 	for _, def := range defs {

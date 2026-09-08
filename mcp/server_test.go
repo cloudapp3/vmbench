@@ -116,15 +116,7 @@ func TestNormalizeSuiteArgsUsesCanonicalSectionsAndCatalog(t *testing.T) {
 	}
 }
 
-func TestNormalizeArgsRejectCatalogRevisionMismatch(t *testing.T) {
-	_, runWarnings := normalizeRunArgs(runArgs{
-		Iterations:      json.RawMessage("1"),
-		Scope:           "network",
-		CatalogRevision: "missing-revision",
-	})
-	if !strings.Contains(strings.Join(runWarnings, "\n"), "pinned revision") {
-		t.Fatalf("run warnings = %v", runWarnings)
-	}
+func TestNormalizeSuiteArgsRejectCatalogRevisionMismatch(t *testing.T) {
 	_, suiteWarnings := normalizeSuiteArgs(suiteArgs{
 		Iterations:      json.RawMessage("1"),
 		Only:            []string{"ping"},

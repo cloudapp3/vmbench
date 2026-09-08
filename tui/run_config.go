@@ -93,9 +93,7 @@ func (s runConfigState) filterExpr() string {
 
 func (s runConfigState) buildOptions() vmbench.Options {
 	return vmbench.Options{
-		Mode:          "single",
 		Engine:        "external",
-		Scope:         vmbench.ScopeHardware,
 		Iterations:    s.iterations,
 		Filter:        s.filterExpr(),
 		HardwareTools: s.selectedTools(),

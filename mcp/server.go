@@ -209,17 +209,11 @@ func (s *Server) toolSysinfo(ctx context.Context, raw json.RawMessage) (toolResu
 }
 
 type runArgs struct {
-	Iterations       json.RawMessage `json:"iterations,omitempty"`
-	Filter           string          `json:"filter,omitempty"`
-	Mode             string          `json:"mode,omitempty"`
-	Scope            string          `json:"scope,omitempty"`
-	DiskPath         string          `json:"disk_path,omitempty"`
-	TimeoutMS        json.RawMessage `json:"timeout_ms,omitempty"`
-	HardwareTools    []string        `json:"hardware_tools,omitempty"`
-	IperfHosts       []string        `json:"iperf_hosts,omitempty"`
-	CatalogSource    string          `json:"catalog_source,omitempty"`
-	CatalogRevision  string          `json:"catalog_revision,omitempty"`
-	CatalogCachePath string          `json:"catalog_cache_path,omitempty"`
+	Iterations    json.RawMessage `json:"iterations,omitempty"`
+	Filter        string          `json:"filter,omitempty"`
+	DiskPath      string          `json:"disk_path,omitempty"`
+	TimeoutMS     json.RawMessage `json:"timeout_ms,omitempty"`
+	HardwareTools []string        `json:"hardware_tools,omitempty"`
 }
 
 func (s *Server) toolRun(ctx context.Context, raw json.RawMessage) (toolResult, error) {
@@ -239,20 +233,12 @@ func (s *Server) toolRun(ctx context.Context, raw json.RawMessage) (toolResult, 
 	runCtx, cancel := context.WithTimeout(ctx, norm.Timeout)
 	defer cancel()
 	report := vmbench.RunCore(runCtx, vmbench.Options{
-		DiskPath:         norm.DiskPath,
-		Timeout:          norm.Timeout,
-		Iterations:       norm.Iterations,
-		Filter:           norm.Filter,
-		Mode:             norm.Mode,
-		Engine:           "external",
-		Scope:            norm.Scope,
-		IperfHosts:       norm.IperfHosts,
-		HardwareTools:    norm.HardwareTools,
-		CatalogSource:    norm.CatalogSource,
-		CatalogRevision:  norm.CatalogRevision,
-		CatalogCachePath: norm.CatalogCachePath,
-		ResolvedCatalog:  norm.ResolvedCatalog,
-		CatalogWarning:   norm.CatalogWarning,
+		DiskPath:      norm.DiskPath,
+		Timeout:       norm.Timeout,
+		Iterations:    norm.Iterations,
+		Filter:        norm.Filter,
+		Engine:        "external",
+		HardwareTools: norm.HardwareTools,
 	})
 	payload := map[string]any{"report": report}
 	result := okToolResult(formatRunSummary(report), payload)
@@ -261,19 +247,11 @@ func (s *Server) toolRun(ctx context.Context, raw json.RawMessage) (toolResult, 
 }
 
 type normalizedRunArgs struct {
-	Iterations       int
-	Filter           string
-	Mode             string
-	Scope            string
-	DiskPath         string
-	Timeout          time.Duration
-	HardwareTools    []string
-	IperfHosts       []string
-	CatalogSource    string
-	CatalogRevision  string
-	CatalogCachePath string
-	ResolvedCatalog  *nodecatalog.Manifest
-	CatalogWarning   string
+	Iterations    int
+	Filter        string
+	DiskPath      string
+	Timeout       time.Duration
+	HardwareTools []string
 }
 
 func normalizeRunArgs(args runArgs) (normalizedRunArgs, []string) {
@@ -283,36 +261,22 @@ func normalizeRunArgs(args runArgs) (normalizedRunArgs, []string) {
 	timeout, timeoutError := normalizeTimeoutMillis(args.TimeoutMS, 5*time.Minute)
 	appendValidationError(&warnings, timeoutError)
 	norm, err := vmbench.NormalizeOptions(vmbench.Options{
-		Iterations:       iterations,
-		Filter:           strings.TrimSpace(args.Filter),
-		Mode:             strings.TrimSpace(args.Mode),
-		Engine:           "external",
-		Scope:            strings.TrimSpace(args.Scope),
-		DiskPath:         strings.TrimSpace(args.DiskPath),
-		Timeout:          timeout,
-		HardwareTools:    cleanList(args.HardwareTools),
-		IperfHosts:       cleanList(args.IperfHosts),
-		CatalogSource:    strings.TrimSpace(args.CatalogSource),
-		CatalogRevision:  strings.TrimSpace(args.CatalogRevision),
-		CatalogCachePath: strings.TrimSpace(args.CatalogCachePath),
+		Iterations:    iterations,
+		Filter:        strings.TrimSpace(args.Filter),
+		Engine:        "external",
+		DiskPath:      strings.TrimSpace(args.DiskPath),
+		Timeout:       timeout,
+		HardwareTools: cleanList(args.HardwareTools),
 	})
 	if err != nil {
 		warnings = append(warnings, err.Error())
 	}
 	return normalizedRunArgs{
-		Iterations:       norm.Iterations,
-		Filter:           norm.Filter,
-		Mode:             norm.Mode,
-		Scope:            norm.Scope,
-		DiskPath:         norm.DiskPath,
-		Timeout:          norm.Timeout,
-		HardwareTools:    norm.HardwareTools,
-		IperfHosts:       norm.IperfHosts,
-		CatalogSource:    norm.CatalogSource,
-		CatalogRevision:  norm.CatalogRevision,
-		CatalogCachePath: norm.CatalogCachePath,
-		ResolvedCatalog:  norm.ResolvedCatalog,
-		CatalogWarning:   norm.CatalogWarning,
+		Iterations:    norm.Iterations,
+		Filter:        norm.Filter,
+		DiskPath:      norm.DiskPath,
+		Timeout:       norm.Timeout,
+		HardwareTools: norm.HardwareTools,
 	}, warnings
 }
 
@@ -489,7 +453,7 @@ func errorToolResult(message string) toolResult {
 }
 
 func capabilitiesPayload() map[string]any {
-	defs := catalog.DefaultDefinitions(true)
+	defs := catalog.DefaultDefinitions()
 	workloads := make([]map[string]string, 0, len(defs))
 	for _, def := range defs {
 		workloads = append(workloads, map[string]string{
@@ -545,19 +509,13 @@ func toolSpecs() []toolSpec {
 		{
 			Name:        "vmbench_run",
 			Title:       "VMBench raw benchmark run",
-			Description: "Run vmbench workloads and return raw metrics. Defaults to hardware scope, one iteration, and no synthetic scoring.",
+			Description: "Run vmbench hardware workloads and return raw metrics. Defaults to one iteration and no synthetic scoring; network diagnostics live in vmbench_suite.",
 			InputSchema: objectSchema(map[string]any{
-				"iterations":         map[string]any{"type": "integer", "minimum": 1, "maximum": maxIterations, "description": "Iterations per workload. Default 1 for MCP."},
-				"filter":             map[string]any{"type": "string", "description": "Regex matched against workload name or category."},
-				"mode":               map[string]any{"type": "string", "enum": []string{"single", "multi", "all"}, "description": "Compatibility mode. Legacy multi/all values run the external catalog once; tools define concurrency."},
-				"scope":              map[string]any{"type": "string", "enum": []string{"hardware", "network", "all"}, "description": "hardware by default; network/all explicitly enable traffic-generating workloads."},
-				"disk_path":          map[string]any{"type": "string", "description": "Temp directory for disk workloads."},
-				"timeout_ms":         map[string]any{"type": "integer", "minimum": 1, "maximum": maxTimeout.Milliseconds(), "description": "Overall tool timeout in milliseconds."},
-				"hardware_tools":     enumArraySchema(catalog.HardwareToolIDs(), "External hardware tools; use capabilities for metadata."),
-				"iperf_hosts":        stringArraySchema("iperf3 hosts; only useful with scope=all or speed sections."),
-				"catalog_source":     map[string]any{"type": "string", "description": "Node catalog source: embedded, auto, or a local JSON path."},
-				"catalog_revision":   map[string]any{"type": "string", "description": "Require an exact node catalog revision before network workloads start."},
-				"catalog_cache_path": map[string]any{"type": "string", "description": "Optional cache path used with catalog_source=auto."},
+				"iterations":     map[string]any{"type": "integer", "minimum": 1, "maximum": maxIterations, "description": "Iterations per workload. Default 1 for MCP."},
+				"filter":         map[string]any{"type": "string", "description": "Regex matched against workload name or category."},
+				"disk_path":      map[string]any{"type": "string", "description": "Temp directory for disk workloads."},
+				"timeout_ms":     map[string]any{"type": "integer", "minimum": 1, "maximum": maxTimeout.Milliseconds(), "description": "Overall tool timeout in milliseconds."},
+				"hardware_tools": enumArraySchema(catalog.HardwareToolIDs(), "External hardware tools; use capabilities for metadata."),
 			}, nil),
 		},
 		{

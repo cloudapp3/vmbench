@@ -82,8 +82,8 @@ func comparabilityWarnings(docs []Document) []string {
 		if current.Iterations != base.Iterations {
 			warnings = append(warnings, fmt.Sprintf("report 1 uses %d iterations; report %d uses %d", base.Iterations, i+1, current.Iterations))
 		}
-		if current.Mode != base.Mode {
-			warnings = append(warnings, fmt.Sprintf("report 1 mode is %q; report %d mode is %q", base.Mode, i+1, current.Mode))
+		if displayMode(current.Mode) != displayMode(base.Mode) {
+			warnings = append(warnings, fmt.Sprintf("report 1 mode is %q; report %d mode is %q", displayMode(base.Mode), i+1, displayMode(current.Mode)))
 		}
 		if current.Scope != base.Scope {
 			warnings = append(warnings, fmt.Sprintf("report 1 scope is %q; report %d scope is %q", displayScope(base.Scope), i+1, displayScope(current.Scope)))
@@ -112,6 +112,15 @@ func displayScope(scope string) string {
 		return scope
 	}
 	return "unknown/legacy"
+}
+
+// displayMode maps the absent mode field of post-removal reports to the
+// "single" value every normalized legacy report carried.
+func displayMode(mode string) string {
+	if mode = strings.TrimSpace(mode); mode != "" {
+		return mode
+	}
+	return "single"
 }
 
 func appendMetricRow(

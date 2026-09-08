@@ -111,15 +111,14 @@ cmd/vmbench/mcp.go
 
 `bytes_processed` / `ops_processed` 是可选累计量：只有 workload 通过 `ProcessedMetricReporter` 明确声明 `ProcessedBytes` / `ProcessedOperations`，且所有成功 sample 的语义一致时才写入。dd 与 HTTP download/upload 可写累计 bytes，sysbench memory latency 只有解析到 total events 时才写 ops；events/s、IOPS、MB/s、score、latency 或其他语义未知值不会被猜测到任一字段。
 
-报告根节点使用 `schema_version: 2`。`config` 记录 `scope`、实际启用的可选 `iperf_hosts`，以及 network/all 的 `catalog_source/catalog_revision/node_ids`；hardware scope 的 `extensions=false` 且清除 network provenance，network/all scope 为 `true`。未启用 network/speed 时，规范化层会清除未使用的 iperf host。项目不再包含 `score/` 包，也不再输出 benchmark 总分。
+报告根节点使用 `schema_version: 2`。`run` 报告固定 `scope=hardware`、`extensions=false`，不再输出 `iperf_hosts` 与 catalog provenance 字段；旧版本网络报告中的这些字段仍可被 compare/history 解析。项目不再包含 `score/` 包，也不再输出 benchmark 总分。
 
 Runner 行为：
 
-- workload 始终串行、隔离执行，不并发不同 benchmark，也不修改进程级 `GOMAXPROCS`、GC 或线程绑定状态。
-- `--mode single` 是标准模式；旧的 `multi` / `all` 仍可被 CLI 接受，但会输出兼容警告、归一化为 `single`，并且只运行一次外部工具 catalog。线程数和队列深度由 sysbench/fio/OpenSSL/WinSAT 各自参数定义。
-- 硬件 workload 使用请求的 1-9 次迭代并聚合中位数；所有 `bench/netio` workload 通过 `IterationLimiter` 限制为一次真实探测，并在结果中记录实际 `iterations: 1`。
-- `vmbench run` 默认 `scope=hardware`；只有显式指定 `--scope network` 或 `--scope all` 才注册网络 workload。CLI 会在启用网络 scope 时提示基础 workload 最多约 1.75 GB 流量，另加可选 speedtest/iperf 流量。
-- CLI 对非法 mode/scope/filter/iteration/tool 直接返回参数错误；没有 workload 命中或任一 workload 失败时，`run` 返回退出码 1。
+- workload 始终串行、隔离执行，不并发不同 benchmark，也不修改进程级 `GOMAXPROCS`、GC 或线程绑定状态。线程数和队列深度由 sysbench/fio/OpenSSL/WinSAT 各自参数定义。
+- 硬件 workload 使用请求的 1-9 次迭代并聚合中位数；`bench/netio` workload 通过 `IterationLimiter` 限制为一次真实探测（suite 场景），并在结果中记录实际 `iterations: 1`。
+- `vmbench run` 是硬件专用命令，只注册外部工具硬件 workload；网络诊断（route/speed/IP 质量等）全部由 `vmbench suite` 提供。
+- CLI 对非法 filter/iteration/tool 直接返回参数错误；没有 workload 命中或任一 workload 失败时，`run` 返回退出码 1。
 - `OnWorkloadStart` 在每个 workload 的首个 sample 进入前同步触发，`OnWorkloadDone` 在该 workload 返回后立即触发；`RunCore` 据此逐项发射 `suite_start` 与 `suite_done` / `suite_fail`，不等待整批结束。同名 workload 也会逐项发射，不按名称去重。
 
 ## Hardware 外部工具模型
@@ -166,6 +165,17 @@ Linux 默认集中的 `sysbench` 内存 workload 拆为顺序读带宽、顺序�
 加载模式为 `embedded`、`auto`、显式 JSON path。默认 `embedded` 保证离线确定性；`auto` 优先读取 user cache，缓存不存在/损坏/不匹配时回退 embedded。`--node-revision` 是精确 pin，任何候选 revision 不匹配都会在 probe 前失败。过期 snapshot 产生 warning，但不会静默替换数据。报告中的 source 规范化为 `embedded|auto|path`，真实本地路径只出现在管理 CLI 的 `path` 字段，避免泄露 home path。
 
 `vmbench nodes update` 要求调用方提供 Ed25519 trust root 和 detached signature，签名覆盖 manifest 精确字节；通过签名和严格 schema 校验后，原子写入 user cache（Unix mode `0600`）。`nodes verify` 可只验证 schema/revision，也可验证 detached signature；`nodes health` 对 HTTP/DNS/TCP endpoint 做有界并发可用性检查并保留逐节点错误。当前 embedded snapshot 覆盖全球 download，以及广州/北京/上海/成都、三网、CERNET、CSTNET 和 IPv6 route/ping 证据。
+
+## Self-Update
+
+`selfupdate/` 实现从 GitHub Releases 自升级，仅用标准库（`net/http`、`crypto/sha256`、`archive/tar`、`archive/zip`、`compress/gzip`）：
+
+- 发现：`GET {APIBase}/releases/latest`（或 `/releases/tags/{tag}` 固定版本），解码 `tag_name`/`draft`/`assets[]`；draft、空 tag、固定 tag 不匹配一律 fail-closed。`APIBase` 默认官方仓库，可用 `--api-url` 覆盖（镜像/测试）。
+- 版本比较：手写数字点分比较（去 `v` 前缀、缺位补 0、数值非字典序），不引入 semver 依赖；非数字组件（`dev`、`-rc1`）一侧视为更旧，dev 构建恒提示可更新。
+- 下载与校验：归档流式落盘同时计算 SHA-256（`io.MultiWriter` + `LimitReader` 上限 256MiB），与同一 release 的 `checksums.txt`（1MiB 上限，sha256sum 格式）比对；校验失败删除临时文件且不动目标。信任模型与 `install.sh` 相同——checksums over TLS，release 资产无签名（与 nodecatalog 的强制 Ed25519 不同）。
+- 资产命名：`vmbench-<ver>-<GOOS>-<GOARCH>.tar.gz`（Windows 为 `.zip`），二进制位于归档根目录；GOOS/GOARCH 可注入，Linux 上可测 Windows 分支。
+- 替换：解出二进制写入目标同目录隐藏临时文件（保留现有 mode，缺省 `0755`）、`Sync` 后 rename 覆盖（复用 nodecatalog `atomicWrite` 的模式）；Windows 先把在用二进制移到 `.old` 再 rename，尽力清理。权限不足时包装为 `ErrTargetNotWritable`，CLI 层提示包管理器/`--dest` 替代。
+- 请求统一携带 `User-Agent: vmbench/<version>`；`GITHUB_TOKEN`/`GH_TOKEN` 作为 bearer token 附带 install.sh 同款 GitHub API 头。
 
 ## Suite Sections
 

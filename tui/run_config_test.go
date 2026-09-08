@@ -19,14 +19,12 @@ func TestRunConfigDefaultsMatchCLI(t *testing.T) {
 	}
 	got := s.buildOptions()
 	want := (vmbench.Options{
-		Mode:          "single",
 		Engine:        "external",
-		Scope:         vmbench.ScopeHardware,
 		Iterations:    3,
 		HardwareTools: catalog.DefaultHardwareTools(),
 	})
-	if got.Iterations != want.Iterations || got.Scope != want.Scope ||
-		got.Mode != want.Mode || got.Engine != want.Engine || got.Filter != "" {
+	if got.Iterations != want.Iterations ||
+		got.Engine != want.Engine || got.Filter != "" {
 		t.Fatalf("buildOptions = %+v, want base %+v", got, want)
 	}
 	if strings.Join(got.HardwareTools, ",") != strings.Join(want.HardwareTools, ",") {
@@ -149,7 +147,7 @@ func TestRunConfigStartEmitsHardwareStart(t *testing.T) {
 	if !ok {
 		t.Fatalf("cmd() returned %T, want hardwareStartMsg", msg)
 	}
-	if start.opts.Scope != vmbench.ScopeHardware || start.opts.Iterations != 3 {
+	if start.opts.Iterations != 3 || start.opts.Engine != "external" {
 		t.Fatalf("start opts = %+v", start.opts)
 	}
 	if _, isModel := updated.(Model); !isModel {

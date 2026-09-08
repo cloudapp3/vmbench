@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/cloudapp3/vmbench/catalog"
-	"github.com/cloudapp3/vmbench/nodecatalog"
 )
 
 // OptionsError reports invalid run configuration before any workload starts.
@@ -38,20 +37,10 @@ func ValidateOptions(opts Options) error {
 		}
 	}
 
-	switch strings.ToLower(strings.TrimSpace(opts.Mode)) {
-	case "", "single", "multi", "all":
-	default:
-		problems = append(problems, "mode must be one of: single, multi, all")
-	}
 	switch strings.ToLower(strings.TrimSpace(opts.Engine)) {
 	case "", "external", "native", "full":
 	default:
 		problems = append(problems, "engine must be one of: external, native, full")
-	}
-	switch strings.ToLower(strings.TrimSpace(opts.Scope)) {
-	case "", ScopeHardware, ScopeNetwork, ScopeAll:
-	default:
-		problems = append(problems, "scope must be one of: hardware, network, all")
 	}
 	if invalid := firstInvalidHardwareTool(opts.HardwareTools); invalid != "" {
 		problems = append(problems, fmt.Sprintf("unknown hardware tool %q; available: %s", invalid, strings.Join(catalog.HardwareToolIDs(), ", ")))
@@ -69,55 +58,7 @@ func NormalizeOptions(opts Options) (Options, error) {
 		return Options{}, err
 	}
 	norm, _, _ := prepareOptions(opts)
-	if norm.Scope == ScopeHardware {
-		clearCatalogOptions(&norm)
-		return norm, nil
-	}
-	if err := resolveCatalogOptions(&norm); err != nil {
-		return Options{}, err
-	}
 	return norm, nil
-}
-
-func resolveCatalogOptions(opts *Options) error {
-	if opts.ResolvedCatalog != nil {
-		manifest := opts.ResolvedCatalog.Clone()
-		if err := manifest.Validate(); err != nil {
-			return fmt.Errorf("node catalog: %w", err)
-		}
-		pin := strings.TrimSpace(opts.CatalogRevision)
-		if pin != "" && manifest.Revision != pin {
-			return fmt.Errorf("node catalog revision %q does not match pinned revision %q", manifest.Revision, pin)
-		}
-		opts.ResolvedCatalog = &manifest
-		opts.CatalogRevision = manifest.Revision
-		if strings.TrimSpace(opts.CatalogSource) == "" {
-			opts.CatalogSource = nodecatalog.SourceEmbedded
-		}
-		return nil
-	}
-	loaded, err := nodecatalog.Load(nodecatalog.LoadOptions{
-		Source:    opts.CatalogSource,
-		Revision:  opts.CatalogRevision,
-		CachePath: opts.CatalogCachePath,
-	})
-	if err != nil {
-		return fmt.Errorf("node catalog: %w", err)
-	}
-	manifest := loaded.Manifest.Clone()
-	opts.ResolvedCatalog = &manifest
-	opts.CatalogSource = loaded.Source
-	opts.CatalogRevision = manifest.Revision
-	opts.CatalogWarning = loaded.Warning
-	return nil
-}
-
-func clearCatalogOptions(opts *Options) {
-	opts.CatalogSource = ""
-	opts.CatalogRevision = ""
-	opts.CatalogCachePath = ""
-	opts.ResolvedCatalog = nil
-	opts.CatalogWarning = ""
 }
 
 func firstInvalidHardwareTool(values []string) string {

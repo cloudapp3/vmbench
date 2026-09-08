@@ -33,8 +33,6 @@ vmbench run
 vmbench run --json report.json --html report.html
 vmbench run --filter 'sysbench|fio|OpenSSL'
 vmbench run --hardware-tool sysbench,openssl,fio,dd
-vmbench run --scope network --iterations 1
-vmbench run --scope all --iterations 1
 
 # VPS 综合测评
 vmbench suite
@@ -56,7 +54,7 @@ vmbench nodes health --node-catalog auto --ip-family v6
 
 其他安装方式（固定版本、自定义目录、Windows、`go install`、源码构建）：源码方式可用 `go install github.com/cloudapp3/vmbench/cmd/vmbench@latest`，或本地构建 `go build -o vmbench ./cmd/vmbench`（项目验证脚本 `./sh/build.sh` 使用 CGO_ENABLED=0，输出到临时目录，可用 `VMBENCH_OUTPUT_DIR` 覆盖）；完整说明见英文 README 的 Install 一节。
 
-`vmbench run` 默认只运行 `hardware` scope。`network` / `all` 必须显式选择，CLI 会提示基础网络 workload 可能传输约 1.75 GB 数据；所有网络 workload 最多执行一次真实探测。workload 始终串行隔离，旧的 `--mode multi/all` 只保留兼容 warning，不会并发 workload 或生成第二轮重复结果。
+`vmbench run` 是硬件专用命令，只编排外部工具硬件基准；路由、测速、IP 质量等全部网络诊断由 `vmbench suite` 提供。workload 始终串行隔离执行，线程数与队列深度由外部工具参数定义。
 
 ## 界面语言
 
@@ -138,9 +136,9 @@ Dashboard 支持：
 
 ## 报告与网络失败语义
 
-- benchmark JSON 使用 schema v2；config 记录规范化后的 `scope` 与可选 `iperf_hosts`，network/all 另记录 `catalog_source/catalog_revision/node_ids`；hardware 清除网络 provenance 且 `extensions=false`。
+- benchmark JSON 使用 schema v2；`run` 报告固定 `scope=hardware`、`extensions=false`，不再输出 `iperf_hosts` 与 catalog provenance 字段；旧版本网络报告中的这些字段仍可被 compare/history 解析。
 - 每项结果包含实际 `iterations` 和 `samples_ms`；`bytes_processed` / `ops_processed` 只在 workload 明确报告累计字节/操作数且 sample 语义一致时出现，不从速率、score 或 latency 猜测。
-- `run` 没有匹配 workload 或任一 workload 失败时返回退出码 1；非法 regex/mode/scope/iteration/tool 返回参数错误。
+- `run` 没有匹配 workload 或任一 workload 失败时返回退出码 1；非法 regex/iteration/tool 返回参数错误。
 - MCP 省略 iterations/timeout 时使用 1 次/5 分钟默认值；显式非法数值、regex 或混入未知项的枚举数组直接以 `isError=true` 拒绝。测量失败仍保留完整 `structuredContent.report` 并标记 `isError=true`。
 - Go traceroute 依赖系统 `traceroute` / `tcptraceroute` / `tracepath` / `tracert`；逐目标保留解析地址、是否到达和状态，命令缺失或无有效 hop 会结构化报错，未到目标但有 hops 则为 `partial`。
 - IP Quality 只有在元数据、公网 IPv4、DNSBL 和 Port 25 探测均得到确定结论时才生成 0-100 风险 score，不确定时 fail-closed 并保留 error/detail。

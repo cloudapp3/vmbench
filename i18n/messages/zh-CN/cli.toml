@@ -33,6 +33,9 @@ other = "对比两份报告"
 [cli.usage.cmdHistory]
 other = "管理本地报告历史"
 
+[cli.usage.cmdUpdate]
+other = "自升级到最新 GitHub 发布版本"
+
 [cli.usage.cmdVersion]
 other = "显示版本"
 
@@ -71,6 +74,9 @@ other = "显示当前主机的系统信息。"
 
 [cli.usage.compareDetail]
 other = "并排对比两份基准测试报告。"
+
+[cli.usage.updateDetail]
+other = "检查 GitHub Releases 是否有新版本并原地替换当前二进制 (按发布 checksums.txt 做 SHA-256 校验)。"
 
 [cli.usage.nodesCommands]
 other = "子命令:"
@@ -113,15 +119,6 @@ other = "将 HTML 报告写入文件"
 
 [cli.flag.quietRun]
 other = "抑制进度输出"
-
-[cli.flag.mode]
-other = "兼容模式: single (旧版 multi/all 也只运行一次目录)"
-
-[cli.flag.scope]
-other = "工作负载范围: hardware、network 或 all"
-
-[cli.flag.iperfHostRun]
-other = "网络测试的 iperf3 服务器 (多个用逗号分隔)"
 
 [cli.flag.hardwareTool]
 other = "硬件测试工具 (逗号分隔: sysbench,openssl,fio,dd,stream,mbw,geekbench,winsat;all 表示全部适配器)"
@@ -182,33 +179,6 @@ other = "流媒体解锁集合: all、globe、tw、hk、jp、kr、na、sa、eu�
 
 [cli.flag.ipQualitySource]
 other = "IP 质量证据来源 (逗号分隔: builtin,securitycheck)"
-
-[cli.flag.noHardware]
-other = "跳过 hardware section"
-
-[cli.flag.noNetworkInfo]
-other = "跳过网络身份 section"
-
-[cli.flag.noRoute]
-other = "跳过 route section"
-
-[cli.flag.noPing]
-other = "跳过 ping section"
-
-[cli.flag.noSpeed]
-other = "跳过 speed section"
-
-[cli.flag.noIP]
-other = "跳过 IP 质量 section"
-
-[cli.flag.noMail]
-other = "跳过邮件端口 section"
-
-[cli.flag.noMedia]
-other = "跳过流媒体 section"
-
-[cli.flag.noReachability]
-other = "跳过网站与 Telegram 可达性 section"
 
 [cli.flag.quietSuite]
 other = "抑制 section 进度输出"
@@ -290,12 +260,6 @@ other = "错误: --timeout 不能为负"
 
 [cli.error.badFilterRegex]
 other = "错误: 无效的 --filter 正则: {{.Err}}"
-
-[cli.error.badMode]
-other = "错误: --mode 必须是 single、multi、all 之一"
-
-[cli.error.badScope]
-other = "错误: --scope 必须是 hardware、network、all 之一"
 
 [cli.error.historyTagRequiresSave]
 other = "错误: --history-tag 需要 --save-history"
@@ -395,9 +359,6 @@ other = "错误: history delete 只需要一个 ID"
 
 [cli.error.invalidStoredReport]
 other = "错误: 存储的报告无效: {{.Err}}"
-
-[cli.notice.networkScopeTransfer]
-other = "提示: 已启用 network 范围,在可选的 speedtest/iperf 工作负载之前可能传输约 1.75 GB 流量"
 
 [cli.notice.historySaved]
 other = "历史: 已保存 {{.ID}}"
@@ -596,3 +557,39 @@ other = "共 {{.Total}} / 空闲 {{.Free}} (每页 {{.Each}})"
 
 [cli.sysinfo.ifaceCount]
 other = "{{.Count}} 个接口 ({{.Names}})"
+
+[cli.update.flag.check]
+other = "仅检查是否有新版本,不安装"
+
+[cli.update.flag.version]
+other = "安装指定版本 (如 v0.6.0)"
+
+[cli.update.flag.timeout]
+other = "整个更新过程超时"
+
+[cli.update.flag.apiUrl]
+other = "GitHub API releases 基础 URL (高级)"
+
+[cli.update.flag.dest]
+other = "二进制目标路径 (默认: 当前可执行文件)"
+
+[cli.update.error.requires]
+other = "错误: update 不接受位置参数,且 --timeout 必须为正"
+
+[cli.update.notice.available]
+other = "有可用更新: {{.Current}} -> v{{.Latest}} ({{.Asset}})"
+
+[cli.update.notice.upToDate]
+other = "已是最新版本 ({{.Current}})"
+
+[cli.update.notice.devBuild]
+other = "当前构建为 {{.Current}} (开发构建);最新发布版本为 v{{.Latest}}"
+
+[cli.update.notice.downloading]
+other = "正在下载 {{.Asset}}..."
+
+[cli.update.notice.updated]
+other = "已更新到 v{{.Latest}}: {{.Old}} -> {{.New}},路径 {{.Path}}"
+
+[cli.update.notice.pkgManagerHint]
+other = "vmbench 可能由 apt/yum 管理;建议使用包管理器升级,或使用 sudo/--dest 重新执行"

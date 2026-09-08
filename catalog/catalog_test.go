@@ -16,25 +16,10 @@ func TestExternalHardwareDefinitionsDoNotRegisterNativeWorkloads(t *testing.T) {
 	assertNoNativeHardwareDefinitions(t, ExternalHardwareDefinitions(""))
 }
 
-func TestLegacyNativeEngineDoesNotRegisterNativeHardware(t *testing.T) {
-	assertNoNativeHardwareDefinitions(t, DefinitionsForScope("native", ScopeHardware, "", nil))
-	assertNoNativeHardwareDefinitions(t, DefinitionsForScope("full", ScopeHardware, "", nil))
-}
-
-func TestScopeSelectionIsExplicit(t *testing.T) {
-	for _, def := range DefinitionsForScopeWithHardwareTools("external", ScopeNetwork, "", nil, nil) {
-		if def.Category != "Network" {
-			t.Fatalf("network scope contains %q category %q", def.Name, def.Category)
-		}
-	}
-	for _, def := range DefinitionsForScopeWithHardwareTools("external", "unknown", "", nil, nil) {
+func TestDefaultDefinitionsAreHardwareOnly(t *testing.T) {
+	for _, def := range DefaultDefinitions() {
 		if def.Category == "Network" {
-			t.Fatalf("unknown scope must default to hardware, got %q", def.Name)
-		}
-	}
-	for _, def := range DefaultDefinitions(false) {
-		if def.Category == "Network" {
-			t.Fatalf("extensions=false contains network workload %q", def.Name)
+			t.Fatalf("hardware catalog contains network workload %q", def.Name)
 		}
 	}
 }

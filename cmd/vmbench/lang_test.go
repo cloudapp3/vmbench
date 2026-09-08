@@ -61,8 +61,8 @@ func TestUsageLocalized(t *testing.T) {
 		lang string
 		want []string
 	}{
-		{"en", []string{"cross-platform CPU and network benchmark suite", "Usage:", "run benchmark workloads", "show version"}},
-		{"zh-CN", []string{"跨平台 CPU 与网络基准测试套件", "用法:", "运行基准测试工作负载", "显示版本"}},
+		{"en", []string{"cross-platform CPU and network benchmark suite", "Usage:", "run benchmark workloads", "self-update to the latest GitHub release", "show version"}},
+		{"zh-CN", []string{"跨平台 CPU 与网络基准测试套件", "用法:", "运行基准测试工作负载", "自升级到最新 GitHub 发布版本", "显示版本"}},
 	}
 	for _, c := range cases {
 		withLang(t, c.lang)

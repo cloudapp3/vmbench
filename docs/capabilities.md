@@ -122,6 +122,7 @@ vmbench compare <a.json> <b.json> [...]      # 自动识别并对比 benchmark/S
 vmbench history add|list|show|delete|compare # 本地报告历史
 vmbench nodes list|verify|update|health      # 版本化节点目录管理
 vmbench mcp serve [--transport stdio]        # 启动 MCP 服务器
+vmbench update [--check] [--version TAG]     # 从 GitHub Releases 自升级
 vmbench version                              # 显示版本号
 ```
 
@@ -133,13 +134,7 @@ vmbench version                              # 显示版本号
 | `--filter` | （全部） | 正则表达式过滤 workload |
 | `--disk-path` | 系统临时目录 | 磁盘测试使用的临时目录 |
 | `--timeout` | `5m` | 单个 workload 超时时间 |
-| `--mode` | `single` | 兼容参数；旧的 `multi` / `all` 会 warning 后按 single 只运行一次 catalog |
-| `--scope` | `hardware` | `hardware` / `network` / `all`；网络范围需显式开启 |
 | `--hardware-tool` | 平台相关 | Linux: sysbench,openssl,fio；macOS: openssl；Windows: winsat |
-| `--iperf-host` | （空） | iperf3 服务器地址（逗号分隔多个） |
-| `--node-catalog` | `embedded` | network/all 使用 embedded / auto / 显式 JSON path |
-| `--node-revision` | （空） | 精确 revision pin |
-| `--node-cache` | 用户 cache | `--node-catalog auto` 的高级 cache path override |
 | `--json` | （空） | 输出 JSON 报告到文件 |
 | `--html` | （空） | 输出 HTML 报告到文件 |
 | `--quiet` | `false` | 静默模式，抑制进度输出 |
@@ -162,7 +157,7 @@ vmbench version                              # 显示版本号
 | `--node-revision` | （空） | pin 精确 catalog revision，不匹配时不启动 probe |
 | `--node-cache` | 用户 cache | `auto` source 的 cache path override |
 | `--hardware-tool` | 平台相关 | 同 run 命令 |
-| `--iperf-host` | （空） | 同 run 命令 |
+| `--iperf-host` | （空） | iperf3 服务器地址（逗号分隔多个；`--speed-provider iperf3` 时必填） |
 | `--json` | （空） | 同 run 命令 |
 | `--html` | （空） | 同 run 命令 |
 | `--quiet` | `false` | 抑制写到 stderr 的 Suite section 进度 |
@@ -205,13 +200,6 @@ vmbench version                              # 显示版本号
 # 基础硬件测试（默认 3 次迭代，工具集按平台选择）
 vmbench run
 
-# 兼容模式：warning 后仍只运行一次标准 catalog
-vmbench run --mode all
-
-# 显式运行网络 workload（每项最多一次真实探测）
-vmbench run --scope network --iterations 1
-vmbench run --scope all --iterations 1
-
 # 只跑 CPU 相关的 workload
 vmbench run --filter 'sysbench|OpenSSL'
 
@@ -253,7 +241,34 @@ vmbench sysinfo
 vmbench sysinfo --json
 ```
 
-`run` 默认只选择 hardware scope。启用 network/all 时 CLI 会提示基础 workload 可能传输约 1.75 GB 数据；非法 regex/mode/scope/iteration/tool 返回退出码 2，没有 workload 命中或任一 workload 失败返回退出码 1。`run` 和启用 hardware 的 `suite` 在执行前按 Definition Name/Category filter 检查本次实际涉及的外部命令，缺失时先写 stderr 提示，Linux 同时给出已知 Debian/Ubuntu 安装命令；受影响 workload 仍执行失败并写入结构化 error，不会静默跳过。
+`run` 只做硬件基准，网络诊断全部由 `vmbench suite` 提供。非法 regex/iteration/tool 返回退出码 2，没有 workload 命中或任一 workload 失败返回退出码 1。`run` 和启用 hardware 的 `suite` 在执行前按 Definition Name/Category filter 检查本次实际涉及的外部命令，缺失时先写 stderr 提示，Linux 同时给出已知 Debian/Ubuntu 安装命令；受影响 workload 仍执行失败并写入结构化 error，不会静默跳过。
+
+### 自升级（`vmbench update`）
+
+已安装的二进制可以直接从 GitHub Releases 原地升级：
+
+```bash
+vmbench update                      # 检查并替换当前二进制
+vmbench update --check              # 只报告最新版本，不安装
+vmbench update --version v0.6.0     # 固定/降级到指定版本
+vmbench update --check --json       # 机器可读状态，供脚本使用
+```
+
+命令会下载当前 OS/架构对应的 release 归档，对照 release `checksums.txt` 校验 SHA-256，解出 `vmbench` 二进制后原子替换正在运行的可执行文件（Windows 上先把旧文件移开）。信任模型与 `install.sh` 相同：TLS 之上的 checksums 校验，release 不做签名验证。`GITHUB_TOKEN`/`GH_TOKEN` 会被用作 API bearer token 以缓解限流。通过 `deb`/`rpm` 安装的用户请优先使用包管理器，或用 `--dest` 指向可写路径。
+
+### 界面语言（i18n）
+
+CLI、TUI 和 Console/HTML 报告标签已本地化为英文和简体中文；新增语言只需新增消息目录（`i18n/messages/<locale>/`）。
+
+语言选择优先级：`--lang` flag（所有子命令）> `VMBENCH_LANG` 环境变量 > TUI 配置文件（`~/.config/vmbench/config.json`）的 `lang` 字段 > OS locale（`zh*` 解析为 `zh-CN`）> 英文。未知值回退英文并输出一行提示。
+
+```bash
+VMBENCH_LANG=zh-CN vmbench --help
+vmbench suite --lang zh-CN
+vmbench tui --lang en
+```
+
+JSON 报告字段名、状态枚举（`ok`/`fail`/...）、Suite section ID、workload 名称（`--filter` 匹配对象）和适配器错误信息在任何 locale 下都保持英文；翻译只发生在渲染层。
 
 ---
 
@@ -532,7 +547,7 @@ Suite 只有所有 enabled section 都为 `status=ok` 才成功。enabled 的空
 
 #### JSON（`--json report.json`）
 
-以下为 Linux 默认 hardware scope 的 schema v2 示例；macOS/Windows 的 `hardware_tools` 默认值不同。config 会记录规范化后的 mode、scope、工具选择和可选 iperf hosts；network/all 还会记录 catalog source/revision/node IDs，hardware 会清除这些网络 provenance 字段。
+以下为 Linux 默认工具集的 schema v2 示例；macOS/Windows 的 `hardware_tools` 默认值不同。config 记录规范化后的工具选择；`scope` 固定为 `hardware`，`mode`/`iperf_hosts`/catalog provenance 字段不再输出（结构体字段保留用于解析旧报告）。
 
 ```json
 {
@@ -544,7 +559,6 @@ Suite 只有所有 enabled section 都为 `status=ok` 才成功。enabled 的空
     "iterations": 3,
     "disk_path": "/tmp",
     "extensions": false,
-    "mode": "single",
     "scope": "hardware",
     "hardware_tools": ["sysbench", "openssl", "fio"]
   },
@@ -569,15 +583,7 @@ Suite 只有所有 enabled section 都为 `status=ok` 才成功。enabled 的空
 }
 ```
 
-hardware scope 的 `extensions` 为 `false`。network/all scope 会设为 `true`；配置了 iperf3 目标时，config 还会保留目标列表，例如：
-
-```json
-{
-  "extensions": true,
-  "scope": "all",
-  "iperf_hosts": ["iperf.example.com:5201"]
-}
-```
+`run` 报告固定 `scope="hardware"`、`extensions=false`，不再输出 `iperf_hosts` / `catalog_source` / `catalog_revision` / `node_ids`。旧版本网络 scope 报告中的这些字段仍可被 `compare` / `history` 解析，参与可比性警告。
 
 `bytes_processed` / `ops_processed` 是可选的累计量字段。Runner 只有在 workload 通过 `ProcessedMetricReporter` 明确声明累计字节或累计操作数，并且所有成功 sample 的语义一致时才输出对应字段；events/s、IOPS、MB/s、score、latency 等速率或诊断值不会被猜测为 processed。
 
@@ -830,12 +836,7 @@ vmbench mcp serve --transport stdio
 |------|------|--------|------|
 | `iterations` | int | 1 | 迭代次数（1-9） |
 | `filter` | string | "" | workload 过滤正则 |
-| `mode` | enum | "single" | 执行模式；multi/all 仅兼容并只运行一次 catalog |
-| `scope` | enum | "hardware" | hardware/network/all；网络必须显式开启 |
 | `hardware_tools` | enum[] | 平台相关 | Linux sysbench/OpenSSL/fio；macOS OpenSSL；Windows WinSAT |
-| `iperf_hosts` | string[] | [] | iperf3 目标；仅 network/all scope 有意义 |
-| `catalog_source` | string | "embedded" | embedded / auto / 显式 path；network/all 使用 |
-| `catalog_revision` | string | "" | 精确 revision pin |
 | `timeout_ms` | int | 300000 | 超时毫秒（最大 900000） |
 
 #### `vmbench_suite`
@@ -868,8 +869,8 @@ vmbench mcp serve --transport stdio
 | 迭代上限 | `iterations` 最大 9 |
 | 超时上限 | `timeout_ms` 最大 15 分钟（900000ms） |
 | 互斥运行 | Server 内部互斥锁，同一时间只允许一个 benchmark |
-| 默认保守 | `vmbench_run` 默认 scope=hardware，`vmbench_suite` 默认只跑 hardware |
-| 网络显式开启 | run 通过 scope，suite 通过 preset 或 only 显式启用 |
+| 默认保守 | `vmbench_run` 只跑硬件基准，`vmbench_suite` 默认只跑 hardware |
+| 网络显式开启 | suite 通过 preset 或 only 显式启用 |
 | stdout 专用 | stdout 只写 JSON-RPC response，诊断信息写 stderr |
 | 原始指标 | 返回原始指标和结构化错误，不输出总分/等级 |
 
@@ -971,11 +972,9 @@ import (
 
 func main() {
     report := vmbench.RunCore(context.Background(), vmbench.Options{
-        Iterations:    3,
-        Engine:        "external",
-        Mode:          "single",
-        Scope:         vmbench.ScopeHardware,
-        Timeout:       5 * time.Minute,
+        Iterations: 3,
+        Engine:     "external",
+        Timeout:    5 * time.Minute,
     })
 
     fmt.Printf("Version: %s\n", report.Version)
@@ -1196,9 +1195,9 @@ type RunConfig struct {
     Iterations    int      `json:"iterations"`
     Filter        string   `json:"filter,omitempty"`
     DiskPath      string   `json:"disk_path,omitempty"`
-    Extensions    bool     `json:"extensions"` // hardware=false; network/all=true
-    Mode          string   `json:"mode,omitempty"`
-    Scope         string   `json:"scope,omitempty"`
+    Extensions    bool     `json:"extensions"` // run 固定 false；保留字段兼容旧网络报告
+    Mode          string   `json:"mode,omitempty"` // run 不再赋值；保留字段解析旧报告
+    Scope         string   `json:"scope,omitempty"` // run 固定 "hardware"
     HardwareTools []string `json:"hardware_tools,omitempty"`
     IperfHosts    []string `json:"iperf_hosts,omitempty"`
     CatalogSource string   `json:"catalog_source,omitempty"`
@@ -1217,13 +1216,8 @@ type Options struct {
     Iterations    int             // 迭代次数（1-9）
     Filter        string          // workload 过滤正则
     OnEvent       EventHandler    // 事件回调函数
-    Mode          string          // single；multi/all 仅兼容并归一化为 single
     Engine        string          // external（native/full 已废弃）
-    Scope         string          // hardware / network / all（默认 hardware）
-    IperfHosts    []string        // iperf3 服务器列表
     HardwareTools []string        // 硬件工具 ID 列表
-    CatalogSource string          // embedded / auto / path
-    CatalogRevision string        // 精确 revision pin
 }
 ```
 

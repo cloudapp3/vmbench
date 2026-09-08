@@ -10,7 +10,7 @@ vmbench 是一款跨平台 VPS 测评工具，用 Go 编写，强调：
 - 结构化报告
 - TUI / CLI 双入口，TUI 内支持主题切换、全页滚动、帮助页、鼠标操作、历史记录对比与 workload 详情
 - 适合自动化采集和横向对比
-- `run` 默认只测硬件，`suite` 提供类似 YABS 的一键完整测评
+- `run` 只测硬件，`suite` 提供类似 YABS 的一键完整测评（含全部网络诊断）
 - 结构像 ECS：按模块、按场景、按原始指标展示
 
 ## 核心能力
@@ -72,8 +72,6 @@ CLI / TUI / 报告标签支持英文与简体中文（`--lang`、`VMBENCH_LANG`�
 vmbench run
 vmbench run --filter 'sysbench|fio|OpenSSL'
 vmbench run --hardware-tool sysbench,openssl,fio,dd
-vmbench run --scope network --iterations 1
-vmbench run --scope all --iterations 1
 vmbench run --json report.json
 vmbench suite
 vmbench suite --preset quick
@@ -89,7 +87,7 @@ vmbench nodes list --node-catalog embedded
 vmbench nodes health --node-catalog auto --ip-family v6
 ```
 
-`vmbench run` 默认 `scope=hardware`。只有显式使用 `--scope network` 或 `--scope all` 才运行网络 workload；这类运行会输出约 1.75 GB 的流量提示，网络 workload 最多执行一次并在报告中记录实际 `iterations=1`。报告 config 会保留规范化后的 `scope`、可选 `iperf_hosts` 和网络实际使用的 `catalog_source/catalog_revision/node_ids`；hardware 的 `extensions=false`，network/all 为 `true`。所有 workload 串行隔离执行，线程数和队列深度由 sysbench/fio/OpenSSL/WinSAT 适配器定义；旧的 `--mode multi/all` 仅为兼容保留，不再并发 workload 或生成重复 pass。`run` 和启用 hardware 的 `suite` 会在执行前检查当前 filter 实际涉及的工具是否可解析，但缺失工具不会被静默跳过。
+`vmbench run` 是硬件专用命令：只编排 sysbench / fio / OpenSSL / WinSAT 等外部工具的硬件基准，网络诊断（route、speed、IP 质量等）全部由 `vmbench suite` 提供。所有 workload 串行隔离执行，线程数和队列深度由适配器定义；报告固定 `scope=hardware`、`extensions=false`。`run` 和启用 hardware 的 `suite` 会在执行前检查当前 filter 实际涉及的工具是否可解析，但缺失工具不会被静默跳过。
 
 ## Suite 场景预设
 
@@ -150,6 +148,10 @@ vmbench nodes health --node-catalog auto --kind route --ip-family v6 --json
 
 `vmbench run` / `vmbench suite` 可用 `--save-history [--history-tag TAG]` 保存；也可用 `history add/list/show/delete` 管理已有 JSON，`history compare --last N` 比较最近 N 份同类型报告。CLI 的 `--json` / `--html` 导出和 history 都先写同目录临时文件、sync 后 rename；Unix 导出/历史文件 mode 为 `0600`，其他平台仍应依赖系统 ACL 保护。报告可能包含 hostname、公网 IP 和 route hops，任何未来 upload/share 都必须显式授权并支持脱敏。Route/Ping 报告区分 catalog protocol 与实际 `probe_protocol/probe_tool`；Suite Compare 只有在 unit、实际 protocol/IP family、provider/probe tool、target/node 以及需要时 catalog revision 全部兼容时才计算 delta。不兼容值仍展示，但明确给出 reason。Route 还必须显式为 `status=ok` 且 `destination_reached=true`，旧报告没有到达证据时不计算 delta。Mail 只比较 `status=open` 的成功连接延迟，拒绝、超时和错误耗时不参与 latency delta。
 
+## 自升级
+
+`vmbench update` 让已安装的二进制从 GitHub Releases 自升级：查询最新 release（`releases/latest`，天然排除 draft/prerelease），与当前构建版本比较后下载对应 OS/arch 的发布归档，按 release `checksums.txt` 做 SHA-256 校验，解出二进制并以临时文件 + rename 原地替换当前可执行文件（Windows 先将旧文件移到 `.old` 再替换）。校验模型与 `install.sh` 一致：checksums over TLS，release 资产本身不做签名；`--version TAG` 可固定/降级版本（等于当前版本也重装，可用于修复），`--check` 只报告不安装，`--json` 输出结构化状态。`GITHUB_TOKEN`/`GH_TOKEN` 会被作为 bearer token 转发给 GitHub API 以缓解速率限制。deb/rpm 安装的实例建议走包管理器升级，或用 `--dest` 指定可写路径；目标不可写时命令 fail-closed 并提示替代方案。
+
 ## MCP 给大模型调用
 
 `vmbench mcp serve --transport stdio` 提供本地 MCP Server，让 Claude、Codex、Cursor、Cline 等客户端通过 tools 调用 vmbench，而不是让模型执行任意 shell。
@@ -160,7 +162,7 @@ vmbench nodes health --node-catalog auto --kind route --ip-family v6 --json
 |---|---|
 | `vmbench_capabilities` | 输出版本、suite sections、presets、hardware tools、speed providers、workload 列表 |
 | `vmbench_sysinfo` | 输出当前主机系统信息和 warning |
-| `vmbench_run` | 运行原始 workload；MCP 默认 `scope=hardware`、`iterations=1` |
+| `vmbench_run` | 运行硬件基准；MCP 默认 `iterations=1`，网络诊断在 `vmbench_suite` |
 | `vmbench_suite` | 运行 VPS suite；MCP 默认只跑 `hardware`，网络 section 必须通过 preset 或 `only` 显式开启 |
 
 MCP 输出仍然遵守 vmbench 的产品原则：只返回原始指标和结构化诊断，不输出 benchmark 总分、等级或 category score。IP Quality 的风险评分属于业务诊断，不是 benchmark 总分。
@@ -184,12 +186,11 @@ MCP 输出仍然遵守 vmbench 的产品原则：只返回原始指标和结构�
 report := vmbench.RunCore(context.Background(), vmbench.Options{
 	Iterations:    3,
 	Engine:        "external",
-	Scope:         vmbench.ScopeHardware,
 	HardwareTools: []string{"sysbench", "openssl", "fio", "dd"},
 })
 ```
 
-需要网络 workload 时显式使用 `vmbench.ScopeNetwork` 或 `vmbench.ScopeAll`，并可设置 `CatalogSource` / `CatalogRevision`；规范化后 config 记录 `catalog_source` / `catalog_revision` / `node_ids`。报告 JSON 当前为 schema v2，config 保留 scope 和可选 iperf hosts，每项保留实际迭代次数、`samples_ms`、吞吐、延迟和结构化错误；`bytes_processed` / `ops_processed` 只在 workload 明确报告累计字节/操作数时出现，不会从 events/s、IOPS、MB/s 或 score 猜测。任一选中 workload 失败时 CLI 返回非零状态。
+`RunCore` 只执行硬件基准；需要网络诊断时使用 `suite.Run`（catalog source/revision 等参数见 suite 包）。报告 JSON 当前为 schema v2，每项保留实际迭代次数、`samples_ms`、吞吐、延迟和结构化错误；`bytes_processed` / `ops_processed` 只在 workload 明确报告累计字节/操作数时出现，不会从 events/s、IOPS、MB/s 或 score 猜测。任一选中 workload 失败时 CLI 返回非零状态。
 
 ## 设计原则
 

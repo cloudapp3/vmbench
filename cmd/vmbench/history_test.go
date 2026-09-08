@@ -145,13 +145,9 @@ func TestRunHardwareOnlyOmitsCatalogAndNetworkProvenance(t *testing.T) {
 	_, code := captureStdout(t, func() int {
 		return run([]string{
 			"run",
-			"--scope", "hardware",
 			"--filter", "^definitely-no-workload$",
 			"--iterations", "1",
 			"--quiet",
-			"--node-catalog", "auto",
-			"--node-revision", "unused-revision",
-			"--node-cache", filepath.Join(t.TempDir(), "unused-cache.json"),
 			"--json", path,
 		})
 	})

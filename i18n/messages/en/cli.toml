@@ -33,6 +33,9 @@ other = "compare two reports"
 [cli.usage.cmdHistory]
 other = "manage local report history"
 
+[cli.usage.cmdUpdate]
+other = "self-update to the latest GitHub release"
+
 [cli.usage.cmdVersion]
 other = "show version"
 
@@ -71,6 +74,9 @@ other = "Show system information for the current host."
 
 [cli.usage.compareDetail]
 other = "Compare two benchmark reports side by side."
+
+[cli.usage.updateDetail]
+other = "Check GitHub Releases for a newer vmbench and replace this binary in place (SHA-256 verified against the release checksums.txt)."
 
 [cli.usage.nodesCommands]
 other = "Commands:"
@@ -113,15 +119,6 @@ other = "write HTML report to file"
 
 [cli.flag.quietRun]
 other = "suppress progress output"
-
-[cli.flag.mode]
-other = "compatibility mode: single (legacy multi/all run the catalog once)"
-
-[cli.flag.scope]
-other = "workload scope: hardware, network, or all"
-
-[cli.flag.iperfHostRun]
-other = "iperf3 server for network test (comma-separated for multiple)"
 
 [cli.flag.hardwareTool]
 other = "hardware tools (comma-separated: sysbench,openssl,fio,dd,stream,mbw,geekbench,winsat; use all for every adapter)"
@@ -182,33 +179,6 @@ other = "media unlock set: all, globe, tw, hk, jp, kr, na, sa, eu, afr, sea, oce
 
 [cli.flag.ipQualitySource]
 other = "IP quality evidence sources (comma-separated: builtin,securitycheck)"
-
-[cli.flag.noHardware]
-other = "skip hardware section"
-
-[cli.flag.noNetworkInfo]
-other = "skip network identity section"
-
-[cli.flag.noRoute]
-other = "skip route section"
-
-[cli.flag.noPing]
-other = "skip ping section"
-
-[cli.flag.noSpeed]
-other = "skip speed section"
-
-[cli.flag.noIP]
-other = "skip IP quality section"
-
-[cli.flag.noMail]
-other = "skip mail port section"
-
-[cli.flag.noMedia]
-other = "skip media section"
-
-[cli.flag.noReachability]
-other = "skip website and Telegram reachability section"
 
 [cli.flag.quietSuite]
 other = "suppress section progress output"
@@ -290,12 +260,6 @@ other = "error: --timeout must not be negative"
 
 [cli.error.badFilterRegex]
 other = "error: invalid --filter regex: {{.Err}}"
-
-[cli.error.badMode]
-other = "error: --mode must be one of: single, multi, all"
-
-[cli.error.badScope]
-other = "error: --scope must be one of: hardware, network, all"
 
 [cli.error.historyTagRequiresSave]
 other = "error: --history-tag requires --save-history"
@@ -395,9 +359,6 @@ other = "error: history delete requires exactly one ID"
 
 [cli.error.invalidStoredReport]
 other = "error: invalid stored report: {{.Err}}"
-
-[cli.notice.networkScopeTransfer]
-other = "notice: network scope is enabled and may transfer about 1.75 GB before optional speedtest/iperf workloads"
 
 [cli.notice.historySaved]
 other = "history: saved {{.ID}}"
@@ -596,3 +557,39 @@ other = "{{.Total}} total / {{.Free}} free ({{.Each}} each)"
 
 [cli.sysinfo.ifaceCount]
 other = "{{.Count}} interfaces ({{.Names}})"
+
+[cli.update.flag.check]
+other = "only check for a newer release; do not install"
+
+[cli.update.flag.version]
+other = "install a specific release version (e.g. v0.6.0)"
+
+[cli.update.flag.timeout]
+other = "timeout for the whole update"
+
+[cli.update.flag.apiUrl]
+other = "GitHub API releases base URL (advanced)"
+
+[cli.update.flag.dest]
+other = "binary destination path (default: this executable)"
+
+[cli.update.error.requires]
+other = "error: update does not accept positional arguments and requires a positive --timeout"
+
+[cli.update.notice.available]
+other = "update available: {{.Current}} -> v{{.Latest}} ({{.Asset}})"
+
+[cli.update.notice.upToDate]
+other = "already up to date ({{.Current}})"
+
+[cli.update.notice.devBuild]
+other = "current build is {{.Current}} (dev build); latest release is v{{.Latest}}"
+
+[cli.update.notice.downloading]
+other = "downloading {{.Asset}}..."
+
+[cli.update.notice.updated]
+other = "updated to v{{.Latest}}: {{.Old}} -> {{.New}} at {{.Path}}"
+
+[cli.update.notice.pkgManagerHint]
+other = "vmbench may be managed by apt/yum; prefer your package manager, or rerun with sudo / --dest"

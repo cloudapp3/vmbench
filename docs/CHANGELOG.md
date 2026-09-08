@@ -1,5 +1,20 @@
 # VMBench Changelog
 
+## v0.7.0（2026-09-08）
+
+### CLI 命令面精简（BREAKING）
+
+- **`run` 回归纯硬件基准**：删除 `--scope` / `--iperf-host` / `--node-catalog` / `--node-revision` / `--node-cache`。`vmbench run` 只编排外部工具硬件 workload，网络诊断（route / ping / speed / IP 质量 / mail / media 等）全部由 `vmbench suite` 提供；`suite` 侧对应参数不受影响。迁移：`vmbench run --scope network|all` → `vmbench suite --only ...` 或 `--preset`。
+- **删除 `--mode`**（run）：纯 legacy 参数，删除前已归一化为 `single` 并只发兼容 warning。
+- **删除 suite 的 9 个 `--no-*` 开关**（`--no-hardware/--no-network-info/--no-route/--no-ping/--no-speed/--no-ip-quality/--no-reachability/--no-mail/--no-media`）：与 `--skip` 语义完全重叠。迁移：`--no X` → `--skip X`。
+- **MCP `vmbench_run`** 同步删除 `mode` / `scope` / `iperf_hosts` / `catalog_source` / `catalog_revision` / `catalog_cache_path` 参数（`vmbench_suite` 不变）；参数解码不拒绝未知字段，旧客户端传入已删参数会被忽略并得到默认的硬件基准行为。
+- 报告兼容：benchmark JSON schema v2 的 `mode` / `scope` / `iperf_hosts` / `catalog_source` / `catalog_revision` / `node_ids` 字段保留（`compare` / `history` 继续解析旧网络报告并参与可比性警告）；新 `run` 报告固定 `scope="hardware"`、`extensions=false`，不再输出 `mode` 与网络 provenance 字段。
+- flag 计数：`suite` 33 → 24，`run` 17 → 12；README/Common Flags 表与 docs 全量同步。
+
+### 自升级命令
+
+- **`vmbench update`**：从 GitHub Releases 自升级——查询最新 release、与当前版本比较、下载对应 OS/arch 归档、按 release `checksums.txt` 做 SHA-256 校验、解出二进制后以临时文件 + rename 原地替换（Windows 先移 `.old`）。`--check` 仅检查，`--version TAG` 固定/降级版本，`--json` 输出结构化状态，`--dest` 指定目标路径；`GITHUB_TOKEN`/`GH_TOKEN` 作为 API bearer token。校验模型与 `install.sh` 一致（checksums over TLS）。新增 `selfupdate/` 包（纯标准库）与 en/zh-CN 成对 i18n；README 与 docs 同步更新。
+
 ## v0.6.0（2026-09-07）
 
 ### TUI 人性化重构（滚动 / 帮助 / 鼠标 / 配置页 / 对比重做 / 详情页）

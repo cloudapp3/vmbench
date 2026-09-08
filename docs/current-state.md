@@ -24,9 +24,8 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 ### 1. Runner / workload 调度
 
 - workload 始终串行、隔离执行，不并发不同 benchmark，也不修改进程级 runtime/GC/线程状态
-- `single` 是标准执行模式；旧的 `multi` / `all` 只为兼容保留，会输出 warning、归一化为 `single`，且只运行一次外部工具 catalog
-- `vmbench run` 默认 `scope=hardware`；网络 workload 只在显式 `--scope network` / `--scope all` 时注册，并提示约 1.75 GB 基础流量
-- 硬件 workload 使用请求的 1-9 次迭代；所有网络 workload 最多执行一次真实探测并记录实际 `iterations=1`
+- `vmbench run` 是硬件专用命令，只注册外部工具硬件 workload；网络诊断全部由 `vmbench suite` 提供
+- 硬件 workload 使用请求的 1-9 次迭代；suite 内的网络探测最多执行一次真实探测并记录实际 `iterations=1`
 - workload start event 在首个 sample 前逐项同步发射，done/fail 在当前 workload 返回后立即发射；同名 workload 也不会合并
 - CLI 对非法参数返回退出码 2；没有 workload 命中或任一 workload 失败时返回退出码 1
 
@@ -80,7 +79,7 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
   - `vmbench_run`
   - `vmbench_suite`
 - 默认安全策略：
-  - `vmbench_run` 默认 `scope=hardware`
+  - `vmbench_run` 只跑硬件基准，不提供网络参数
   - `vmbench_suite` 默认只跑 `hardware`
   - `iterations` 默认 1，最大 9
   - `timeout_ms` 最大 15 分钟
@@ -94,7 +93,7 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 - Dashboard / Running / Results / Compare / SuiteConfig / SuiteRunning / SuiteResults
 - Go TUI 只保留 Hardware Benchmark 入口，不再提供独立 Multi-Core 入口；SuiteConfig 默认实际应用包含 `network_info` 的 Quick sections 和 Cloudflare provider，并使用与 CLI/MCP 相同的 catalog/config 模型
 - Results 只展示原始时间、吞吐、延迟、detail/error
-- benchmark JSON 使用 schema v2；config 记录实际 scope/可选 iperf hosts，network/all 另记录 catalog source/revision/node IDs；hardware 清除网络 provenance 且 `extensions=false`
+- benchmark JSON 使用 schema v2；`run` 报告固定 `scope=hardware`、`extensions=false`，不再输出 iperf hosts 与 catalog provenance；旧版本网络报告的这些字段仍可被 compare/history 解析
 - 结果保留实际 iterations 与 `samples_ms`；processed 字段仅在明确为累计 bytes/ops 且 sample 语义一致时出现
 - TUI benchmark Compare 忽略 error metric；CLI/history Suite Compare 另检查 protocol/provider/node/catalog revision 与 Route 到达证据，并提示所有不兼容原因
 - Console / JSON / HTML 是同一数据模型的不同视图

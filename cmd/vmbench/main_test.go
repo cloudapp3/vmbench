@@ -60,7 +60,6 @@ func TestRunSuiteIperfWithoutHostExitsNonZero(t *testing.T) {
 
 func TestRunRejectsPinnedCatalogMismatchBeforeNetworkExecution(t *testing.T) {
 	tests := [][]string{
-		{"run", "--scope", "network", "--node-revision", "missing-revision"},
 		{"suite", "--only", "ping", "--node-revision", "missing-revision"},
 	}
 	for _, args := range tests {
