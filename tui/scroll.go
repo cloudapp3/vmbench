@@ -72,8 +72,6 @@ func pageContent(m Model) string {
 		return viewCompare(m)
 	case pageConfig:
 		return viewConfig(m)
-	case pageSuiteRunning:
-		return viewSuiteRunning(m)
 	case pageSuiteResults:
 		return viewSuiteResults(m)
 	case pageHelp:

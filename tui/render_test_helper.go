@@ -45,7 +45,8 @@ func WithPageForRender(m Model, name string) Model {
 		m.config.preset = 2 // first real preset (quick)
 		m.config.applyPreset()
 	case "suite-running":
-		m.page = pageSuiteRunning
+		m.page = pageRunning
+		m.runKind = "suite"
 		m.suiteSections = []suiteSection{
 			{id: suite.SectionHardware, label: "Hardware", status: "done", message: "ok"},
 			{id: suite.SectionNetworkInfo, label: "Network Info", status: "done", message: "ok"},

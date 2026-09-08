@@ -13,10 +13,26 @@ import (
 	"github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/catalog"
 	"github.com/cloudapp3/vmbench/i18n"
+	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
 )
 
+type suiteEventMsg struct{ event suite.Event }
+type suiteStartMsg struct{ opts suite.Options }
+type suiteDoneMsg struct{ report suite.SuiteReport }
+
+type suiteSection struct {
+	id        suite.SectionID
+	label     string
+	status    string
+	message   string
+	startedAt time.Time
+}
+
+// startBenchmark and startSuite share the single running page; m.runKind
+// picks which progress view renders ("run" workload grid vs "suite" section
+// grid) and which cancel-modal copy is shown.
 func startBenchmark(m Model, opts vmbench.Options) (tea.Model, tea.Cmd) {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
@@ -179,6 +195,8 @@ func updateWorkloadEvent(m Model, ev vmbench.Event) (tea.Model, tea.Cmd) {
 	return m, waitForEvent(m.eventCh)
 }
 
+// updateRunning handles keys for both run kinds; cancel (esc), the event log
+// toggle (tab), and quit (q) mean the same thing either way.
 func updateRunning(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
@@ -197,6 +215,136 @@ func updateRunning(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	return m, nil
+}
+
+func newSuiteSections(sel suite.SectionSelector) []suiteSection {
+	order := []struct {
+		id      suite.SectionID
+		enabled bool
+	}{
+		{suite.SectionHardware, sel.Hardware},
+		{suite.SectionNetworkInfo, sel.NetworkInfo},
+		{suite.SectionRoute, sel.Route},
+		{suite.SectionPing, sel.Ping},
+		{suite.SectionSpeed, sel.Speed},
+		{suite.SectionIPQuality, sel.IPQuality},
+		{suite.SectionReachability, sel.Reachability},
+		{suite.SectionMail, sel.Mail},
+		{suite.SectionMedia, sel.Media},
+	}
+	out := make([]suiteSection, 0, len(order))
+	for _, o := range order {
+		if !o.enabled {
+			continue
+		}
+		out = append(out, suiteSection{id: o.id, label: i18n.SectionLabel(string(o.id)), status: "waiting"})
+	}
+	return out
+}
+
+func startSuite(m Model, opts suite.Options) (tea.Model, tea.Cmd) {
+	ctx, cancel := context.WithCancel(context.Background())
+	m.cancel = cancel
+	m.suiteEventCh = make(chan suite.Event, 50)
+	m.suiteSections = newSuiteSections(opts.Sections)
+	m.eventLog = m.eventLog[:0]
+	m.startedAt = time.Now()
+	m.page = pageRunning
+	m.runKind = "suite"
+
+	return m, tea.Batch(
+		runSuiteCmd(ctx, opts, m.suiteEventCh),
+		waitForSuiteEvent(m.suiteEventCh),
+		m.spinner.Tick,
+	)
+}
+
+func runSuiteCmd(ctx context.Context, opts suite.Options, ch chan<- suite.Event) tea.Cmd {
+	return func() tea.Msg {
+		opts.OnEvent = func(ev suite.Event) {
+			ch <- ev
+		}
+		report := suite.Run(ctx, opts)
+		return suiteDoneMsg{report: report}
+	}
+}
+
+func waitForSuiteEvent(ch <-chan suite.Event) tea.Cmd {
+	return func() tea.Msg {
+		ev, ok := <-ch
+		if !ok {
+			return nil
+		}
+		return suiteEventMsg{event: ev}
+	}
+}
+
+func updateSuiteEvent(m Model, ev suite.Event) (tea.Model, tea.Cmd) {
+	addLog := func(msg string) {
+		m.eventLog = append(m.eventLog, fmt.Sprintf("%s %s", time.Now().Format("15:04:05"), msg))
+		if len(m.eventLog) > 50 {
+			m.eventLog = m.eventLog[len(m.eventLog)-50:]
+		}
+	}
+
+	updateSection := func(status, msg string) {
+		for i := range m.suiteSections {
+			if m.suiteSections[i].id == ev.Section {
+				m.suiteSections[i].status = status
+				if msg != "" {
+					m.suiteSections[i].message = msg
+				}
+				return
+			}
+		}
+	}
+
+	switch ev.Kind {
+	case suite.EventSectionStart:
+		updateSection("running", "")
+		for i := range m.suiteSections {
+			if m.suiteSections[i].id == ev.Section {
+				m.suiteSections[i].startedAt = time.Now()
+				break
+			}
+		}
+		addLog("▸ start  " + string(ev.Section))
+	case suite.EventSectionDone:
+		updateSection("done", ev.Message)
+		clearSectionStartedAt(&m, ev.Section)
+		addLog("✓ " + i18n.PadCells(i18n.StatusLabel("done"), 7) + "   " + string(ev.Section) + "  " + ev.Message)
+	case suite.EventSectionFail:
+		status := strings.ToLower(strings.TrimSpace(ev.Status))
+		marker := "✗"
+		switch status {
+		case "partial":
+			marker = "!"
+		case "skip", "skipped":
+			status = "skipped"
+			marker = "⊘"
+		case "error", "fail", "failed":
+		default:
+			status = "fail"
+		}
+		updateSection(status, ev.Message)
+		addLog(marker + " " + i18n.PadCells(i18n.StatusLabel(status), 7) + "   " + string(ev.Section) + "  " + ev.Message)
+	case suite.EventSectionSkip:
+		updateSection("skip", "")
+		clearSectionStartedAt(&m, ev.Section)
+	case suite.EventSuiteDone:
+		addLog("● " + i18n.T("tui.suiteRunning.complete") + "  " + ev.Message)
+	}
+	return m, waitForSuiteEvent(m.suiteEventCh)
+}
+
+// clearSectionStartedAt stops the elapsed timer for a finished section.
+func clearSectionStartedAt(m *Model, id suite.SectionID) {
+	for i := range m.suiteSections {
+		if m.suiteSections[i].id == id {
+			m.suiteSections[i].startedAt = time.Time{}
+			return
+		}
+	}
 }
 
 // recordWorkloadDone banks the wall-clock duration of a finished workload
@@ -255,7 +403,17 @@ func handleConfirm(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// viewRunning renders whichever progress shape the started benchmark uses:
+// the per-workload grid for the hardware run, the per-section grid for the
+// suite.
 func viewRunning(m Model) string {
+	if m.runKind == "suite" {
+		return viewSuiteProgress(m)
+	}
+	return viewWorkloadProgress(m)
+}
+
+func viewWorkloadProgress(m Model) string {
 	t := theme.Active
 	width := m.width
 
@@ -334,41 +492,226 @@ func viewRunning(m Model) string {
 	}
 
 	parts := []string{headLine, "", progressLine, "", grid}
+	if log := appendEventLogCard(m, width); log != "" {
+		parts = append(parts, "", log)
+	}
+	view := strings.Join(parts, "\n")
+	return viewWithCancelModal(m, view, width)
+}
 
-	if m.showLog && len(m.eventLog) > 0 {
-		logLines := m.eventLog
-		if len(logLines) > 8 {
-			logLines = logLines[len(logLines)-8:]
+// viewSuiteProgress renders the per-section grid for a suite run.
+func viewSuiteProgress(m Model) string {
+	t := theme.Active
+	width := m.width
+
+	total := len(m.suiteSections)
+	done := 0
+	failed := 0
+	for _, s := range m.suiteSections {
+		switch s.status {
+		case "done":
+			done++
+		case "partial":
+			done++
+			failed++
+		case "fail", "failed", "error", "skipped":
+			done++
+			failed++
+		case "skip":
+			done++
 		}
-		body := lipgloss.NewStyle().Foreground(t.Muted).Render(strings.Join(logLines, "\n"))
-		logCard := comp.Card{
-			Title:  i18n.T("tui.running.eventLog"),
-			Body:   body,
-			Accent: t.Accent,
-			Width:  width - 2,
-		}
-		parts = append(parts, "", logCard.Render())
+	}
+	ratio := 0.0
+	if total > 0 {
+		ratio = float64(done) / float64(total)
+	}
+
+	elapsed := time.Duration(0)
+	if !m.startedAt.IsZero() {
+		elapsed = time.Since(m.startedAt).Truncate(time.Second)
+	}
+
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(t.Primary)
+	header := lipgloss.JoinHorizontal(lipgloss.Bottom,
+		titleStyle.Render(i18n.T("tui.suiteRunning.title")),
+		"    ",
+		lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.Tf("tui.running.elapsed", map[string]any{"Elapsed": elapsed.String()})),
+	)
+
+	barWidth := width - 30
+	if barWidth < 20 {
+		barWidth = 20
+	}
+	progressLine := comp.ProgressLine(barWidth, ratio, i18n.T("tui.running.overall"), t.Primary) +
+		lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("  %d/%d  ✗%d", done, total, failed))
+	if m.height < 40 {
+		return viewSuiteProgressCompact(m, header, progressLine)
+	}
+
+	cardW := width - 4
+	if width >= 120 {
+		cardW = (width - 6) / 2
+	}
+
+	var cards []string
+	for _, s := range m.suiteSections {
+		cards = append(cards, suiteSectionCard(m, s, cardW))
+	}
+
+	var grid string
+	if width >= 120 {
+		grid = pairCards(cards, width)
+	} else {
+		grid = strings.Join(cards, "\n")
+	}
+
+	parts := []string{header, "", progressLine, "", grid}
+	if log := appendEventLogCard(m, width); log != "" {
+		parts = append(parts, "", log)
 	}
 
 	view := strings.Join(parts, "\n")
+	return viewWithCancelModal(m, view, width)
+}
 
-	if m.confirm {
-		modal := comp.Modal{
-			Title: i18n.T("tui.modal.cancelBenchmark"),
-			Body:  i18n.T("tui.modal.cancelBenchmarkBody"),
-			Actions: []comp.ModalAction{
-				{Key: "y", Label: i18n.T("tui.modal.cancelRun"), Selected: true, Danger: true},
-				{Key: "n", Label: i18n.T("tui.modal.keepRunning")},
-			},
-			Width: 50,
-		}
-		view += "\n\n" + lipgloss.NewStyle().
-			Width(width).
-			Align(lipgloss.Center).
-			Render(modal.Render())
+func viewSuiteProgressCompact(m Model, header, progressLine string) string {
+	t := theme.Active
+	lineWidth := m.width - 4
+	parts := []string{header, progressLine, ""}
+	for _, section := range m.suiteSections {
+		parts = append(parts, suiteSectionCompactLine(m, section, lineWidth))
 	}
 
-	return view
+	if m.showLog && len(m.eventLog) > 0 {
+		logLines := m.eventLog
+		if len(logLines) > 2 {
+			logLines = logLines[len(logLines)-2:]
+		}
+		parts = append(parts, "", lipgloss.NewStyle().Bold(true).Foreground(t.Accent).Render(i18n.T("tui.suiteRunning.recentEvents")))
+		for _, line := range logLines {
+			parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(truncStr(line, lineWidth)))
+		}
+	}
+	if m.confirm {
+		prompt := lipgloss.NewStyle().Bold(true).Foreground(t.Danger).Render(i18n.T("tui.modal.cancelSuite")) +
+			lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.T("tui.modal.cancelSuiteCompact"))
+		parts = append(parts, "", prompt)
+	}
+	return strings.Join(parts, "\n")
+}
+
+func suiteSectionCompactLine(m Model, s suiteSection, width int) string {
+	labelWidth := comp.ColWidth(s.label, 20)
+	label := lipgloss.NewStyle().Bold(true).Foreground(sectionAccent(s.id)).Width(labelWidth).
+		Render(truncStr(s.label, labelWidth))
+	return label + suiteSectionStatus(m, s, width-labelWidth)
+}
+
+func suiteSectionStatus(m Model, s suiteSection, maxWidth int) string {
+	if maxWidth < 8 {
+		maxWidth = 8
+	}
+	switch s.status {
+	case "done":
+		return comp.StatusPill(comp.StatusDone, truncStr(firstStr(s.message, "ok"), maxWidth-2))
+	case "partial":
+		return comp.StatusPill(comp.StatusPartial, truncStr(firstStr(s.message, "partial"), maxWidth-2))
+	case "fail", "failed", "error":
+		return comp.StatusPill(comp.StatusFail, truncStr(firstStr(s.message, "failed"), maxWidth-2))
+	case "skip", "skipped":
+		return comp.StatusPill(comp.StatusSkip, "skipped")
+	case "running":
+		elapsed := ""
+		if !s.startedAt.IsZero() {
+			elapsed = " " + lipgloss.NewStyle().Foreground(theme.Active.Subtle).Render(
+				time.Since(s.startedAt).Truncate(time.Second).String())
+		}
+		return m.spinner.View() + " " + lipgloss.NewStyle().Foreground(theme.Active.Warning).Render(i18n.T("tui.suiteRunning.runningNow")) + elapsed
+	default:
+		return comp.StatusPill(comp.StatusWaiting, i18n.StatusLabel("waiting"))
+	}
+}
+
+func suiteSectionCard(m Model, s suiteSection, width int) string {
+	card := comp.Card{
+		Title:  s.label,
+		Body:   suiteSectionStatus(m, s, 42),
+		Accent: sectionAccent(s.id),
+		Width:  width,
+	}
+	return card.Render()
+}
+
+func sectionAccent(id suite.SectionID) lipgloss.AdaptiveColor {
+	t := theme.Active
+	switch id {
+	case suite.SectionHardware:
+		return t.CategorySystem
+	case suite.SectionNetworkInfo:
+		return t.Info
+	case suite.SectionRoute, suite.SectionPing:
+		return t.CategoryNetwork
+	case suite.SectionSpeed:
+		return t.CategoryInteger
+	case suite.SectionIPQuality:
+		return t.Accent
+	case suite.SectionReachability:
+		return t.CategoryNetwork
+	case suite.SectionMail:
+		return t.CategoryFloat
+	case suite.SectionMedia:
+		return t.CategoryDisk
+	default:
+		return t.Primary
+	}
+}
+
+// appendEventLogCard renders the most recent event-log lines as a card, or
+// "" while the log is hidden or empty.
+func appendEventLogCard(m Model, width int) string {
+	if !m.showLog || len(m.eventLog) == 0 {
+		return ""
+	}
+	logLines := m.eventLog
+	if len(logLines) > 8 {
+		logLines = logLines[len(logLines)-8:]
+	}
+	body := lipgloss.NewStyle().Foreground(theme.Active.Muted).Render(strings.Join(logLines, "\n"))
+	return comp.Card{
+		Title:  i18n.T("tui.running.eventLog"),
+		Body:   body,
+		Accent: theme.Active.Accent,
+		Width:  width - 2,
+	}.Render()
+}
+
+// viewWithCancelModal overlays the run-kind-specific cancel confirmation on
+// the rendered running view.
+func viewWithCancelModal(m Model, view string, width int) string {
+	if !m.confirm {
+		return view
+	}
+	title := i18n.T("tui.modal.cancelBenchmark")
+	body := i18n.T("tui.modal.cancelBenchmarkBody")
+	cancelLabel := i18n.T("tui.modal.cancelRun")
+	if m.runKind == "suite" {
+		title = i18n.T("tui.modal.cancelSuite")
+		body = i18n.T("tui.modal.cancelSuiteBody")
+		cancelLabel = i18n.T("tui.modal.cancelSuite")
+	}
+	modal := comp.Modal{
+		Title: title,
+		Body:  body,
+		Actions: []comp.ModalAction{
+			{Key: "y", Label: cancelLabel, Selected: true, Danger: true},
+			{Key: "n", Label: i18n.T("tui.modal.keepRunning")},
+		},
+		Width: 50,
+	}
+	return view + "\n\n" + lipgloss.NewStyle().
+		Width(width).
+		Align(lipgloss.Center).
+		Render(modal.Render())
 }
 
 type workloadGroup struct {

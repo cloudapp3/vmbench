@@ -142,7 +142,8 @@ func TestRunningWorstCaseBounds(t *testing.T) {
 }
 
 func TestSuiteSectionElapsed(t *testing.T) {
-	m := scrollTestModel(t, pageSuiteRunning, nil)
+	m := scrollTestModel(t, pageRunning, nil)
+	m.runKind = "suite"
 	m.suiteSections = []suiteSection{
 		{id: suite.SectionRoute, label: "Route", status: "running", startedAt: time.Now().Add(-4 * time.Second)},
 		{id: suite.SectionPing, label: "Ping", status: "waiting"},

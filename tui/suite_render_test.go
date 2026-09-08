@@ -39,7 +39,8 @@ func TestSuitePagesFitCompactTerminalWidth(t *testing.T) {
 		setup func(*Model)
 	}{
 		{name: "config", page: pageConfig},
-		{name: "running", page: pageSuiteRunning, setup: func(m *Model) {
+		{name: "running", page: pageRunning, setup: func(m *Model) {
+			m.runKind = "suite"
 			m.suiteSections = []suiteSection{
 				{id: suite.SectionHardware, label: "Hardware", status: "done", message: "ok"},
 				{id: suite.SectionNetworkInfo, label: "Network Info", status: "done", message: "ok"},
@@ -160,8 +161,9 @@ func TestSuitePagesFit80x24Terminal(t *testing.T) {
 		},
 		{
 			name: "running",
-			page: pageSuiteRunning,
+			page: pageRunning,
 			setup: func(m *Model) {
+				m.runKind = "suite"
 				m.suiteSections = compactSuiteSectionsFixture()
 			},
 			expected: []string{"Running Suite", "Hardware", "Reachability", "Mail Ports"},
@@ -232,8 +234,9 @@ func TestSuitePagesFit80x24TerminalZhCN(t *testing.T) {
 		},
 		{
 			name: "running",
-			page: pageSuiteRunning,
+			page: pageRunning,
 			setup: func(m *Model) {
+				m.runKind = "suite"
 				m.suiteSections = compactSuiteSectionsFixture()
 			},
 			expected: []string{"综合测试运行中", "硬件"},
@@ -317,7 +320,8 @@ func TestCompactSuiteConfigFieldsFit80x24(t *testing.T) {
 
 func TestCompactSuiteRunningWorstCaseFits80x24(t *testing.T) {
 	m := NewModel("", "")
-	m.page = pageSuiteRunning
+	m.page = pageRunning
+	m.runKind = "suite"
 	m.width = 80
 	m.height = 24
 	m.suiteSections = compactSuiteSectionsFixture()

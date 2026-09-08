@@ -77,12 +77,6 @@ func helpFor(p page) []helpEntry {
 			{keys: "↵", descKey: "tui.hint.start", short: true},
 			{keys: "esc", descKey: "tui.hint.back", short: true},
 		}
-	case pageSuiteRunning:
-		return []helpEntry{
-			{keys: "esc", descKey: "tui.hint.cancel", short: true},
-			{keys: "tab", descKey: "tui.hint.log", short: true},
-			{keys: "q", descKey: "tui.hint.quit", short: true},
-		}
 	case pageSuiteResults:
 		return []helpEntry{
 			{keys: "esc", descKey: "tui.hint.back", short: true},
@@ -149,8 +143,6 @@ func helpSectionTitle(p page) string {
 		return i18n.T("tui.help.sec.results")
 	case pageCompare:
 		return i18n.T("tui.help.sec.compare")
-	case pageSuiteRunning:
-		return i18n.T("tui.help.sec.suiteRunning")
 	case pageSuiteResults:
 		return i18n.T("tui.help.sec.suiteResults")
 	}
@@ -165,7 +157,6 @@ var helpPageOrder = []page{
 	pageResultDetail,
 	pageComparePicker,
 	pageCompare,
-	pageSuiteRunning,
 	pageSuiteResults,
 }
 

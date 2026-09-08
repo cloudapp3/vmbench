@@ -106,13 +106,11 @@ other = "全局按键"
 [tui.help.sec.dashboard]
 other = "主菜单"
 [tui.help.sec.running]
-other = "硬件跑分进行中"
+other = "评测进行中"
 [tui.help.sec.results]
 other = "跑分结果"
 [tui.help.sec.compare]
 other = "报告对比"
-[tui.help.sec.suiteRunning]
-other = "Suite 进行中"
 [tui.help.sec.suiteResults]
 other = "Suite 结果"
 

@@ -24,8 +24,8 @@ func TestStartSuiteLandsOnSuiteRunningPage(t *testing.T) {
 	}
 	updated, _ := startSuite(m, norm)
 	um := updated.(Model)
-	if um.page != pageSuiteRunning || um.runKind != "suite" {
-		t.Fatalf("startSuite page=%d runKind=%q, want pageSuiteRunning/suite", um.page, um.runKind)
+	if um.page != pageRunning || um.runKind != "suite" {
+		t.Fatalf("startSuite page=%d runKind=%q, want pageRunning/suite", um.page, um.runKind)
 	}
 	if !slices.Contains(m.config.presetIDs, configPresetHardware) {
 		t.Fatalf("preset IDs = %v, want hardware pseudo-preset", m.config.presetIDs)
@@ -59,7 +59,8 @@ func TestUpdateSuiteEventPreservesPartialStatus(t *testing.T) {
 	}
 	updated.width = 80
 	updated.height = 24
-	if got := viewSuiteRunning(updated); !strings.Contains(got, "1/1") || !strings.Contains(got, "✗1") {
+	updated.runKind = "suite"
+	if got := viewRunning(updated); !strings.Contains(got, "1/1") || !strings.Contains(got, "✗1") {
 		t.Fatalf("running view did not count partial as a terminal non-ok section:\n%s", got)
 	}
 }

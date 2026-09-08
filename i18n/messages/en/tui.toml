@@ -106,13 +106,11 @@ other = "Global"
 [tui.help.sec.dashboard]
 other = "Dashboard"
 [tui.help.sec.running]
-other = "Hardware Benchmark Running"
+other = "Benchmark Running"
 [tui.help.sec.results]
 other = "Benchmark Results"
 [tui.help.sec.compare]
 other = "Compare Reports"
-[tui.help.sec.suiteRunning]
-other = "Suite Running"
 [tui.help.sec.suiteResults]
 other = "Suite Results"
 

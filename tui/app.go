@@ -28,7 +28,6 @@ const (
 	pageResults
 	pageCompare
 	pageConfig
-	pageSuiteRunning
 	pageSuiteResults
 	pageHelp
 	pageComparePicker
@@ -225,8 +224,6 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return updateCompare(m, msg)
 		case pageConfig:
 			return updateConfig(m, msg)
-		case pageSuiteRunning:
-			return updateSuiteRunning(m, msg)
 		case pageSuiteResults:
 			return updateSuiteResults(m, msg)
 		case pageHelp:
