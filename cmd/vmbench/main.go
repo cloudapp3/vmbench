@@ -14,13 +14,11 @@ import (
 	"sort"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	"github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/catalog"
 	"github.com/cloudapp3/vmbench/history"
 	"github.com/cloudapp3/vmbench/i18n"
-	"github.com/cloudapp3/vmbench/nodecatalog"
 	gbreport "github.com/cloudapp3/vmbench/report"
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/suitecompare"
@@ -59,10 +57,6 @@ func run(args []string) int {
 		return runTUI(nil)
 	}
 	switch args[0] {
-	case "run":
-		return runBench(args[1:])
-	case "suite":
-		return runSuite(args[1:])
 	case "tui":
 		return runTUI(args[1:])
 	case "mcp":
@@ -83,22 +77,28 @@ func run(args []string) int {
 		fmt.Printf("vmbench %s\n", vmbench.Version)
 		return 0
 	case "-h", "--help", "help":
-		printUsage(os.Stdout)
+		printRootHelp(os.Stdout)
 		return 0
+	case "run", "suite":
+		// Removed in v0.8.0: benchmark flags moved to the root command.
+		fmt.Fprintf(os.Stderr, "%s\n\n", i18n.Tf("cli.error.mergedCommand", map[string]any{"Command": args[0]}))
+		printUsage(os.Stderr)
+		return 2
 	default:
+		if strings.HasPrefix(args[0], "-") {
+			return runBenchmark(args)
+		}
 		fmt.Fprintf(os.Stderr, "%s\n\n", i18n.Tf("cli.error.unknownCommand", map[string]any{"Command": args[0]}))
 		printUsage(os.Stderr)
 		return 2
 	}
 }
 
-func printUsage(w io.Writer) {
-	fmt.Fprintln(w, strings.Join([]string{
-		i18n.T("cli.usage.tagline"),
-		"",
-		i18n.T("cli.usage.header"),
-		"  vmbench run      [flags]              " + i18n.T("cli.usage.cmdRun"),
-		"  vmbench suite    [flags]              " + i18n.T("cli.usage.cmdSuite"),
+// usageRows renders the command list shared by the short usage and the full
+// root help. The first row is the merged root benchmark surface.
+func usageRows() []string {
+	return []string{
+		"  vmbench [flags]                      " + i18n.T("cli.usage.cmdBench"),
 		"  vmbench tui                          " + i18n.T("cli.usage.cmdTui"),
 		"  vmbench mcp serve [flags]            " + i18n.T("cli.usage.cmdMcp"),
 		"  vmbench list                          " + i18n.T("cli.usage.cmdList"),
@@ -108,383 +108,64 @@ func printUsage(w io.Writer) {
 		"  vmbench history   <command>           " + i18n.T("cli.usage.cmdHistory"),
 		"  vmbench update   [flags]              " + i18n.T("cli.usage.cmdUpdate"),
 		"  vmbench version                       " + i18n.T("cli.usage.cmdVersion"),
+	}
+}
+
+func printUsage(w io.Writer) {
+	fmt.Fprintln(w, strings.Join([]string{
+		i18n.T("cli.usage.tagline"),
+		"",
+		i18n.T("cli.usage.header"),
+		strings.Join(usageRows(), "\n"),
 		"",
 		i18n.T("cli.usage.detailHint"),
 	}, "\n"))
 }
 
-func runBench(args []string) int {
-	fs := flag.NewFlagSet("run", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
-	registerLangFlag(fs)
-
-	var (
-		iterations   int
-		filter       string
-		diskPath     string
-		timeout      time.Duration
-		jsonOut      string
-		htmlOut      string
-		quiet        bool
-		hardwareTool string
-		saveHistory  bool
-		historyTag   string
-	)
-
-	fs.IntVar(&iterations, "iterations", 3, i18n.T("cli.flag.iterationsRun"))
-	fs.StringVar(&filter, "filter", "", i18n.T("cli.flag.filterRun"))
-	fs.StringVar(&diskPath, "disk-path", "", i18n.T("cli.flag.diskPath"))
-	fs.DurationVar(&timeout, "timeout", 0, i18n.T("cli.flag.timeoutRun"))
-	fs.StringVar(&jsonOut, "json", "", i18n.T("cli.flag.jsonRun"))
-	fs.StringVar(&htmlOut, "html", "", i18n.T("cli.flag.htmlRun"))
-	fs.BoolVar(&quiet, "quiet", false, i18n.T("cli.flag.quietRun"))
-	fs.StringVar(&hardwareTool, "hardware-tool", "", i18n.T("cli.flag.hardwareTool"))
-	fs.BoolVar(&saveHistory, "save-history", false, i18n.T("cli.flag.saveHistory"))
-	fs.StringVar(&historyTag, "history-tag", "", i18n.T("cli.flag.historyTag"))
-
-	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, strings.Join([]string{
-			"Usage: vmbench run [flags]",
-			"",
-			i18n.T("cli.usage.runDetail"),
-			"",
-			i18n.T("cli.usage.flags"),
-		}, "\n"))
-		fs.PrintDefaults()
-	}
-
-	if err := fs.Parse(args); err != nil {
-		if err == flag.ErrHelp {
-			return 0
-		}
-		return 2
-	}
-	if iterations < 1 || iterations > 9 {
-		fmt.Fprintln(os.Stderr, i18n.T("cli.error.iterationsRange"))
-		return 2
-	}
-	if timeout < 0 {
-		fmt.Fprintln(os.Stderr, i18n.T("cli.error.timeoutNegative"))
-		return 2
-	}
-	var filterRE *regexp.Regexp
-	filter = strings.TrimSpace(filter)
-	if filter != "" {
-		var err error
-		if filterRE, err = regexp.Compile(filter); err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.badFilterRegex", map[string]any{"Err": err.Error()}))
-			return 2
-		}
-	}
-	if strings.TrimSpace(historyTag) != "" && !saveHistory {
-		fmt.Fprintln(os.Stderr, i18n.T("cli.error.historyTagRequiresSave"))
-		return 2
-	}
-	if bad := invalidCSVValue(hardwareTool, catalog.StandardizeHardwareTools); bad != "" {
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownHardwareTool", map[string]any{"Value": bad}))
-		return 2
-	}
-	hardwareTools := parseHosts(hardwareTool)
-	if strings.TrimSpace(hardwareTool) != "" && len(catalog.StandardizeHardwareTools(hardwareTools)) == 0 {
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.noValidHardwareTools", map[string]any{"Value": hardwareTool, "Available": strings.Join(catalog.HardwareToolIDs(), ", ")}))
-		return 2
-	}
-
-	runOptions, err := vmbench.NormalizeOptions(vmbench.Options{
-		DiskPath:      diskPath,
-		Timeout:       timeout,
-		Iterations:    iterations,
-		Filter:        filter,
-		Engine:        "external",
-		HardwareTools: hardwareTools,
-		OnEvent:       progressPrinter(!quiet),
-	})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 2
-	}
-	printHardwareToolPreflight(os.Stderr, runOptions.HardwareTools, filterRE)
-	report := vmbench.RunCore(context.Background(), runOptions)
-	if saveHistory {
-		record, err := saveHistoryReport(report, historyTag)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.savingHistory", map[string]any{"Err": err.Error()}))
-			return 1
-		}
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.notice.historySaved", map[string]any{"ID": record.ID}))
-	}
-
-	if jsonOut != "" {
-		if err := writeFile(jsonOut, func(w io.Writer) error {
-			return gbreport.WriteJSON(w, report)
-		}); err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.writingJSON", map[string]any{"Err": err.Error()}))
-			return 1
-		}
-	}
-	if htmlOut != "" {
-		if err := writeFile(htmlOut, func(w io.Writer) error {
-			return gbreport.WriteHTML(w, report)
-		}); err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.writingHTML", map[string]any{"Err": err.Error()}))
-			return 1
-		}
-	}
-
-	if err := gbreport.WriteConsole(os.Stdout, report); err != nil {
-		return 1
-	}
-	if gbreport.HasFailures(report) {
-		return 1
-	}
-	return 0
+// printRootHelp is the full root help: usage, benchmark detail, reference
+// blocks, and every benchmark flag.
+func printRootHelp(w io.Writer) {
+	fmt.Fprintln(w, strings.Join([]string{
+		i18n.T("cli.usage.tagline"),
+		"",
+		i18n.T("cli.usage.header"),
+		strings.Join(usageRows(), "\n"),
+		"",
+		i18n.T("cli.usage.benchDetail"),
+		"",
+	}, "\n"))
+	printBenchDetails(w, newBenchmarkFlagSet(newBenchmarkFlags()))
 }
 
-func runSuite(args []string) int {
-	fs := flag.NewFlagSet("suite", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
-	registerLangFlag(fs)
+// printBenchUsage backs the benchmark FlagSet's own --help output.
+func printBenchUsage(fs *flag.FlagSet) {
+	fmt.Fprintln(os.Stderr, strings.Join([]string{
+		"Usage: vmbench [flags]",
+		"",
+		i18n.T("cli.usage.benchDetail"),
+		"",
+	}, "\n"))
+	printBenchDetails(os.Stderr, fs)
+}
 
-	var (
-		iterations      int
-		filter          string
-		diskPath        string
-		timeout         time.Duration
-		jsonOut         string
-		htmlOut         string
-		preset          string
-		routePreset     string
-		speedProvider   string
-		hardwareTool    string
-		iperfHost       string
-		only            string
-		skip            string
-		ipVersion       string
-		mediaSet        string
-		ipSource        string
-		saveHistory     bool
-		historyTag      string
-		catalogSource   string
-		catalogRevision string
-		catalogCache    string
-		quiet           bool
-	)
-
-	fs.IntVar(&iterations, "iterations", 3, i18n.T("cli.flag.iterationsSuite"))
-	fs.StringVar(&filter, "filter", "", i18n.T("cli.flag.filterSuite"))
-	fs.StringVar(&diskPath, "disk-path", "", i18n.T("cli.flag.diskPath"))
-	fs.DurationVar(&timeout, "timeout", 0, i18n.T("cli.flag.timeoutSuite"))
-	fs.StringVar(&jsonOut, "json", "", i18n.T("cli.flag.jsonSuite"))
-	fs.StringVar(&htmlOut, "html", "", i18n.T("cli.flag.htmlSuite"))
-	fs.StringVar(&preset, "preset", "", i18n.T("cli.flag.preset"))
-	fs.StringVar(&routePreset, "route-presets", "", i18n.T("cli.flag.routePresets"))
-	fs.StringVar(&speedProvider, "speed-provider", "", i18n.T("cli.flag.speedProvider"))
-	fs.StringVar(&hardwareTool, "hardware-tool", "", i18n.T("cli.flag.hardwareTool"))
-	fs.StringVar(&iperfHost, "iperf-host", "", i18n.T("cli.flag.iperfHostSuite"))
-	fs.StringVar(&only, "only", "", i18n.T("cli.flag.only"))
-	fs.StringVar(&skip, "skip", "", i18n.T("cli.flag.skip"))
-	fs.StringVar(&ipVersion, "ip-version", "v4", i18n.T("cli.flag.ipVersion"))
-	fs.StringVar(&mediaSet, "media-set", "all", i18n.T("cli.flag.mediaSet"))
-	fs.StringVar(&ipSource, "ip-quality-source", "builtin", i18n.T("cli.flag.ipQualitySource"))
-	fs.BoolVar(&saveHistory, "save-history", false, i18n.T("cli.flag.saveHistory"))
-	fs.StringVar(&historyTag, "history-tag", "", i18n.T("cli.flag.historyTag"))
-	fs.BoolVar(&quiet, "quiet", false, i18n.T("cli.flag.quietSuite"))
-	fs.StringVar(&catalogSource, "node-catalog", nodecatalog.SourceEmbedded, i18n.T("cli.flag.nodeCatalog"))
-	fs.StringVar(&catalogRevision, "node-revision", "", i18n.T("cli.flag.nodeRevision"))
-	fs.StringVar(&catalogCache, "node-cache", "", i18n.T("cli.flag.nodeCache"))
-	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, strings.Join([]string{
-			"Usage: vmbench suite [flags]",
-			"",
-			i18n.T("cli.usage.suiteDetail"),
-			"",
-			i18n.T("cli.usage.presets"),
-			formatPresetHelp(),
-			"",
-			i18n.T("cli.usage.speedProviders"),
-			formatSpeedProviderHelp(),
-			"",
-			i18n.T("cli.usage.hardwareTools"),
-			formatHardwareToolHelp(),
-			"",
-			i18n.T("cli.usage.flags"),
-		}, "\n"))
-		fs.PrintDefaults()
-	}
-
-	if err := fs.Parse(args); err != nil {
-		if err == flag.ErrHelp {
-			return 0
-		}
-		return 2
-	}
-	if iterations < 1 || iterations > 9 {
-		fmt.Fprintln(os.Stderr, i18n.T("cli.error.iterationsRange"))
-		return 2
-	}
-	if timeout < 0 {
-		fmt.Fprintln(os.Stderr, i18n.T("cli.error.timeoutNegative"))
-		return 2
-	}
-	var filterRE *regexp.Regexp
-	filter = strings.TrimSpace(filter)
-	if filter != "" {
-		var err error
-		if filterRE, err = regexp.Compile(filter); err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.badFilterRegex", map[string]any{"Err": err.Error()}))
-			return 2
-		}
-	}
-	if strings.TrimSpace(historyTag) != "" && !saveHistory {
-		fmt.Fprintln(os.Stderr, i18n.T("cli.error.historyTagRequiresSave"))
-		return 2
-	}
-	switch strings.ToLower(strings.TrimSpace(ipVersion)) {
-	case "v4", "v6", "dual":
-	default:
-		fmt.Fprintln(os.Stderr, i18n.T("cli.error.badIPVersion"))
-		return 2
-	}
-	if bad := invalidSectionName(only); bad != "" {
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownSectionOnly", map[string]any{"Value": bad}))
-		return 2
-	}
-	if bad := invalidSectionName(skip); bad != "" {
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownSectionSkip", map[string]any{"Value": bad}))
-		return 2
-	}
-	if bad := invalidCSVValue(routePreset, suite.StandardizeRoutePresets); bad != "" {
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownRoutePreset", map[string]any{"Value": bad}))
-		return 2
-	}
-	if bad := invalidCSVValue(speedProvider, suite.StandardizeSpeedProviders); bad != "" {
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownSpeedProvider", map[string]any{"Value": bad}))
-		return 2
-	}
-	if bad := invalidCSVValue(hardwareTool, catalog.StandardizeHardwareTools); bad != "" {
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownHardwareTool", map[string]any{"Value": bad}))
-		return 2
-	}
-	if strings.TrimSpace(mediaSet) != "" {
-		if _, err := suite.StandardizeMediaSet(mediaSet); err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownMediaSet", map[string]any{"Value": mediaSet, "Available": strings.Join(suite.MediaSets(), ", ")}))
-			return 2
-		}
-	}
-	if bad := invalidCSVValue(ipSource, suite.StandardizeIPSources); bad != "" {
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownIPSource", map[string]any{"Value": bad, "Available": strings.Join(suite.IPSourceIDs(), ", ")}))
-		return 2
-	}
-
-	routePresets := parseHosts(routePreset)
-	speedProviders := parseHosts(speedProvider)
-	hardwareTools := parseHosts(hardwareTool)
-	if strings.TrimSpace(speedProvider) != "" && len(suite.StandardizeSpeedProviders(speedProviders)) == 0 {
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.noValidSpeedProviders", map[string]any{"Value": speedProvider, "Available": strings.Join(suite.SpeedProviderIDs(), ", ")}))
-		return 2
-	}
-	if strings.TrimSpace(hardwareTool) != "" && len(catalog.StandardizeHardwareTools(hardwareTools)) == 0 {
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.noValidHardwareTools", map[string]any{"Value": hardwareTool, "Available": strings.Join(catalog.HardwareToolIDs(), ", ")}))
-		return 2
-	}
-	sections := suite.DefaultSections()
-	if strings.TrimSpace(preset) != "" {
-		spec, ok := suite.LookupPreset(preset)
-		if !ok {
-			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownPreset", map[string]any{"Value": preset, "Available": strings.Join(suite.PresetIDs(), ", ")}))
-			return 2
-		}
-		sections = spec.Sections
-		if strings.TrimSpace(ipVersion) == "" && spec.IPVersion != "" {
-			ipVersion = spec.IPVersion
-		}
-		if len(routePresets) == 0 && len(spec.RoutePresets) > 0 {
-			routePresets = spec.RoutePresets
-		}
-	}
-	if strings.TrimSpace(only) != "" {
-		var err error
-		sections, err = suite.ApplySectionNames(suite.SectionSelector{}, parseHosts(only), true)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 2
-		}
-	}
-	if strings.TrimSpace(skip) != "" {
-		var err error
-		sections, err = suite.ApplySectionNames(sections, parseHosts(skip), false)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 2
-		}
-	}
-	if !sections.AnyEnabled() {
-		fmt.Fprintln(os.Stderr, i18n.T("cli.error.noSectionsEnabled"))
-		return 2
-	}
-
-	suiteOptions, err := suite.NormalizeOptions(suite.Options{
-		Iterations:       iterations,
-		Filter:           filter,
-		DiskPath:         diskPath,
-		Timeout:          timeout,
-		Preset:           preset,
-		RoutePresets:     routePresets,
-		SpeedProviders:   speedProviders,
-		HardwareTools:    hardwareTools,
-		Sections:         sections,
-		IperfHosts:       parseHosts(iperfHost),
-		IPVersion:        ipVersion,
-		MediaSet:         mediaSet,
-		IPSources:        parseHosts(ipSource),
-		CatalogSource:    catalogSource,
-		CatalogRevision:  catalogRevision,
-		CatalogCachePath: catalogCache,
-		OnEvent:          suiteProgressPrinter(!quiet),
-	})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 2
-	}
-	if suiteOptions.Sections.Hardware {
-		printHardwareToolPreflight(os.Stderr, suiteOptions.HardwareTools, filterRE)
-	}
-	report := suite.Run(context.Background(), suiteOptions)
-	if saveHistory {
-		record, err := saveHistoryReport(report, historyTag)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.savingHistory", map[string]any{"Err": err.Error()}))
-			return 1
-		}
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.notice.historySaved", map[string]any{"ID": record.ID}))
-	}
-
-	if jsonOut != "" {
-		if err := writeFile(jsonOut, func(w io.Writer) error {
-			enc := json.NewEncoder(w)
-			enc.SetIndent("", "  ")
-			return enc.Encode(report)
-		}); err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.writingJSON", map[string]any{"Err": err.Error()}))
-			return 1
-		}
-	}
-	if htmlOut != "" {
-		if err := writeFile(htmlOut, func(w io.Writer) error {
-			return suite.WriteHTML(w, report)
-		}); err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.writingHTML", map[string]any{"Err": err.Error()}))
-			return 1
-		}
-	}
-	if err := suite.WriteConsole(os.Stdout, report); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return 1
-	}
-	if report.HasFailures() {
-		return 1
-	}
-	return 0
+// printBenchDetails writes the benchmark reference blocks (presets, speed
+// providers, hardware tools, flags) followed by the flag defaults.
+func printBenchDetails(w io.Writer, fs *flag.FlagSet) {
+	fs.SetOutput(w)
+	fmt.Fprintln(w, strings.Join([]string{
+		i18n.T("cli.usage.presets"),
+		formatPresetHelp(),
+		"",
+		i18n.T("cli.usage.speedProviders"),
+		formatSpeedProviderHelp(),
+		"",
+		i18n.T("cli.usage.hardwareTools"),
+		formatHardwareToolHelp(),
+		"",
+		i18n.T("cli.usage.flags"),
+	}, "\n"))
+	fs.PrintDefaults()
+	fmt.Fprintln(w, i18n.T("cli.usage.detailHint"))
 }
 
 func formatPresetHelp() string {
@@ -963,25 +644,6 @@ func parseHosts(s string) []string {
 func invalidCSVValue(raw string, normalize func([]string) []string) string {
 	for _, value := range parseHosts(raw) {
 		if len(normalize([]string{value})) == 0 {
-			return value
-		}
-	}
-	return ""
-}
-
-func invalidSectionName(raw string) string {
-	for _, value := range parseHosts(raw) {
-		switch strings.ToLower(strings.TrimSpace(value)) {
-		case "hardware", "hw",
-			"network_info", "network-info", "netinfo", "identity", "network_identity", "network-identity",
-			"route", "trace", "traceroute", "backtrace",
-			"ping", "latency",
-			"speed", "speedtest", "network",
-			"ip", "ip_quality", "ip-quality", "quality",
-			"reachability", "reach", "web", "website", "tg", "telegram",
-			"mail", "email", "ports", "port",
-			"media", "unlock", "streaming":
-		default:
 			return value
 		}
 	}

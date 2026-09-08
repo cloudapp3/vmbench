@@ -6,11 +6,8 @@ other = "vmbench — 跨平台 CPU 与网络基准测试套件"
 [cli.usage.header]
 other = "用法:"
 
-[cli.usage.cmdRun]
-other = "运行基准测试工作负载"
-
-[cli.usage.cmdSuite]
-other = "运行 VPS 综合测试套件"
+[cli.usage.cmdBench]
+other = "运行基准测试;--preset/--only/--skip 选择 section"
 
 [cli.usage.cmdTui]
 other = "交互式 TUI 模式"
@@ -40,13 +37,10 @@ other = "自升级到最新 GitHub 发布版本"
 other = "显示版本"
 
 [cli.usage.detailHint]
-other = "运行 'vmbench run --help'、'vmbench suite --help' 或 'vmbench mcp serve --help' 查看详细参数。"
+other = "运行 'vmbench --help' 查看基准测试参数,或 'vmbench mcp serve --help' 查看 MCP 服务参数。"
 
-[cli.usage.runDetail]
-other = "运行基准测试工作负载并生成测量报告。"
-
-[cli.usage.suiteDetail]
-other = "以 VPS 综合测试套件形式运行 hardware/network_info/route/ping/speed/ip_quality/reachability/mail/media。"
+[cli.usage.benchDetail]
+other = "运行硬件基准测试;配合 --preset/--only/--skip 运行网络诊断 section。不带 section 选择时仅运行硬件基准。"
 
 [cli.usage.flags]
 other = "参数:"
@@ -96,10 +90,10 @@ other = "执行轻量 HEAD/DNS/TCP 可用性检查"
 [cli.usage.nodesCatalog]
 other = "节点目录选择:"
 
-[cli.flag.iterationsRun]
+[cli.flag.iterations]
 other = "每个工作负载的迭代次数 (1-9)"
 
-[cli.flag.filterRun]
+[cli.flag.filter]
 other = "运行匹配正则的工作负载"
 
 [cli.flag.lang]
@@ -108,16 +102,16 @@ other = "界面语言 (en, zh-CN)"
 [cli.flag.diskPath]
 other = "磁盘测试临时目录"
 
-[cli.flag.timeoutRun]
-other = "单个工作负载超时 (默认 5m)"
+[cli.flag.timeout]
+other = "单个 section 超时 (默认 5m;hardware 按工作负载应用)"
 
-[cli.flag.jsonRun]
+[cli.flag.json]
 other = "将 JSON 报告写入文件"
 
-[cli.flag.htmlRun]
+[cli.flag.html]
 other = "将 HTML 报告写入文件"
 
-[cli.flag.quietRun]
+[cli.flag.quiet]
 other = "抑制进度输出"
 
 [cli.flag.hardwareTool]
@@ -138,21 +132,6 @@ other = "要求精确的节点目录版本"
 [cli.flag.nodeCache]
 other = "--node-catalog auto 时的缓存路径覆盖"
 
-[cli.flag.iterationsSuite]
-other = "硬件工作负载的迭代次数"
-
-[cli.flag.filterSuite]
-other = "运行匹配正则的硬件工作负载"
-
-[cli.flag.timeoutSuite]
-other = "单个 section 超时 (默认 5m;hardware 按工作负载应用)"
-
-[cli.flag.jsonSuite]
-other = "将 suite JSON 报告写入文件"
-
-[cli.flag.htmlSuite]
-other = "将 suite HTML 报告写入文件"
-
 [cli.flag.preset]
 other = "场景预设: quick、website、proxy、mail"
 
@@ -162,7 +141,7 @@ other = "逗号分隔的回程预设 (gz,bj,sh,cd,cernet,cstnet)"
 [cli.flag.speedProvider]
 other = "测速提供方 (逗号分隔: cloudflare,speedtest_net,speedtest_cn,iperf3,china_isp,speedtest_isp)"
 
-[cli.flag.iperfHostSuite]
+[cli.flag.iperfHost]
 other = "测速 section 的 iperf3 服务器 (逗号分隔)"
 
 [cli.flag.only]
@@ -179,9 +158,6 @@ other = "流媒体解锁集合: all、globe、tw、hk、jp、kr、na、sa、eu�
 
 [cli.flag.ipQualitySource]
 other = "IP 质量证据来源 (逗号分隔: builtin,securitycheck)"
-
-[cli.flag.quietSuite]
-other = "抑制 section 进度输出"
 
 [cli.flag.jsonSysinfo]
 other = "以 JSON 输出"
@@ -251,6 +227,12 @@ other = "错误: {{.Err}}"
 
 [cli.error.unknownCommand]
 other = "未知命令: {{.Command}}"
+
+[cli.error.mergedCommand]
+other = '错误: "vmbench {{.Command}}" 已在 v0.8.0 移除;基准测试参数已上移到 vmbench 本身,如 "vmbench --preset quick" (见 "vmbench --help")'
+
+[cli.error.noPositionalArgs]
+other = "错误: 基准测试参数不接受位置参数"
 
 [cli.error.iterationsRange]
 other = "错误: --iterations 必须在 1 到 9 之间"

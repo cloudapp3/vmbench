@@ -6,11 +6,8 @@ other = "vmbench — cross-platform CPU and network benchmark suite"
 [cli.usage.header]
 other = "Usage:"
 
-[cli.usage.cmdRun]
-other = "run benchmark workloads"
-
-[cli.usage.cmdSuite]
-other = "run VPS composite suite"
+[cli.usage.cmdBench]
+other = "run benchmarks; --preset/--only/--skip select sections"
 
 [cli.usage.cmdTui]
 other = "interactive TUI mode"
@@ -40,13 +37,10 @@ other = "self-update to the latest GitHub release"
 other = "show version"
 
 [cli.usage.detailHint]
-other = "Run 'vmbench run --help', 'vmbench suite --help', or 'vmbench mcp serve --help' for detailed flags."
+other = "Run 'vmbench --help' for benchmark flags, or 'vmbench mcp serve --help' for MCP server flags."
 
-[cli.usage.runDetail]
-other = "Run benchmark workloads and produce a measured report."
-
-[cli.usage.suiteDetail]
-other = "Run hardware/network_info/route/ping/speed/ip_quality/reachability/mail/media as a composite VPS test suite."
+[cli.usage.benchDetail]
+other = "Run hardware benchmarks and, with --preset/--only/--skip, the network diagnostic sections. Without a section selection this runs the hardware benchmark only."
 
 [cli.usage.flags]
 other = "Flags:"
@@ -96,10 +90,10 @@ other = "run lightweight HEAD/DNS/TCP availability checks"
 [cli.usage.nodesCatalog]
 other = "Catalog selection:"
 
-[cli.flag.iterationsRun]
+[cli.flag.iterations]
 other = "iterations per workload (1-9)"
 
-[cli.flag.filterRun]
+[cli.flag.filter]
 other = "run workloads matching regex"
 
 [cli.flag.lang]
@@ -108,16 +102,16 @@ other = "interface language (en, zh-CN)"
 [cli.flag.diskPath]
 other = "disk benchmark temp directory"
 
-[cli.flag.timeoutRun]
-other = "per-workload timeout (default 5m)"
+[cli.flag.timeout]
+other = "per-section timeout (default 5m; hardware applies it per workload)"
 
-[cli.flag.jsonRun]
+[cli.flag.json]
 other = "write JSON report to file"
 
-[cli.flag.htmlRun]
+[cli.flag.html]
 other = "write HTML report to file"
 
-[cli.flag.quietRun]
+[cli.flag.quiet]
 other = "suppress progress output"
 
 [cli.flag.hardwareTool]
@@ -138,21 +132,6 @@ other = "require an exact node catalog revision"
 [cli.flag.nodeCache]
 other = "cache path override used with --node-catalog auto"
 
-[cli.flag.iterationsSuite]
-other = "iterations for hardware workloads"
-
-[cli.flag.filterSuite]
-other = "run hardware workloads matching regex"
-
-[cli.flag.timeoutSuite]
-other = "per-section timeout (default 5m; hardware applies it per workload)"
-
-[cli.flag.jsonSuite]
-other = "write suite JSON report to file"
-
-[cli.flag.htmlSuite]
-other = "write suite HTML report to file"
-
 [cli.flag.preset]
 other = "scenario preset: quick, website, proxy, mail"
 
@@ -162,7 +141,7 @@ other = "comma-separated route presets (gz,bj,sh,cd,cernet,cstnet)"
 [cli.flag.speedProvider]
 other = "speed providers (comma-separated: cloudflare,speedtest_net,speedtest_cn,iperf3,china_isp,speedtest_isp)"
 
-[cli.flag.iperfHostSuite]
+[cli.flag.iperfHost]
 other = "iperf3 server(s) for speed section (comma-separated)"
 
 [cli.flag.only]
@@ -179,9 +158,6 @@ other = "media unlock set: all, globe, tw, hk, jp, kr, na, sa, eu, afr, sea, oce
 
 [cli.flag.ipQualitySource]
 other = "IP quality evidence sources (comma-separated: builtin,securitycheck)"
-
-[cli.flag.quietSuite]
-other = "suppress section progress output"
 
 [cli.flag.jsonSysinfo]
 other = "output as JSON"
@@ -251,6 +227,12 @@ other = "error: {{.Err}}"
 
 [cli.error.unknownCommand]
 other = "unknown command: {{.Command}}"
+
+[cli.error.mergedCommand]
+other = 'error: "vmbench {{.Command}}" was removed in v0.8.0; benchmark flags now live on vmbench itself, e.g. "vmbench --preset quick" (see "vmbench --help")'
+
+[cli.error.noPositionalArgs]
+other = "error: benchmark flags do not accept positional arguments"
 
 [cli.error.iterationsRange]
 other = "error: --iterations must be between 1 and 9"

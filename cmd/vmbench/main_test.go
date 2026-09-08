@@ -20,14 +20,31 @@ func TestRunRejectsRemovedECSDiffCommands(t *testing.T) {
 	}
 }
 
+func TestRemovedRunSuiteCommandsReportMigration(t *testing.T) {
+	for _, command := range []string{"run", "suite"} {
+		output, code := captureStderr(t, func() int { return run([]string{command}) })
+		if code != 2 {
+			t.Fatalf("run(%q) = %d, want migration exit 2", command, code)
+		}
+		for _, want := range []string{"v0.8.0", "vmbench --help"} {
+			if !strings.Contains(output, want) {
+				t.Errorf("run(%q) stderr missing %q:\n%s", command, want, output)
+			}
+		}
+	}
+}
+
 func TestRunRejectsInvalidBenchmarkArguments(t *testing.T) {
 	tests := [][]string{
-		{"run", "--iterations", "0"},
-		{"run", "--filter", "["},
-		{"run", "--mode", "parallel"},
-		{"run", "--scope", "internet"},
-		{"run", "--hardware-tool", "openssl,unknown"},
-		{"run", "--history-tag", "missing-save-flag"},
+		{"--iterations", "0"},
+		{"--iterations", "10"},
+		{"--filter", "["},
+		{"--mode", "parallel"},
+		{"--scope", "internet"},
+		{"--hardware-tool", "openssl,unknown"},
+		{"--history-tag", "missing-save-flag"},
+		{"--json", "out.json", "stray-positional"},
+		{"--only", "hardware", "--speed-provider", "cloudflare,unknown"},
 	}
 	for _, args := range tests {
 		if code := run(args); code != 2 {
@@ -36,14 +53,11 @@ func TestRunRejectsInvalidBenchmarkArguments(t *testing.T) {
 	}
 }
 
-func TestRunRejectsInvalidSuiteArguments(t *testing.T) {
+func TestRunRejectsInvalidSectionArguments(t *testing.T) {
 	tests := [][]string{
-		{"suite", "--iterations", "10"},
-		{"suite", "--filter", "["},
-		{"suite", "--ip-version", "v5"},
-		{"suite", "--only", "hardware,unknown"},
-		{"suite", "--speed-provider", "cloudflare,unknown"},
-		{"suite", "--history-tag", "missing-save-flag"},
+		{"--ip-version", "v5"},
+		{"--only", "hardware,unknown"},
+		{"--skip", "media,unknown"},
 	}
 	for _, args := range tests {
 		if code := run(args); code != 2 {
@@ -52,15 +66,37 @@ func TestRunRejectsInvalidSuiteArguments(t *testing.T) {
 	}
 }
 
-func TestRunSuiteIperfWithoutHostExitsNonZero(t *testing.T) {
-	if code := run([]string{"suite", "--only", "speed", "--speed-provider", "iperf3"}); code != 1 {
-		t.Fatalf("run(suite iperf3 without host) = %d, want 1", code)
+func TestInvalidSectionNameResolvesAliases(t *testing.T) {
+	for _, value := range []string{"network_info", "network-identity", "netinfo", "reachability", "website", "telegram"} {
+		if got := invalidSectionName(value); got != "" {
+			t.Fatalf("invalidSectionName(%q) = %q, want accepted", value, got)
+		}
+	}
+	if got := invalidSectionName("bogus"); got != "bogus" {
+		t.Fatalf("invalidSectionName(bogus) = %q, want bogus", got)
+	}
+}
+
+func TestSectionAliasesAcceptedThroughRootFlags(t *testing.T) {
+	// The revision mismatch is intentional: it proves the alias resolves and
+	// the run reaches catalog preflight instead of failing section parsing.
+	for _, only := range []string{"network", "latency", "traceroute"} {
+		args := []string{"--only", only, "--node-revision", "missing-revision"}
+		if code := run(args); code != 2 {
+			t.Fatalf("run(%v) = %d, want catalog preflight exit 2", args, code)
+		}
+	}
+}
+
+func TestRunIperfWithoutHostExitsNonZero(t *testing.T) {
+	if code := run([]string{"--only", "speed", "--speed-provider", "iperf3"}); code != 1 {
+		t.Fatalf("run(iperf3 without host) = %d, want 1", code)
 	}
 }
 
 func TestRunRejectsPinnedCatalogMismatchBeforeNetworkExecution(t *testing.T) {
 	tests := [][]string{
-		{"suite", "--only", "ping", "--node-revision", "missing-revision"},
+		{"--only", "ping", "--node-revision", "missing-revision"},
 	}
 	for _, args := range tests {
 		if code := run(args); code != 2 {
@@ -69,21 +105,13 @@ func TestRunRejectsPinnedCatalogMismatchBeforeNetworkExecution(t *testing.T) {
 	}
 }
 
-func TestSuiteAcceptsExpandedRoutePresetsWithoutStartingNetwork(t *testing.T) {
+func TestAcceptsExpandedRoutePresetsWithoutStartingNetwork(t *testing.T) {
 	// The revision mismatch is intentional: it proves every new preset passes
 	// parsing and reaches catalog preflight without executing probes.
 	if code := run([]string{
-		"suite", "--only", "route", "--route-presets", "cd,cernet,cstnet",
+		"--only", "route", "--route-presets", "cd,cernet,cstnet",
 		"--ip-version", "dual", "--node-revision", "missing-revision",
 	}); code != 2 {
 		t.Fatalf("expanded route preset preflight code = %d, want 2", code)
-	}
-}
-
-func TestInvalidSectionNameAcceptsNetworkEvidenceAliases(t *testing.T) {
-	for _, value := range []string{"network_info", "network-identity", "netinfo", "reachability", "website", "telegram"} {
-		if got := invalidSectionName(value); got != "" {
-			t.Fatalf("invalidSectionName(%q) = %q, want accepted", value, got)
-		}
 	}
 }
