@@ -12,10 +12,10 @@ func StatusLabel(token string) string {
 	return Tfallback("status."+token, token)
 }
 
-// SectionLabel returns the display label for a suite section ID, or the ID
+// SectionLabel returns the display label for a checkup section ID, or the ID
 // itself when no translation exists.
 func SectionLabel(id string) string {
-	return Tfallback("suite.section."+id, id)
+	return Tfallback("checkup.section."+id, id)
 }
 
 // YesNo localizes boolean display values ("yes"/"no").

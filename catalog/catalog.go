@@ -387,7 +387,7 @@ func normalizeHardwareToolID(value string) string {
 
 // DefaultDefinitions returns the external hardware workload catalog (for the
 // list command and MCP capabilities). Network diagnostics are not run-scope
-// workloads anymore; they live in the suite sections.
+// workloads anymore; they live in the checkup sections.
 func DefaultDefinitions() []Definition {
 	return ExternalHardwareDefinitionsForTools("", nil)
 }

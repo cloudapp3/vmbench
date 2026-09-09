@@ -4,7 +4,7 @@
 
 ## 1. 结论摘要
 
-1. **功能覆盖度已基本对齐**：vmbench 的 Suite 已覆盖 ECS 约 85% 的测试面（网络身份/NAT、三网回程路由、ping、测速、IP 质量、邮件端口、流媒体解锁、网站/Telegram 可达性），且在 BGP/RDAP 归属、磁盘 IO 细分、测速 provider 数量上超过 ECS。
+1. **功能覆盖度已基本对齐**：vmbench 的体检已覆盖 ECS 约 85% 的测试面（网络身份/NAT、三网回程路由、ping、测速、IP 质量、邮件端口、流媒体解锁、网站/Telegram 可达性），且在 BGP/RDAP 归属、磁盘 IO 细分、测速 provider 数量上超过 ECS。
 2. **差距不在"测什么"，而在"最后一公里"**：ECS 的杀手锏是"一键安装 → 跑完 → 自动生成 pastebin 分享链接 → 直接贴论坛"的零摩擦闭环；vmbench 的报告停留在本地文件，没有分享环节，这是对 VPS 玩家群体最大的缺失。
 3. **两者的真实分叉是产品定位**：ECS 是"测评展示工具"（终点是一段可分享的文本），vmbench 是"测量基础设施"（终点是结构化证据 + 可对比数据 + 可被程序/AI 调用）。ECS 生态没有 JSON、对比、历史、MCP；vmbench 没有分享和中文社区渗透。
 4. **同源生态**：vmbench 的四个网络依赖（UnlockTests、backtrace、gostun、basics）正是 ECS Go 版同一作者（oneclickvirt 生态）的 Apache-2.0 库。网络探测能力同源，差异在编排、语义严格度和输出模型，不存在探测维度上的代差。
@@ -55,7 +55,7 @@
 |---|---|---|---|
 | 分享 | 跑完自动上传 pastebin/h501，拿到链接即可贴帖 | 无；HTML/JSON 在本地磁盘（文档明确：未来上传必须显式授权 + 支持脱敏） | **ECS（决定性）** |
 | 机器可读输出 | 无 | JSON schema v2（envelope、config、provenance、结构化错误） | **vmbench（独有）** |
-| 报告对比 | 无 | `compare` 自动识别 benchmark/Suite，兼容性门控后才算 delta | **vmbench（独有）** |
+| 报告对比 | 无 | `compare` 自动识别 benchmark/体检，兼容性门控后才算 delta | **vmbench（独有）** |
 | 本地历史 | 覆盖式 txt | 原子化 history 存储（0700/0600）+ `history compare --last N` | **vmbench（独有）** |
 | 可复现性 | 测速节点 ID 自动更新，隐式漂移 | 版本化节点 catalog：embedded 离线快照 + revision pin + Ed25519 签名更新 + 报告记录 source/revision/node IDs | **vmbench（独有）** |
 | 语义严格度 | 文本展示为主 | route 必须到达目标才算 ok、RST 不算丢包、mail 只比较 open 延迟、fail-closed 出分 | **vmbench** |

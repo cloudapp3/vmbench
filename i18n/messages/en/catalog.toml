@@ -1,126 +1,126 @@
-# Spec display names and descriptions (suite presets, speed providers, route presets, IP sources, hardware tools). Struct fields stay English; these are display-time translations.
+# Spec display names and descriptions (checkup presets, speed providers, route presets, IP sources, hardware tools). Struct fields stay English; these are display-time translations.
 
-[suite.preset.quick.name]
+[checkup.preset.quick.name]
 other = "Quick VPS"
 
-[suite.preset.quick.description]
+[checkup.preset.quick.description]
 other = "YABS-like quick run: hardware, network identity, speed, and IP quality."
 
-[suite.preset.website.name]
+[checkup.preset.website.name]
 other = "Website Hosting"
 
-[suite.preset.website.description]
+[checkup.preset.website.description]
 other = "Website/server scenario: hardware, network identity, China ping/route, speed, reachability, IP quality, and mail ports."
 
-[suite.preset.proxy.name]
+[checkup.preset.proxy.name]
 other = "Proxy/Unlock"
 
-[suite.preset.proxy.description]
+[checkup.preset.proxy.description]
 other = "Proxy scenario: network identity, China ping/route, speed, reachability, IP quality, and streaming unlock."
 
-[suite.preset.mail.name]
+[checkup.preset.mail.name]
 other = "Mail Server"
 
-[suite.preset.mail.description]
+[checkup.preset.mail.description]
 other = "Mail scenario: network identity, IP quality, mail ports, and route diagnostics."
 
-[suite.speed.cloudflare.name]
+[checkup.speed.cloudflare.name]
 other = "Cloudflare"
 
-[suite.speed.cloudflare.description]
+[checkup.speed.cloudflare.description]
 other = "HTTP multi-download and upload via speed.cloudflare.com."
 
-[suite.speed.speedtest_net.name]
+[checkup.speed.speedtest_net.name]
 other = "Speedtest.net"
 
-[suite.speed.speedtest_net.description]
+[checkup.speed.speedtest_net.description]
 other = "Ookla Speedtest CLI JSON result."
 
-[suite.speed.speedtest_net.requires]
+[checkup.speed.speedtest_net.requires]
 other = "speedtest CLI"
 
-[suite.speed.speedtest_cn.name]
+[checkup.speed.speedtest_cn.name]
 other = "Speedtest.cn"
 
-[suite.speed.speedtest_cn.description]
+[checkup.speed.speedtest_cn.description]
 other = "Compatible speedtest.cn CLI JSON result."
 
-[suite.speed.speedtest_cn.requires]
+[checkup.speed.speedtest_cn.requires]
 other = "speedtest-cn compatible CLI"
 
-[suite.speed.iperf3.name]
+[checkup.speed.iperf3.name]
 other = "iperf3"
 
-[suite.speed.iperf3.description]
+[checkup.speed.iperf3.description]
 other = "TCP bandwidth to user-provided --iperf-host targets."
 
-[suite.speed.iperf3.requires]
+[checkup.speed.iperf3.requires]
 other = "iperf3 CLI and --iperf-host"
 
-[suite.speed.china_isp.name]
+[checkup.speed.china_isp.name]
 other = "China ISP (speedtest.cn)"
 
-[suite.speed.china_isp.description]
+[checkup.speed.china_isp.description]
 other = "Direct HTTP download per China carrier (telecom/unicom/mobile) from versioned catalog isp_download nodes."
 
-[suite.speed.speedtest_isp.name]
+[checkup.speed.speedtest_isp.name]
 other = "China ISP (speedtest.net)"
 
-[suite.speed.speedtest_isp.description]
+[checkup.speed.speedtest_isp.description]
 other = "Ookla speedtest CLI pinned to per-carrier China server IDs."
 
-[suite.speed.speedtest_isp.requires]
+[checkup.speed.speedtest_isp.requires]
 other = "speedtest CLI"
 
-[suite.route.gz.name]
+[checkup.route.gz.name]
 other = "广州三网"
 
-[suite.route.gz.description]
+[checkup.route.gz.description]
 other = "广州电信 / 联通 / 移动预置点"
 
-[suite.route.bj.name]
+[checkup.route.bj.name]
 other = "北京三网"
 
-[suite.route.bj.description]
+[checkup.route.bj.description]
 other = "北京电信 / 联通 / 移动预置点"
 
-[suite.route.sh.name]
+[checkup.route.sh.name]
 other = "上海三网"
 
-[suite.route.sh.description]
+[checkup.route.sh.description]
 other = "上海电信 / 联通 / 移动预置点"
 
-[suite.route.cd.name]
+[checkup.route.cd.name]
 other = "成都线路"
 
-[suite.route.cd.description]
+[checkup.route.cd.description]
 other = "成都电信 / 联通 / 移动 / 教育网预置点"
 
-[suite.route.cernet.name]
+[checkup.route.cernet.name]
 other = "教育网"
 
-[suite.route.cernet.description]
+[checkup.route.cernet.description]
 other = "CERNET 可验证预置点"
 
-[suite.route.cstnet.name]
+[checkup.route.cstnet.name]
 other = "科技网"
 
-[suite.route.cstnet.description]
+[checkup.route.cstnet.description]
 other = "CSTNET 可验证预置点"
 
-[suite.ipSource.builtin.name]
+[checkup.ipSource.builtin.name]
 other = "Builtin"
 
-[suite.ipSource.builtin.description]
+[checkup.ipSource.builtin.description]
 other = "ip-api.com metadata, ipapi.is ownership cross-check, DNSBL, mail ports."
 
-[suite.ipSource.securitycheck.name]
+[checkup.ipSource.securitycheck.name]
 other = "securityCheck"
 
-[suite.ipSource.securitycheck.description]
+[checkup.ipSource.securitycheck.description]
 other = "18-database IP quality view from the external securityCheck binary."
 
-[suite.ipSource.securitycheck.requires]
+[checkup.ipSource.securitycheck.requires]
 other = "securityCheck binary (github.com/oneclickvirt/securityCheck)"
 
 [catalog.tool.sysbench.name]

@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/checkup"
 	"github.com/cloudapp3/vmbench/history"
 	gbreport "github.com/cloudapp3/vmbench/report"
-	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/sysinfo"
 )
 
@@ -43,21 +43,21 @@ func WithPageForRender(m Model, name string) Model {
 	case "config-advanced":
 		m.page = pageConfig
 		m.config.advancedOpen = true
-	case "suite-running":
+	case "checkup-running":
 		m.page = pageRunning
-		m.runKind = "suite"
-		m.suiteSections = []suiteSection{
-			{id: suite.SectionHardware, label: "Hardware", status: "done", message: "ok"},
-			{id: suite.SectionNetworkInfo, label: "Network Info", status: "done", message: "ok"},
-			{id: suite.SectionRoute, label: "Route", status: "done", message: "ok"},
-			{id: suite.SectionPing, label: "Ping", status: "running"},
-			{id: suite.SectionSpeed, label: "Speed", status: "waiting"},
-			{id: suite.SectionIPQuality, label: "IP Quality", status: "waiting"},
-			{id: suite.SectionReachability, label: "Reachability", status: "waiting"},
-			{id: suite.SectionMail, label: "Mail Ports", status: "skip"},
+		m.runKind = "checkup"
+		m.checkupSections = []checkupSection{
+			{id: checkup.SectionHardware, label: "Hardware", status: "done", message: "ok"},
+			{id: checkup.SectionNetworkInfo, label: "Network Info", status: "done", message: "ok"},
+			{id: checkup.SectionRoute, label: "Route", status: "done", message: "ok"},
+			{id: checkup.SectionPing, label: "Ping", status: "running"},
+			{id: checkup.SectionSpeed, label: "Speed", status: "waiting"},
+			{id: checkup.SectionIPQuality, label: "IP Quality", status: "waiting"},
+			{id: checkup.SectionReachability, label: "Reachability", status: "waiting"},
+			{id: checkup.SectionMail, label: "Mail Ports", status: "skip"},
 		}
-	case "suite-results":
-		m.page = pageSuiteResults
+	case "checkup-results":
+		m.page = pageCheckupResults
 	case "help":
 		m.helpFrom = pageDashboard
 		m.page = pageHelp
@@ -65,7 +65,7 @@ func WithPageForRender(m Model, name string) Model {
 		m.page = pageComparePicker
 		m.picker.records = []history.Record{
 			{ID: "run-20260907-101010", Kind: history.KindRun, Tag: "baseline", ReportTime: time.Date(2026, 9, 7, 10, 10, 10, 0, time.UTC)},
-			{ID: "suite-20260906-220000", Kind: history.KindSuite, Tag: "evening", ReportTime: time.Date(2026, 9, 6, 22, 0, 0, 0, time.UTC)},
+			{ID: "checkup-20260906-220000", Kind: history.KindCheckup, Tag: "evening", ReportTime: time.Date(2026, 9, 6, 22, 0, 0, 0, time.UTC)},
 			{ID: "run-20260905-090000", Kind: history.KindRun, ReportTime: time.Date(2026, 9, 5, 9, 0, 0, 0, time.UTC)},
 		}
 		m.picker.a = 0
@@ -107,8 +107,8 @@ func WithReportForRender(m Model, r *vmbench.Report) Model {
 	return m
 }
 
-func WithSuiteReportForRender(m Model, r *suite.SuiteReport) Model {
-	m.suiteReport = r
+func WithCheckupReportForRender(m Model, r *checkup.CheckupReport) Model {
+	m.checkupReport = r
 	return m
 }
 

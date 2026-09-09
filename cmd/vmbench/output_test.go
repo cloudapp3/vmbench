@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/cloudapp3/vmbench/catalog"
-	"github.com/cloudapp3/vmbench/suite"
+	"github.com/cloudapp3/vmbench/checkup"
 )
 
 func TestWriteFileAtomicallyReplacesWithOwnerOnlyMode(t *testing.T) {
@@ -64,12 +64,12 @@ func TestWriteFilePreservesExistingReportOnEncodeFailure(t *testing.T) {
 	}
 }
 
-func TestSuiteProgressPrinterWritesSectionLifecycle(t *testing.T) {
+func TestCheckupProgressPrinterWritesSectionLifecycle(t *testing.T) {
 	var output bytes.Buffer
-	printer := suiteProgressPrinterTo(&output, true)
-	printer(suite.Event{Kind: suite.EventSectionStart, Section: suite.SectionHardware, Status: "running"})
-	printer(suite.Event{Kind: suite.EventSectionDone, Section: suite.SectionHardware, Status: "ok", Message: "2 ok"})
-	printer(suite.Event{Kind: suite.EventSuiteDone, Status: "ok", Message: "1/1 sections ok"})
+	printer := checkupProgressPrinterTo(&output, true)
+	printer(checkup.Event{Kind: checkup.EventSectionStart, Section: checkup.SectionHardware, Status: "running"})
+	printer(checkup.Event{Kind: checkup.EventSectionDone, Section: checkup.SectionHardware, Status: "ok", Message: "2 ok"})
+	printer(checkup.Event{Kind: checkup.EventCheckupDone, Status: "ok", Message: "1/1 sections ok"})
 	for _, want := range []string{"hardware", "running", "2 ok", "complete", "1/1 sections ok"} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("progress output = %q, want %q", output.String(), want)

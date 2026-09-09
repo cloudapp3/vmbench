@@ -14,9 +14,9 @@ import (
 
 	vmbench "github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/catalog"
+	"github.com/cloudapp3/vmbench/checkup"
 	"github.com/cloudapp3/vmbench/nodecatalog"
 	gbreport "github.com/cloudapp3/vmbench/report"
-	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/sysinfo"
 )
 
@@ -185,9 +185,7 @@ func (s *Server) callTool(ctx context.Context, name string, raw json.RawMessage)
 		return okToolResult("vmbench capabilities", capabilitiesPayload()), nil
 	case "vmbench_sysinfo":
 		return s.toolSysinfo(ctx, raw)
-	case "vmbench_run", "vmbench_suite":
-		// vmbench_suite is a deprecated alias kept for older clients (v0.9.0
-		// candidate for removal); both names run the merged benchmark tool.
+	case "vmbench_run":
 		return s.toolBench(ctx, raw)
 	default:
 		return errorToolResult("unknown tool: " + name), nil
@@ -208,12 +206,11 @@ func (s *Server) toolSysinfo(ctx context.Context, raw json.RawMessage) (toolResu
 }
 
 const (
-	benchKindRun   = "run"
-	benchKindSuite = "suite"
+	benchKindRun     = "run"
+	benchKindCheckup = "checkup"
 )
 
-// benchArgs carries the unified vmbench_run tool arguments, also accepted by
-// the deprecated vmbench_suite alias.
+// benchArgs carries the unified vmbench_run tool arguments.
 type benchArgs struct {
 	Iterations       json.RawMessage `json:"iterations,omitempty"`
 	Filter           string          `json:"filter,omitempty"`
@@ -235,11 +232,11 @@ type benchArgs struct {
 }
 
 // benchPlan is the normalized execution plan. A hardware-only selection runs
-// the bare hardware benchmark (run report); anything else runs the suite.
+// the bare hardware benchmark (run report); anything else runs the checkup.
 type benchPlan struct {
-	Kind  string
-	Run   vmbench.Options
-	Suite suite.Options
+	Kind    string
+	Run     vmbench.Options
+	Checkup checkup.Options
 }
 
 func (s *Server) toolBench(ctx context.Context, raw json.RawMessage) (toolResult, error) {
@@ -266,9 +263,9 @@ func (s *Server) toolBench(ctx context.Context, raw json.RawMessage) (toolResult
 		return result, nil
 	}
 
-	report := suite.Run(ctx, plan.Suite)
+	report := checkup.Run(ctx, plan.Checkup)
 	payload := map[string]any{"report": report}
-	result := okToolResult(formatSuiteSummary(report), payload)
+	result := okToolResult(formatCheckupSummary(report), payload)
 	result.IsError = report.HasFailures()
 	return result, nil
 }
@@ -281,11 +278,11 @@ func normalizeBenchArgs(args benchArgs) (benchPlan, []string) {
 	appendValidationError(&warnings, timeoutError)
 
 	preset := strings.ToLower(strings.TrimSpace(args.Preset))
-	sections := suite.SectionSelector{Hardware: true}
+	sections := checkup.SectionSelector{Hardware: true}
 	if preset != "" {
-		spec, ok := suite.LookupPreset(preset)
+		spec, ok := checkup.LookupPreset(preset)
 		if !ok {
-			warnings = append(warnings, "unknown preset: "+preset+"; available: "+strings.Join(suite.PresetIDs(), ", "))
+			warnings = append(warnings, "unknown preset: "+preset+"; available: "+strings.Join(checkup.PresetIDs(), ", "))
 		} else {
 			sections = spec.Sections
 		}
@@ -297,12 +294,12 @@ func normalizeBenchArgs(args benchArgs) (benchPlan, []string) {
 		sections = applySectionNames(sections, args.Skip, false, &warnings)
 	}
 	if !sections.AnyEnabled() {
-		warnings = append(warnings, "at least one suite section must remain enabled")
+		warnings = append(warnings, "at least one checkup section must remain enabled")
 	}
 
 	// Shared field validation independent of the execution kind, so an
 	// invalid value in a currently unused parameter still surfaces.
-	if err := suite.ValidateOptions(suite.Options{
+	if err := checkup.ValidateOptions(checkup.Options{
 		Filter:         strings.TrimSpace(args.Filter),
 		RoutePresets:   cleanList(args.RoutePresets),
 		SpeedProviders: cleanList(args.SpeedProviders),
@@ -330,7 +327,7 @@ func normalizeBenchArgs(args benchArgs) (benchPlan, []string) {
 		return benchPlan{Kind: benchKindRun, Run: norm}, dedupeStrings(warnings)
 	}
 
-	norm, err := suite.NormalizeOptions(suite.Options{
+	norm, err := checkup.NormalizeOptions(checkup.Options{
 		Iterations:       iterations,
 		Filter:           strings.TrimSpace(args.Filter),
 		DiskPath:         strings.TrimSpace(args.DiskPath),
@@ -351,7 +348,7 @@ func normalizeBenchArgs(args benchArgs) (benchPlan, []string) {
 	if err != nil {
 		warnings = append(warnings, err.Error())
 	}
-	return benchPlan{Kind: benchKindSuite, Suite: norm}, dedupeStrings(warnings)
+	return benchPlan{Kind: benchKindCheckup, Checkup: norm}, dedupeStrings(warnings)
 }
 
 // dedupeStrings removes repeated warning strings while preserving order; the
@@ -369,12 +366,12 @@ func dedupeStrings(values []string) []string {
 	return out
 }
 
-func selectorFromNames(names []string, enable bool, warnings *[]string) suite.SectionSelector {
-	return applySectionNames(suite.SectionSelector{}, names, enable, warnings)
+func selectorFromNames(names []string, enable bool, warnings *[]string) checkup.SectionSelector {
+	return applySectionNames(checkup.SectionSelector{}, names, enable, warnings)
 }
 
-func applySectionNames(base suite.SectionSelector, names []string, enable bool, warnings *[]string) suite.SectionSelector {
-	sections, err := suite.ApplySectionNames(base, names, enable)
+func applySectionNames(base checkup.SectionSelector, names []string, enable bool, warnings *[]string) checkup.SectionSelector {
+	sections, err := checkup.ApplySectionNames(base, names, enable)
 	if err != nil {
 		*warnings = append(*warnings, err.Error())
 		return base
@@ -462,25 +459,25 @@ func capabilitiesPayload() map[string]any {
 		catalogInfo["schema_version"] = manifest.SchemaVersion
 	}
 	return map[string]any{
-		"version":            vmbench.Version,
-		"protocol_version":   protocolVersion,
-		"go":                 runtime.Version(),
-		"os":                 runtime.GOOS,
-		"arch":               runtime.GOARCH,
-		"suite_sections":     suite.SectionIDs(),
-		"suite_presets":      suite.Presets(),
-		"route_presets":      suite.RoutePresets(),
-		"speed_providers":    suite.SpeedProviders(),
-		"media_sets":         suite.MediaSets(),
-		"ip_sources":         suite.IPSources(),
-		"hardware_tools":     catalog.HardwareTools(),
-		"default_hardware":   catalog.DefaultHardwareTools(),
-		"default_suite_only": []string{"hardware"},
-		"workloads":          workloads,
-		"node_catalog":       catalogInfo,
+		"version":              vmbench.Version,
+		"protocol_version":     protocolVersion,
+		"go":                   runtime.Version(),
+		"os":                   runtime.GOOS,
+		"arch":                 runtime.GOARCH,
+		"checkup_sections":     checkup.SectionIDs(),
+		"checkup_presets":      checkup.Presets(),
+		"route_presets":        checkup.RoutePresets(),
+		"speed_providers":      checkup.SpeedProviders(),
+		"media_sets":           checkup.MediaSets(),
+		"ip_sources":           checkup.IPSources(),
+		"hardware_tools":       catalog.HardwareTools(),
+		"default_hardware":     catalog.DefaultHardwareTools(),
+		"default_checkup_only": []string{"hardware"},
+		"workloads":            workloads,
+		"node_catalog":         catalogInfo,
 		"policy": map[string]string{
 			"scoring": "vmbench MCP returns raw metrics and structured diagnostics only; no benchmark total score, grade, or category score.",
-			"network": "network suite sections run only when explicitly requested by preset or only sections.",
+			"network": "network checkup sections run only when explicitly requested by preset or only sections.",
 		},
 	}
 }
@@ -490,7 +487,7 @@ func toolSpecs() []toolSpec {
 		{
 			Name:        "vmbench_capabilities",
 			Title:       "VMBench capabilities",
-			Description: "List vmbench version, suite sections, presets, hardware tools, speed providers, and workloads.",
+			Description: "List vmbench version, checkup sections, presets, hardware tools, speed providers, and workloads.",
 			InputSchema: objectSchema(nil, nil),
 		},
 		{
@@ -502,38 +499,31 @@ func toolSpecs() []toolSpec {
 		{
 			Name:        "vmbench_run",
 			Title:       "VMBench benchmark",
-			Description: "Run vmbench benchmarks and return raw metrics. Defaults to hardware only (returns a run report); pass preset/only/skip to run suite sections (returns a suite report). Default one iteration, no synthetic scoring.",
-			InputSchema: benchInputSchema(),
-		},
-		{
-			Name:        "vmbench_suite",
-			Title:       "VMBench VPS suite (Deprecated: use vmbench_run)",
-			Description: "Deprecated: use vmbench_run. Run VPS suite sections; defaults to hardware only so network diagnostics are opt-in unless a preset/only list requests them.",
+			Description: "Run vmbench benchmarks and return raw metrics. Defaults to hardware only (returns a run report); pass preset/only/skip to run checkup sections (returns a checkup report). Default one iteration, no synthetic scoring.",
 			InputSchema: benchInputSchema(),
 		},
 	}
 }
 
-// benchInputSchema builds the shared schema for vmbench_run and its
-// deprecated vmbench_suite alias.
+// benchInputSchema builds the input schema for the vmbench_run tool.
 func benchInputSchema() map[string]any {
 	return objectSchema(map[string]any{
 		"iterations":         map[string]any{"type": "integer", "minimum": 1, "maximum": maxIterations, "description": "Iterations per workload. Default 1 for MCP."},
 		"filter":             map[string]any{"type": "string", "description": "Regex matched against workload name or category."},
 		"disk_path":          map[string]any{"type": "string", "description": "Temp directory for disk workloads."},
 		"timeout_ms":         map[string]any{"type": "integer", "minimum": 1, "maximum": maxTimeout.Milliseconds(), "description": "Per-section timeout in milliseconds; hardware applies it per workload."},
-		"preset":             map[string]any{"type": "string", "enum": suite.PresetIDs(), "description": "Scenario preset. Enables its sections."},
-		"only":               enumArraySchema(suite.SectionIDs(), "Run only these suite sections."),
-		"skip":               enumArraySchema(suite.SectionIDs(), "Skip these suite sections."),
+		"preset":             map[string]any{"type": "string", "enum": checkup.PresetIDs(), "description": "Scenario preset. Enables its sections."},
+		"only":               enumArraySchema(checkup.SectionIDs(), "Run only these checkup sections."),
+		"skip":               enumArraySchema(checkup.SectionIDs(), "Skip these checkup sections."),
 		"route_presets":      enumArraySchema(routePresetIDs(), "Route/ping preset IDs."),
-		"speed_providers":    enumArraySchema(suite.SpeedProviderIDs(), "Speed providers."),
+		"speed_providers":    enumArraySchema(checkup.SpeedProviderIDs(), "Speed providers."),
 		"hardware_tools":     enumArraySchema(catalog.HardwareToolIDs(), "External hardware tools."),
 		"iperf_hosts":        stringArraySchema("iperf3 hosts; adds iperf3 speed provider when speed is enabled."),
 		"ip_version":         map[string]any{"type": "string", "enum": []string{"v4", "v6", "dual"}, "description": "Network IP version."},
-		"media_set":          map[string]any{"type": "string", "enum": suite.MediaSets(), "description": "Media unlock set. Default all (full platform list)."},
-		"ip_sources":         enumArraySchema(suite.IPSourceIDs(), "IP quality evidence sources. securitycheck requires the external binary."),
+		"media_set":          map[string]any{"type": "string", "enum": checkup.MediaSets(), "description": "Media unlock set. Default all (full platform list)."},
+		"ip_sources":         enumArraySchema(checkup.IPSourceIDs(), "IP quality evidence sources. securitycheck requires the external binary."),
 		"catalog_source":     map[string]any{"type": "string", "description": "Node catalog source: embedded, auto, or a local JSON path."},
-		"catalog_revision":   map[string]any{"type": "string", "description": "Require an exact node catalog revision before Suite sections start."},
+		"catalog_revision":   map[string]any{"type": "string", "description": "Require an exact node catalog revision before Checkup sections start."},
 		"catalog_cache_path": map[string]any{"type": "string", "description": "Optional cache path used with catalog_source=auto."},
 	}, nil)
 }
@@ -630,7 +620,7 @@ func cleanList(in []string) []string {
 }
 
 func routePresetIDs() []string {
-	items := suite.RoutePresets()
+	items := checkup.RoutePresets()
 	out := make([]string, 0, len(items))
 	for _, item := range items {
 		out = append(out, item.ID)
@@ -666,7 +656,7 @@ func formatRunSummary(doc gbreport.Document) string {
 	return fmt.Sprintf("vmbench run completed: status=%s workloads=%d failed=%d warnings=%d", status, len(workloads), failed, len(doc.Warnings))
 }
 
-func formatSuiteSummary(report suite.SuiteReport) string {
+func formatCheckupSummary(report checkup.CheckupReport) string {
 	sections := report.Sections()
 	enabled := 0
 	failed := 0
@@ -679,7 +669,7 @@ func formatSuiteSummary(report suite.SuiteReport) string {
 			failed++
 		}
 	}
-	return fmt.Sprintf("vmbench suite completed: status=%s sections=%d failed=%d message=%s", report.Status, enabled, failed, report.Message)
+	return fmt.Sprintf("vmbench checkup completed: status=%s sections=%d failed=%d message=%s", report.Status, enabled, failed, report.Message)
 }
 
 func joinNonEmpty(parts []string, sep string) string {

@@ -9,15 +9,15 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/checkup"
 	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/nodecatalog"
-	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
 )
 
 // The config page is a flat, ECS-style checklist: a start row on top, one row
-// per suite section, and one collapsible advanced row. Every setting ships a
+// per checkup section, and one collapsible advanced row. Every setting ships a
 // default (all sections on, matching a full VPS checkup), so a fresh user can
 // open the page and press enter. ↑↓ moves the cursor, space or enter toggles
 // a row, enter on the start row runs.
@@ -56,8 +56,8 @@ var (
 
 type configState struct {
 	cursor       int
-	sections     suite.SectionSelector
-	sectionIDs   []suite.SectionID
+	sections     checkup.SectionSelector
+	sectionIDs   []checkup.SectionID
 	advancedOpen bool
 
 	iterations   int
@@ -71,10 +71,10 @@ func newConfigState() configState {
 	return configState{
 		// All sections on by default: opening the page and pressing enter
 		// runs the full checkup, and users untick what they do not want.
-		sections: suite.DefaultSections(),
-		sectionIDs: []suite.SectionID{
-			suite.SectionHardware, suite.SectionNetworkInfo, suite.SectionRoute, suite.SectionPing,
-			suite.SectionSpeed, suite.SectionIPQuality, suite.SectionReachability, suite.SectionMail, suite.SectionMedia,
+		sections: checkup.DefaultSections(),
+		sectionIDs: []checkup.SectionID{
+			checkup.SectionHardware, checkup.SectionNetworkInfo, checkup.SectionRoute, checkup.SectionPing,
+			checkup.SectionSpeed, checkup.SectionIPQuality, checkup.SectionReachability, checkup.SectionMail, checkup.SectionMedia,
 		},
 		iterations:   3,
 		ipVersion:    "v4",
@@ -85,23 +85,23 @@ func newConfigState() configState {
 
 func (s *configState) sectionGet(i int) bool {
 	switch s.sectionIDs[i] {
-	case suite.SectionHardware:
+	case checkup.SectionHardware:
 		return s.sections.Hardware
-	case suite.SectionNetworkInfo:
+	case checkup.SectionNetworkInfo:
 		return s.sections.NetworkInfo
-	case suite.SectionRoute:
+	case checkup.SectionRoute:
 		return s.sections.Route
-	case suite.SectionPing:
+	case checkup.SectionPing:
 		return s.sections.Ping
-	case suite.SectionSpeed:
+	case checkup.SectionSpeed:
 		return s.sections.Speed
-	case suite.SectionIPQuality:
+	case checkup.SectionIPQuality:
 		return s.sections.IPQuality
-	case suite.SectionReachability:
+	case checkup.SectionReachability:
 		return s.sections.Reachability
-	case suite.SectionMail:
+	case checkup.SectionMail:
 		return s.sections.Mail
-	case suite.SectionMedia:
+	case checkup.SectionMedia:
 		return s.sections.Media
 	}
 	return false
@@ -109,23 +109,23 @@ func (s *configState) sectionGet(i int) bool {
 
 func (s *configState) sectionToggle(i int) {
 	switch s.sectionIDs[i] {
-	case suite.SectionHardware:
+	case checkup.SectionHardware:
 		s.sections.Hardware = !s.sections.Hardware
-	case suite.SectionNetworkInfo:
+	case checkup.SectionNetworkInfo:
 		s.sections.NetworkInfo = !s.sections.NetworkInfo
-	case suite.SectionRoute:
+	case checkup.SectionRoute:
 		s.sections.Route = !s.sections.Route
-	case suite.SectionPing:
+	case checkup.SectionPing:
 		s.sections.Ping = !s.sections.Ping
-	case suite.SectionSpeed:
+	case checkup.SectionSpeed:
 		s.sections.Speed = !s.sections.Speed
-	case suite.SectionIPQuality:
+	case checkup.SectionIPQuality:
 		s.sections.IPQuality = !s.sections.IPQuality
-	case suite.SectionReachability:
+	case checkup.SectionReachability:
 		s.sections.Reachability = !s.sections.Reachability
-	case suite.SectionMail:
+	case checkup.SectionMail:
 		s.sections.Mail = !s.sections.Mail
-	case suite.SectionMedia:
+	case checkup.SectionMedia:
 		s.sections.Media = !s.sections.Media
 	}
 }
@@ -245,11 +245,11 @@ func (s configState) buildRunOptions() vmbench.Options {
 	}
 }
 
-// buildSuiteOptions assembles suite options. Providers, route presets, media
+// buildCheckupOptions assembles checkup options. Providers, route presets, media
 // sets, and IP sources are not surfaced any more; NormalizeOptions fills
 // each with its default when the section is enabled.
-func (s configState) buildSuiteOptions() suite.Options {
-	return suite.Options{
+func (s configState) buildCheckupOptions() checkup.Options {
+	return checkup.Options{
 		Iterations:    s.iterations,
 		Sections:      s.sections,
 		IPVersion:     s.ipVersion,
@@ -333,7 +333,7 @@ func updateConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // configStart launches the configured run. One report-kind rule, shared with
 // the CLI and MCP: exactly the hardware section runs the bare benchmark (run
-// report), anything else runs the suite.
+// report), anything else runs the checkup.
 func configStart(m Model) (tea.Model, tea.Cmd) {
 	s := m.config
 	if !s.sections.AnyEnabled() {
@@ -346,11 +346,11 @@ func configStart(m Model) (tea.Model, tea.Cmd) {
 		}
 		return m, func() tea.Msg { return hardwareStartMsg{opts: opts} }
 	}
-	norm, err := suite.NormalizeOptions(s.buildSuiteOptions())
+	norm, err := checkup.NormalizeOptions(s.buildCheckupOptions())
 	if err != nil {
 		return configToast(m, err.Error())
 	}
-	return m, func() tea.Msg { return suiteStartMsg{opts: norm} }
+	return m, func() tea.Msg { return checkupStartMsg{opts: norm} }
 }
 
 func viewConfig(m Model) string {
@@ -425,7 +425,7 @@ func configStartRow(m Model, focus bool) string {
 	if enabled {
 		desc := i18n.Tf("tui.config.startSummary", map[string]any{
 			"Count":    s.enabledCount(),
-			"Duration": formatDuration(estimateSuiteDuration(s, m.historyStats)),
+			"Duration": formatDuration(estimateCheckupDuration(s, m.historyStats)),
 		})
 		return configBand(focus) + " " + labelStyle.Render(label) + "  " + descStyle.Render(desc)
 	}

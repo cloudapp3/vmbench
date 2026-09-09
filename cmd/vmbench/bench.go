@@ -14,16 +14,16 @@ import (
 
 	"github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/catalog"
+	"github.com/cloudapp3/vmbench/checkup"
 	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/nodecatalog"
 	gbreport "github.com/cloudapp3/vmbench/report"
-	"github.com/cloudapp3/vmbench/suite"
 )
 
 // benchmarkFlags carries every root-level benchmark flag. The flag set is the
-// union of the former `run` and `suite` subcommands (merged in v0.8.0): with
+// union of the former `run` and `checkup` subcommands (merged in v0.8.0): with
 // no preset/only/skip selection the command runs the hardware benchmark only
-// and produces a run report; any wider selection runs the composite suite.
+// and produces a run report; any wider selection runs the composite checkup.
 type benchmarkFlags struct {
 	iterations      int
 	filter          string
@@ -94,7 +94,7 @@ func newBenchmarkFlagSet(bf *benchmarkFlags) *flag.FlagSet {
 
 // runBenchmark executes the root benchmark surface. Hardware-only selections
 // keep the former `vmbench run` behavior (run report, workload exit codes);
-// anything else keeps the former `vmbench suite` behavior.
+// anything else keeps the former `vmbench checkup` behavior.
 func runBenchmark(args []string) int {
 	bf := newBenchmarkFlags()
 	fs := newBenchmarkFlagSet(bf)
@@ -127,7 +127,7 @@ func runBenchmark(args []string) int {
 	if sections.HardwareOnly() {
 		return bf.runHardwareOnly(filterRE)
 	}
-	return bf.runSuiteSections(sections, routePresets, ipVersion, filterRE)
+	return bf.runCheckupSections(sections, routePresets, ipVersion, filterRE)
 }
 
 // validate applies the shared preflight checks in stable order and returns
@@ -172,11 +172,11 @@ func (bf *benchmarkFlags) validate(fs *flag.FlagSet) (*regexp.Regexp, int) {
 		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownSectionSkip", map[string]any{"Value": bad}))
 		return nil, 2
 	}
-	if bad := invalidCSVValue(bf.routePreset, suite.StandardizeRoutePresets); bad != "" {
+	if bad := invalidCSVValue(bf.routePreset, checkup.StandardizeRoutePresets); bad != "" {
 		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownRoutePreset", map[string]any{"Value": bad}))
 		return nil, 2
 	}
-	if bad := invalidCSVValue(bf.speedProvider, suite.StandardizeSpeedProviders); bad != "" {
+	if bad := invalidCSVValue(bf.speedProvider, checkup.StandardizeSpeedProviders); bad != "" {
 		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownSpeedProvider", map[string]any{"Value": bad}))
 		return nil, 2
 	}
@@ -185,18 +185,18 @@ func (bf *benchmarkFlags) validate(fs *flag.FlagSet) (*regexp.Regexp, int) {
 		return nil, 2
 	}
 	if strings.TrimSpace(bf.mediaSet) != "" {
-		if _, err := suite.StandardizeMediaSet(bf.mediaSet); err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownMediaSet", map[string]any{"Value": bf.mediaSet, "Available": strings.Join(suite.MediaSets(), ", ")}))
+		if _, err := checkup.StandardizeMediaSet(bf.mediaSet); err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownMediaSet", map[string]any{"Value": bf.mediaSet, "Available": strings.Join(checkup.MediaSets(), ", ")}))
 			return nil, 2
 		}
 	}
-	if bad := invalidCSVValue(bf.ipSource, suite.StandardizeIPSources); bad != "" {
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownIPSource", map[string]any{"Value": bad, "Available": strings.Join(suite.IPSourceIDs(), ", ")}))
+	if bad := invalidCSVValue(bf.ipSource, checkup.StandardizeIPSources); bad != "" {
+		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownIPSource", map[string]any{"Value": bad, "Available": strings.Join(checkup.IPSourceIDs(), ", ")}))
 		return nil, 2
 	}
 	speedProviders := parseHosts(bf.speedProvider)
-	if strings.TrimSpace(bf.speedProvider) != "" && len(suite.StandardizeSpeedProviders(speedProviders)) == 0 {
-		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.noValidSpeedProviders", map[string]any{"Value": bf.speedProvider, "Available": strings.Join(suite.SpeedProviderIDs(), ", ")}))
+	if strings.TrimSpace(bf.speedProvider) != "" && len(checkup.StandardizeSpeedProviders(speedProviders)) == 0 {
+		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.noValidSpeedProviders", map[string]any{"Value": bf.speedProvider, "Available": strings.Join(checkup.SpeedProviderIDs(), ", ")}))
 		return nil, 2
 	}
 	hardwareTools := parseHosts(bf.hardwareTool)
@@ -210,15 +210,15 @@ func (bf *benchmarkFlags) validate(fs *flag.FlagSet) (*regexp.Regexp, int) {
 // resolveSections turns preset/--only/--skip into the effective section
 // selection. The base selection is hardware-only, matching the default
 // behavior of the merged root command.
-func (bf *benchmarkFlags) resolveSections() (suite.SectionSelector, []string, string, int) {
-	sections := suite.SectionSelector{Hardware: true}
+func (bf *benchmarkFlags) resolveSections() (checkup.SectionSelector, []string, string, int) {
+	sections := checkup.SectionSelector{Hardware: true}
 	routePresets := parseHosts(bf.routePreset)
 	ipVersion := bf.ipVersion
 	if strings.TrimSpace(bf.preset) != "" {
-		spec, ok := suite.LookupPreset(bf.preset)
+		spec, ok := checkup.LookupPreset(bf.preset)
 		if !ok {
-			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownPreset", map[string]any{"Value": bf.preset, "Available": strings.Join(suite.PresetIDs(), ", ")}))
-			return suite.SectionSelector{}, nil, "", 2
+			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownPreset", map[string]any{"Value": bf.preset, "Available": strings.Join(checkup.PresetIDs(), ", ")}))
+			return checkup.SectionSelector{}, nil, "", 2
 		}
 		sections = spec.Sections
 		if strings.TrimSpace(ipVersion) == "" && spec.IPVersion != "" {
@@ -230,23 +230,23 @@ func (bf *benchmarkFlags) resolveSections() (suite.SectionSelector, []string, st
 	}
 	if strings.TrimSpace(bf.only) != "" {
 		var err error
-		sections, err = suite.ApplySectionNames(suite.SectionSelector{}, parseHosts(bf.only), true)
+		sections, err = checkup.ApplySectionNames(checkup.SectionSelector{}, parseHosts(bf.only), true)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return suite.SectionSelector{}, nil, "", 2
+			return checkup.SectionSelector{}, nil, "", 2
 		}
 	}
 	if strings.TrimSpace(bf.skip) != "" {
 		var err error
-		sections, err = suite.ApplySectionNames(sections, parseHosts(bf.skip), false)
+		sections, err = checkup.ApplySectionNames(sections, parseHosts(bf.skip), false)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return suite.SectionSelector{}, nil, "", 2
+			return checkup.SectionSelector{}, nil, "", 2
 		}
 	}
 	if !sections.AnyEnabled() {
 		fmt.Fprintln(os.Stderr, i18n.T("cli.error.noSectionsEnabled"))
-		return suite.SectionSelector{}, nil, "", 2
+		return checkup.SectionSelector{}, nil, "", 2
 	}
 	return sections, routePresets, ipVersion, 0
 }
@@ -274,9 +274,9 @@ func (bf *benchmarkFlags) runHardwareOnly(filterRE *regexp.Regexp) int {
 	return bf.writeRunReport(report)
 }
 
-// runSuiteSections is the former `vmbench suite` execution path.
-func (bf *benchmarkFlags) runSuiteSections(sections suite.SectionSelector, routePresets []string, ipVersion string, filterRE *regexp.Regexp) int {
-	suiteOptions, err := suite.NormalizeOptions(suite.Options{
+// runCheckupSections is the former `vmbench checkup` execution path.
+func (bf *benchmarkFlags) runCheckupSections(sections checkup.SectionSelector, routePresets []string, ipVersion string, filterRE *regexp.Regexp) int {
+	checkupOptions, err := checkup.NormalizeOptions(checkup.Options{
 		Iterations:       bf.iterations,
 		Filter:           bf.filter,
 		DiskPath:         bf.diskPath,
@@ -293,20 +293,20 @@ func (bf *benchmarkFlags) runSuiteSections(sections suite.SectionSelector, route
 		CatalogSource:    bf.catalogSource,
 		CatalogRevision:  bf.catalogRevision,
 		CatalogCachePath: bf.catalogCache,
-		OnEvent:          suiteProgressPrinter(!bf.quiet),
+		OnEvent:          checkupProgressPrinter(!bf.quiet),
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 2
 	}
-	if suiteOptions.Sections.Hardware {
-		printHardwareToolPreflight(os.Stderr, suiteOptions.HardwareTools, filterRE)
+	if checkupOptions.Sections.Hardware {
+		printHardwareToolPreflight(os.Stderr, checkupOptions.HardwareTools, filterRE)
 	}
-	report := suite.Run(context.Background(), suiteOptions)
+	report := checkup.Run(context.Background(), checkupOptions)
 	if !bf.saveHistoryIfRequested(report) {
 		return 1
 	}
-	return bf.writeSuiteReport(report)
+	return bf.writeCheckupReport(report)
 }
 
 func (bf *benchmarkFlags) saveHistoryIfRequested(report any) bool {
@@ -348,7 +348,7 @@ func (bf *benchmarkFlags) writeRunReport(report vmbench.Report) int {
 	return 0
 }
 
-func (bf *benchmarkFlags) writeSuiteReport(report suite.SuiteReport) int {
+func (bf *benchmarkFlags) writeCheckupReport(report checkup.CheckupReport) int {
 	if bf.jsonOut != "" {
 		if err := writeFile(bf.jsonOut, func(w io.Writer) error {
 			enc := json.NewEncoder(w)
@@ -361,13 +361,13 @@ func (bf *benchmarkFlags) writeSuiteReport(report suite.SuiteReport) int {
 	}
 	if bf.htmlOut != "" {
 		if err := writeFile(bf.htmlOut, func(w io.Writer) error {
-			return suite.WriteHTML(w, report)
+			return checkup.WriteHTML(w, report)
 		}); err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.writingHTML", map[string]any{"Err": err.Error()}))
 			return 1
 		}
 	}
-	if err := suite.WriteConsole(os.Stdout, report); err != nil {
+	if err := checkup.WriteConsole(os.Stdout, report); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
@@ -378,11 +378,11 @@ func (bf *benchmarkFlags) writeSuiteReport(report suite.SuiteReport) int {
 }
 
 // invalidSectionName returns the first unrecognized section value, resolving
-// aliases through suite.NormalizeSectionName so CLI and library agree.
+// aliases through checkup.NormalizeSectionName so CLI and library agree.
 func invalidSectionName(raw string) string {
-	valid := suite.SectionIDs()
+	valid := checkup.SectionIDs()
 	for _, value := range parseHosts(raw) {
-		if !slices.Contains(valid, suite.NormalizeSectionName(value)) {
+		if !slices.Contains(valid, checkup.NormalizeSectionName(value)) {
 			return value
 		}
 	}

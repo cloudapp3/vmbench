@@ -1,126 +1,126 @@
-# 规格显示名与描述 (suite 预设、测速提供方、回程预设、IP 来源、硬件工具)。结构体字段保持英文,此处仅作显示层翻译。
+# 规格显示名与描述 (checkup 预设、测速提供方、回程预设、IP 来源、硬件工具)。结构体字段保持英文,此处仅作显示层翻译。
 
-[suite.preset.quick.name]
+[checkup.preset.quick.name]
 other = "快速 VPS"
 
-[suite.preset.quick.description]
+[checkup.preset.quick.description]
 other = "类 YABS 快速测试: 硬件、网络身份、测速与 IP 质量。"
 
-[suite.preset.website.name]
+[checkup.preset.website.name]
 other = "网站托管"
 
-[suite.preset.website.description]
+[checkup.preset.website.description]
 other = "网站/服务器场景: 硬件、网络身份、国内 ping/回程、测速、可达性、IP 质量与邮件端口。"
 
-[suite.preset.proxy.name]
+[checkup.preset.proxy.name]
 other = "代理/解锁"
 
-[suite.preset.proxy.description]
+[checkup.preset.proxy.description]
 other = "代理场景: 网络身份、国内 ping/回程、测速、可达性、IP 质量与流媒体解锁。"
 
-[suite.preset.mail.name]
+[checkup.preset.mail.name]
 other = "邮件服务器"
 
-[suite.preset.mail.description]
+[checkup.preset.mail.description]
 other = "邮件场景: 网络身份、IP 质量、邮件端口与回程诊断。"
 
-[suite.speed.cloudflare.name]
+[checkup.speed.cloudflare.name]
 other = "Cloudflare"
 
-[suite.speed.cloudflare.description]
+[checkup.speed.cloudflare.description]
 other = "通过 speed.cloudflare.com 进行 HTTP 多线程下载与上传。"
 
-[suite.speed.speedtest_net.name]
+[checkup.speed.speedtest_net.name]
 other = "Speedtest.net"
 
-[suite.speed.speedtest_net.description]
+[checkup.speed.speedtest_net.description]
 other = "Ookla Speedtest CLI 的 JSON 结果。"
 
-[suite.speed.speedtest_net.requires]
+[checkup.speed.speedtest_net.requires]
 other = "speedtest CLI"
 
-[suite.speed.speedtest_cn.name]
+[checkup.speed.speedtest_cn.name]
 other = "Speedtest.cn"
 
-[suite.speed.speedtest_cn.description]
+[checkup.speed.speedtest_cn.description]
 other = "兼容 speedtest.cn 的 CLI JSON 结果。"
 
-[suite.speed.speedtest_cn.requires]
+[checkup.speed.speedtest_cn.requires]
 other = "兼容 speedtest-cn 的 CLI"
 
-[suite.speed.iperf3.name]
+[checkup.speed.iperf3.name]
 other = "iperf3"
 
-[suite.speed.iperf3.description]
+[checkup.speed.iperf3.description]
 other = "到用户提供的 --iperf-host 目标的 TCP 带宽。"
 
-[suite.speed.iperf3.requires]
+[checkup.speed.iperf3.requires]
 other = "iperf3 CLI 与 --iperf-host"
 
-[suite.speed.china_isp.name]
+[checkup.speed.china_isp.name]
 other = "国内三网 (speedtest.cn)"
 
-[suite.speed.china_isp.description]
+[checkup.speed.china_isp.description]
 other = "按国内运营商 (电信/联通/移动) 从版本化目录 isp_download 节点直接 HTTP 下载。"
 
-[suite.speed.speedtest_isp.name]
+[checkup.speed.speedtest_isp.name]
 other = "国内三网 (speedtest.net)"
 
-[suite.speed.speedtest_isp.description]
+[checkup.speed.speedtest_isp.description]
 other = "Ookla speedtest CLI 固定到各运营商国内服务器 ID。"
 
-[suite.speed.speedtest_isp.requires]
+[checkup.speed.speedtest_isp.requires]
 other = "speedtest CLI"
 
-[suite.route.gz.name]
+[checkup.route.gz.name]
 other = "Guangzhou triple-carrier"
 
-[suite.route.gz.description]
+[checkup.route.gz.description]
 other = "Guangzhou telecom / unicom / mobile presets"
 
-[suite.route.bj.name]
+[checkup.route.bj.name]
 other = "Beijing triple-carrier"
 
-[suite.route.bj.description]
+[checkup.route.bj.description]
 other = "Beijing telecom / unicom / mobile presets"
 
-[suite.route.sh.name]
+[checkup.route.sh.name]
 other = "Shanghai triple-carrier"
 
-[suite.route.sh.description]
+[checkup.route.sh.description]
 other = "Shanghai telecom / unicom / mobile presets"
 
-[suite.route.cd.name]
+[checkup.route.cd.name]
 other = "Chengdu routes"
 
-[suite.route.cd.description]
+[checkup.route.cd.description]
 other = "Chengdu telecom / unicom / mobile / CERNET presets"
 
-[suite.route.cernet.name]
+[checkup.route.cernet.name]
 other = "CERNET"
 
-[suite.route.cernet.description]
+[checkup.route.cernet.description]
 other = "Verifiable CERNET presets"
 
-[suite.route.cstnet.name]
+[checkup.route.cstnet.name]
 other = "CSTNET"
 
-[suite.route.cstnet.description]
+[checkup.route.cstnet.description]
 other = "Verifiable CSTNET presets"
 
-[suite.ipSource.builtin.name]
+[checkup.ipSource.builtin.name]
 other = "内置"
 
-[suite.ipSource.builtin.description]
+[checkup.ipSource.builtin.description]
 other = "ip-api.com 元数据、ipapi.is 归属交叉验证、DNSBL、邮件端口。"
 
-[suite.ipSource.securitycheck.name]
+[checkup.ipSource.securitycheck.name]
 other = "securityCheck"
 
-[suite.ipSource.securitycheck.description]
+[checkup.ipSource.securitycheck.description]
 other = "来自外部 securityCheck 二进制的 18 库 IP 质量视图。"
 
-[suite.ipSource.securitycheck.requires]
+[checkup.ipSource.securitycheck.requires]
 other = "securityCheck 二进制 (github.com/oneclickvirt/securityCheck)"
 
 [catalog.tool.sysbench.name]

@@ -9,8 +9,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/checkup"
 	"github.com/cloudapp3/vmbench/i18n"
-	"github.com/cloudapp3/vmbench/suite"
 )
 
 func TestNewConfigStateDefaultsToFullChecklist(t *testing.T) {
@@ -18,7 +18,7 @@ func TestNewConfigStateDefaultsToFullChecklist(t *testing.T) {
 
 	// Opening the page and pressing enter runs the full checkup; the cursor
 	// starts on the start row so enter alone launches it.
-	if s.sections != suite.DefaultSections() {
+	if s.sections != checkup.DefaultSections() {
 		t.Fatalf("default sections = %+v, want all on", s.sections)
 	}
 	if row := s.currentRow(); row.kind != rowStart {
@@ -30,15 +30,15 @@ func TestNewConfigStateDefaultsToFullChecklist(t *testing.T) {
 
 	// The UI no longer picks tools/providers/sets; normalization must fill
 	// the documented defaults for them.
-	norm, err := suite.NormalizeOptions(s.buildSuiteOptions())
+	norm, err := checkup.NormalizeOptions(s.buildCheckupOptions())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(norm.HardwareTools) == 0 {
-		t.Fatal("normalized suite should default hardware tools")
+		t.Fatal("normalized checkup should default hardware tools")
 	}
-	if norm.MediaSet != suite.DefaultMediaSet() {
-		t.Fatalf("normalized MediaSet = %q, want %q", norm.MediaSet, suite.DefaultMediaSet())
+	if norm.MediaSet != checkup.DefaultMediaSet() {
+		t.Fatalf("normalized MediaSet = %q, want %q", norm.MediaSet, checkup.DefaultMediaSet())
 	}
 	if strings.Join(norm.SpeedProviders, ",") == "" || strings.Join(norm.RoutePresets, ",") == "" {
 		t.Fatalf("normalized providers/routes = %v/%v, want defaults", norm.SpeedProviders, norm.RoutePresets)
@@ -157,22 +157,22 @@ func TestConfigAdvancedToggleAndCycles(t *testing.T) {
 }
 
 func TestConfigStartEmitsKindBasedOnSections(t *testing.T) {
-	// Default full checklist → suite report.
+	// Default full checklist → checkup report.
 	m := scrollTestModel(t, pageConfig, nil)
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("enter should return a cmd")
 	}
-	start, ok := cmd().(suiteStartMsg)
+	start, ok := cmd().(checkupStartMsg)
 	if !ok {
-		t.Fatalf("cmd() returned %T, want suiteStartMsg", cmd())
+		t.Fatalf("cmd() returned %T, want checkupStartMsg", cmd())
 	}
-	norm, err := suite.NormalizeOptions(start.opts)
+	norm, err := checkup.NormalizeOptions(start.opts)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !norm.Sections.Media || !norm.Sections.Hardware {
-		t.Fatalf("suite start sections = %+v, want full checklist", norm.Sections)
+		t.Fatalf("checkup start sections = %+v, want full checklist", norm.Sections)
 	}
 
 	// Untick everything except hardware → bare benchmark run.
@@ -270,22 +270,22 @@ func TestConfigRowsFit80x24BothLocales(t *testing.T) {
 	}
 }
 
-func TestSuiteDurationEstimates(t *testing.T) {
+func TestCheckupDurationEstimates(t *testing.T) {
 	s := newConfigState()
 
-	rough := estimateSuiteDuration(s, historyStats{})
+	rough := estimateCheckupDuration(s, historyStats{})
 	if rough <= 0 {
 		t.Fatalf("rough estimate should be positive, got %v", rough)
 	}
 
 	stats := historyStats{
-		avg: map[suite.SectionID]time.Duration{
-			suite.SectionHardware: 60 * time.Second,
-			suite.SectionSpeed:    20 * time.Second,
+		avg: map[checkup.SectionID]time.Duration{
+			checkup.SectionHardware: 60 * time.Second,
+			checkup.SectionSpeed:    20 * time.Second,
 		},
 		samples: 3,
 	}
-	if withHistory := estimateSuiteDuration(s, stats); withHistory <= 0 || withHistory >= rough {
+	if withHistory := estimateCheckupDuration(s, stats); withHistory <= 0 || withHistory >= rough {
 		t.Fatalf("history estimate %v should beat rough %v on full checklist", withHistory, rough)
 	}
 }

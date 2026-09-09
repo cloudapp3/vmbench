@@ -1,4 +1,4 @@
-# TUI 界面: 菜单、按键提示、弹窗、表格、suite 配置与结果。
+# TUI 界面: 菜单、按键提示、弹窗、表格、checkup 配置与结果。
 
 [tui.menu.benchmark]
 other = "运行评测"
@@ -111,8 +111,8 @@ other = "评测进行中"
 other = "跑分结果"
 [tui.help.sec.compare]
 other = "报告对比"
-[tui.help.sec.suiteResults]
-other = "Suite 结果"
+[tui.help.sec.checkupResults]
+other = "体检结果"
 
 [tui.hint.digits]
 other = "切换 section 1-9"
@@ -153,13 +153,13 @@ other = "取消运行"
 [tui.modal.keepRunning]
 other = "继续运行"
 
-[tui.modal.cancelSuite]
+[tui.modal.cancelCheckup]
 other = "取消综合测试?"
 
-[tui.modal.cancelSuiteBody]
+[tui.modal.cancelCheckupBody]
 other = "进行中的 section 将被中止。"
 
-[tui.modal.cancelSuiteCompact]
+[tui.modal.cancelCheckupCompact]
 other = "  y 取消  ·  n 继续"
 
 [tui.results.noResults]
@@ -228,11 +228,11 @@ other = "剩余 ~{{.Eta}}"
 [tui.running.samples]
 other = "{{.Done}}/{{.Total}} 采样"
 
-[tui.suiteSummary.minutes]
+[tui.checkupSummary.minutes]
 other = "{{.Minutes}} 分"
-[tui.suiteSummary.minutesSeconds]
+[tui.checkupSummary.minutesSeconds]
 other = "{{.Minutes}} 分 {{.Seconds}} 秒"
-[tui.suiteSummary.seconds]
+[tui.checkupSummary.seconds]
 other = "{{.Seconds}} 秒"
 
 [tui.detail.title]
@@ -302,7 +302,7 @@ other = "输入两份报告路径,tab 切换,回车对比"
 other = "请先选择两条记录"
 
 [tui.compare.mixedKinds]
-other = "跑分报告与 Suite 报告无法互相对比"
+other = "跑分报告与体检报告无法互相对比"
 
 [tui.compare.noHistory]
 other = "暂无历史记录。可用 --save-history 跑分或 vmbench history add 添加。"
@@ -388,16 +388,16 @@ other = "架构"
 [tui.sys.cache]
 other = "缓存"
 
-[tui.suiteRunning.title]
+[tui.checkupRunning.title]
 other = "◈ 综合测试运行中"
 
-[tui.suiteRunning.recentEvents]
+[tui.checkupRunning.recentEvents]
 other = "最近事件"
 
-[tui.suiteRunning.runningNow]
+[tui.checkupRunning.runningNow]
 other = "运行中..."
 
-[tui.suiteRunning.complete]
+[tui.checkupRunning.complete]
 other = "综合测试完成"
 
 [tui.config.title]
@@ -475,23 +475,23 @@ other = "25/587 端口"
 [tui.config.sectionDesc.media]
 other = "Netflix · Disney+ · YouTube"
 
-[tui.suiteResults.title]
+[tui.checkupResults.title]
 other = "◈ 综合测试报告"
 
-[tui.suiteResults.noResults]
-other = "暂无 Suite 结果。"
+[tui.checkupResults.noResults]
+other = "暂无 体检结果。"
 
-[tui.suiteResults.noSections]
+[tui.checkupResults.noSections]
 other = "没有启用的 section。"
 
-[tui.suiteResults.noIdentityEvidence]
+[tui.checkupResults.noIdentityEvidence]
 other = "无身份证据"
 
-[tui.suiteResults.noProviders]
+[tui.checkupResults.noProviders]
 other = "无提供方"
 
-[tui.suiteResults.noData]
+[tui.checkupResults.noData]
 other = "无数据"
 
-[tui.suiteResults.moreItems]
+[tui.checkupResults.moreItems]
 other = "... 另有 {{.Count}} 项 (见 JSON/HTML 报告)"

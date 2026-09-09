@@ -11,10 +11,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/checkup"
 	"github.com/cloudapp3/vmbench/history"
 	"github.com/cloudapp3/vmbench/i18n"
 	gbreport "github.com/cloudapp3/vmbench/report"
-	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/sysinfo"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
@@ -28,7 +28,7 @@ const (
 	pageResults
 	pageCompare
 	pageConfig
-	pageSuiteResults
+	pageCheckupResults
 	pageHelp
 	pageComparePicker
 	pageResultDetail
@@ -65,7 +65,7 @@ type workloadState struct {
 	status    string
 	metric    string
 	duration  string
-	startedAt time.Time // set on EventSuiteStart; wall clock for elapsed/ETA
+	startedAt time.Time // set on EventCheckupStart; wall clock for elapsed/ETA
 	iterCur   int       // completed iteration samples of the current workload
 	iterTotal int       // grown as iterations are observed
 }
@@ -90,30 +90,30 @@ type Model struct {
 	spinner   spinner.Model
 
 	// ETA bookkeeping: wall-clock durations of finished workloads and the
-	// run-wide sample counters from EventSuiteProgress.
+	// run-wide sample counters from EventCheckupProgress.
 	workloadDoneAt  []time.Duration
 	runSamplesDone  int
 	runSamplesTotal int
 
 	// config is the single benchmark configuration page; runKind records
-	// which report kind a started benchmark produces ("run" or "suite").
+	// which report kind a started benchmark produces ("run" or "checkup").
 	config  configState
 	runKind string
 
-	suiteSections []suiteSection
-	suiteEventCh  chan suite.Event
-	suiteReport   *suite.SuiteReport
+	checkupSections []checkupSection
+	checkupEventCh  chan checkup.Event
+	checkupReport   *checkup.CheckupReport
 
 	historyStats historyStats
 
 	compareA string
 	compareB string
 
-	compareDocs      []gbreport.Document
-	compareErr       error
-	compareLoading   bool
-	compareKind      string
-	suiteCompareText string
+	compareDocs        []gbreport.Document
+	compareErr         error
+	compareLoading     bool
+	compareKind        string
+	checkupCompareText string
 
 	picker               pickerState
 	reportCameFromPicker bool
@@ -223,8 +223,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return updateCompare(m, msg)
 		case pageConfig:
 			return updateConfig(m, msg)
-		case pageSuiteResults:
-			return updateSuiteResults(m, msg)
+		case pageCheckupResults:
+			return updateCheckupResults(m, msg)
 		case pageHelp:
 			return updateHelp(m, msg)
 		case pageComparePicker:
@@ -253,15 +253,15 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.page = pageResults
 		return m, nil
 
-	case suiteStartMsg:
-		return startSuite(m, msg.opts)
+	case checkupStartMsg:
+		return startCheckup(m, msg.opts)
 
-	case suiteEventMsg:
-		return updateSuiteEvent(m, msg.event)
+	case checkupEventMsg:
+		return updateCheckupEvent(m, msg.event)
 
-	case suiteDoneMsg:
-		m.suiteReport = &msg.report
-		m.page = pageSuiteResults
+	case checkupDoneMsg:
+		m.checkupReport = &msg.report
+		m.page = pageCheckupResults
 		return m, nil
 
 	case compareLoadedMsg:
@@ -293,15 +293,15 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return followFocus(m), nil
 
-	case suiteCompareMsg:
+	case checkupCompareMsg:
 		m.compareLoading = false
 		if msg.err != nil {
 			m.compareErr = msg.err
-			m.suiteCompareText = ""
+			m.checkupCompareText = ""
 			m.page = pageComparePicker
 		} else {
 			m.compareErr = nil
-			m.suiteCompareText = msg.text
+			m.checkupCompareText = msg.text
 			m.page = pageCompare
 		}
 		return m, nil
@@ -312,10 +312,10 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toast, cmd = comp.ShowToast(msg.err.Error(), comp.ToastError, 4*time.Second)
 			return m, cmd
 		}
-		if msg.kind == history.KindSuite && msg.suite != nil {
-			m.suiteReport = msg.suite
+		if msg.kind == history.KindCheckup && msg.checkup != nil {
+			m.checkupReport = msg.checkup
 			m.reportCameFromPicker = true
-			m.page = pageSuiteResults
+			m.page = pageCheckupResults
 			return m, nil
 		}
 		if msg.run != nil {
@@ -355,7 +355,7 @@ func (m Model) View() string {
 	}
 
 	header := renderHeader(m)
-	// The body is clipped to the viewport so tall pages (suite results,
+	// The body is clipped to the viewport so tall pages (checkup results,
 	// compare tables) scroll instead of overflowing the alt screen.
 	content, pos := viewScrollPos(m)
 

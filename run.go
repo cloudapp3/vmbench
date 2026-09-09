@@ -33,8 +33,8 @@ func RunCore(ctx context.Context, opts Options) Report {
 		Timeout:    norm.Timeout,
 		OnWorkloadStart: func(progress gbbench.ProgressEvent) {
 			emitEvent(norm, Event{
-				Kind:      EventSuiteStart,
-				Suite:     workloadKey(progress.Workload),
+				Kind:      EventCheckupStart,
+				Checkup:   workloadKey(progress.Workload),
 				Workload:  strings.TrimSpace(progress.Workload),
 				Iteration: 0,
 				Current:   progress.Current,
@@ -48,8 +48,8 @@ func RunCore(ctx context.Context, opts Options) Report {
 				progressValue = float64(progress.Current) / float64(progress.Total)
 			}
 			emitEvent(norm, Event{
-				Kind:      EventSuiteProgress,
-				Suite:     workloadKey(progress.Workload),
+				Kind:      EventCheckupProgress,
+				Checkup:   workloadKey(progress.Workload),
 				Workload:  strings.TrimSpace(progress.Workload),
 				Iteration: progress.Iteration,
 				Current:   progress.Current,

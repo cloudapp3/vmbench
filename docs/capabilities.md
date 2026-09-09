@@ -12,7 +12,7 @@
 3. [CLI 命令体系](#3-cli-命令体系)
 4. [硬件测评能力](#4-硬件测评能力)
 5. [网络诊断能力](#5-网络诊断能力)
-6. [VPS Suite 综合测评](#6-vps-suite-综合测评)
+6. [VPS 体检（checkup）](#6-vps-体检checkup)
 7. [报告输出体系](#7-报告输出体系)
 8. [TUI 交互界面](#8-tui-交互界面)
 9. [MCP 大模型接入](#9-mcp-大模型接入)
@@ -45,7 +45,7 @@ vmbench 是一款**跨平台 VPS 基准测试工具**，使用 Go 编写，面�
 | **串行隔离测量** | 不并发不同 workload；线程数/队列深度由外部工具参数定义，网络 workload 只执行一次真实探测 |
 | **结构化错误保留** | 缺失工具、网络失败等全部以结构化 error 记录，不伪造结果、不静默跳过 |
 | **对比优先于排名** | `compare` 按原始指标对齐；只有 unit/实际 protocol 与 IP family/provider 与 probe tool/node/catalog revision 兼容才做 delta，不产生排名表 |
-| **预设只表达场景** | suite preset（quick/website/proxy/mail）只决定跑哪些 section，不改变输出模型 |
+| **预设只表达场景** | checkup preset（quick/website/proxy/mail）只决定跑哪些 section，不改变输出模型 |
 | **不强行归一化** | 不同工具、不同维度的指标各自独立，不合并为单一数值 |
 | **安全边界** | MCP 不接受任意 shell 命令，参数受限，同一时间只允许一个 benchmark 运行 |
 
@@ -93,7 +93,7 @@ vmbench 是一款**跨平台 VPS 基准测试工具**，使用 Go 编写，面�
 | Console 报告 | 终端彩色表格输出 |
 | JSON 报告 | 机器可解析的完整结构化数据；同目录临时文件原子导出，Unix mode `0600` |
 | HTML 报告 | 带系统信息卡片的可视化报告；同目录临时文件原子导出，Unix mode `0600` |
-| 报告对比 | 自动识别 benchmark/Suite；仅对兼容证据计算 delta |
+| 报告对比 | 自动识别 benchmark/体检；仅对兼容证据计算 delta |
 | 本地历史 | add/list/show/delete、`compare --last N`、`--save-history` |
 | 系统信息 | CPU/GPU/内存/磁盘/网络/OS/虚拟化全量采集 |
 
@@ -117,7 +117,7 @@ vmbench                                      # 启动 TUI（默认行为）
 vmbench [flags]                              # 运行基准测试：默认仅 hardware，preset/only/skip 选择网络 section
 vmbench list                                 # 列出可用 workload
 vmbench sysinfo [--json]                     # 显示系统信息
-vmbench compare <a.json> <b.json> [...]      # 自动识别并对比 benchmark/Suite
+vmbench compare <a.json> <b.json> [...]      # 自动识别并对比 benchmark/体检报告
 vmbench history add|list|show|delete|compare # 本地报告历史
 vmbench nodes list|verify|update|health      # 版本化节点目录管理
 vmbench mcp serve [--transport stdio]        # 启动 MCP 服务器
@@ -125,7 +125,7 @@ vmbench update [--check] [--version TAG]     # 从 GitHub Releases 自升级
 vmbench version                              # 显示版本号
 ```
 
-v0.8.0 起 `run` / `suite` 子命令合并进根命令。报告种类规则：解析 preset/only/skip 后，生效 section 恰好只有 `hardware` → 产出 benchmark（run 报告，与 v0.7.0 的 `vmbench run` 字节级兼容）；否则产出 suite 报告。唯一显式 flag 是 `--lang` 时打开对应语言的 TUI 而不开跑基准；多余位置参数会被拒绝。
+v0.8.0 起 `run` / `suite` 子命令合并进根命令。报告种类规则：解析 preset/only/skip 后，生效 section 恰好只有 `hardware` → 产出 benchmark（run 报告，与 v0.7.0 的 `vmbench run` 字节级兼容）；否则产出体检报告。唯一显式 flag 是 `--lang` 时打开对应语言的 TUI 而不开跑基准；多余位置参数会被拒绝。
 
 ### 基准参数（根命令）
 
@@ -163,7 +163,7 @@ v0.8.0 起 `run` / `suite` 子命令合并进根命令。报告种类规则：�
 | `nodes verify` | 校验严格 schema/revision；提供 signature + Ed25519 key 时同时验签 |
 | `nodes update` | 下载 manifest，验签/校验后原子更新 cache（Unix mode `0600`） |
 | `nodes health` | 对筛选节点执行受限并发 HTTP HEAD、DNS 或 TCP 可用性检查 |
-| `history add FILE [--tag TAG]` | 导入已有 benchmark/Suite JSON |
+| `history add FILE [--tag TAG]` | 导入已有 benchmark/体检 JSON |
 | `history list` | 按报告时间列出本地记录 |
 | `history show ID` | 输出某条记录中的原始报告 |
 | `history delete ID` | 删除指定记录 |
@@ -218,7 +218,7 @@ vmbench --speed-provider cloudflare,speedtest_net
 # 使用 iperf3 测速
 vmbench --speed-provider iperf3 --iperf-host 1.2.3.4
 
-# 对比 benchmark 或 Suite 报告，以及最近 N 份同类型历史
+# 对比 benchmark 或体检报告，以及最近 N 份同类型历史
 vmbench compare report-a.json report-b.json report-c.json
 vmbench history compare --last 3
 
@@ -259,7 +259,7 @@ vmbench --lang zh-CN
 vmbench tui --lang en
 ```
 
-JSON 报告字段名、状态枚举（`ok`/`fail`/...）、Suite section ID、workload 名称（`--filter` 匹配对象）和适配器错误信息在任何 locale 下都保持英文；翻译只发生在渲染层。
+JSON 报告字段名、状态枚举（`ok`/`fail`/...）、checkup section ID、workload 名称（`--filter` 匹配对象）和适配器错误信息在任何 locale 下都保持英文；翻译只发生在渲染层。
 
 ---
 
@@ -387,9 +387,9 @@ Linux 的 dd read 使用 `iflag=direct`，避免页缓存产生远高于真实�
 | `Net Traceroute` | 三网回程路由追踪 | 系统 traceroute 命令 |
 | `Net IP Quality` | IP 信誉/DNSBL/风险评分 | HTTP API |
 | `Net Streaming Unlock` | 流媒体平台解锁检测 | HTTP |
-| Suite `network_info` section | 公网 IPv4/IPv6、ASN/provider/location、NAT evidence | HTTP API + 本机地址 |
-| Suite `reachability` section | Website HTTPS / Telegram DC TCP | HTTPS / TCP Connect |
-| Suite `mail` section | 邮件端口可达性探测 | TCP Connect |
+| 体检 `network_info` section | 公网 IPv4/IPv6、ASN/provider/location、NAT evidence | HTTP API + 本机地址 |
+| 体检 `reachability` section | Website HTTPS / Telegram DC TCP | HTTPS / TCP Connect |
+| 体检 `mail` section | 邮件端口可达性探测 | TCP Connect |
 
 ### 路由追踪（Traceroute）
 
@@ -417,7 +417,7 @@ Manifest 字段为 `schema_version/revision/generated_at/expires_at/nodes[]`。�
 
 ### 网络身份与可达性
 
-`network_info` 只在显式 Suite 网络 section 中执行；hardware-only `run` 不会增加公网身份请求。它结合本机 virtualization 与公网 provider 结果，分别记录 IPv4/IPv6 地址、ASN/provider/location，并以 `direct/translated/unknown` 表达可验证的 NAT 证据，不声称无法证明的 cone/symmetric NAT 类型。
+`network_info` 只在显式体检网络 section 中执行；hardware-only `run` 不会增加公网身份请求。它结合本机 virtualization 与公网 provider 结果，分别记录 IPv4/IPv6 地址、ASN/provider/location，并以 `direct/translated/unknown` 表达可验证的 NAT 证据，不声称无法证明的 cone/symmetric NAT 类型。
 
 `reachability` 默认测试 Google、GitHub、Cloudflare HTTPS 与 Telegram DC1-DC5 TCP 443。每个结果保留 target ID/category/protocol/endpoint/status/latency，HTTP probe 另带 status code，任何受限网络失败进入独立 error。
 
@@ -457,7 +457,7 @@ IP Quality 采用 fail-closed：元数据、公网 IPv4、DNSBL 或 Port 25 探�
 
 ---
 
-## 6. VPS Suite 综合测评
+## 6. VPS 体检（checkup）
 
 ### 九个 Section
 
@@ -526,7 +526,7 @@ speed
 
 默认只启用 `cloudflare`。同时选择多个 provider 时，顶层 summary 会写入 `aggregation: "best_per_metric"`；下载、上传与延迟可能分别来自不同 provider。选择 `iperf3` 但没有可用 host 时直接返回 provider/section error。
 
-Suite 只有所有 enabled section 都为 `status=ok` 才成功。enabled 的空状态、`skipped`、`partial`、`error` 都使总体失败、发 `section.fail` 并让 CLI 返回退出码 1；disabled section 才发 `section.skip`。默认 timeout 为 5 分钟：hardware 按 workload 应用，其他网络 section 各自派生 section context，deadline/cancel 写入结构化 error。CLI 默认把 section start/完成/失败和 Suite 完成状态实时写到 stderr，`--quiet` 可关闭进度。Ping 全目标失败会保留逐目标 results 并返回聚合 error。
+体检只有所有 enabled section 都为 `status=ok` 才成功。enabled 的空状态、`skipped`、`partial`、`error` 都使总体失败、发 `section.fail` 并让 CLI 返回退出码 1；disabled section 才发 `section.skip`。默认 timeout 为 5 分钟：hardware 按 workload 应用，其他网络 section 各自派生 section context，deadline/cancel 写入结构化 error。CLI 默认把 section start/完成/失败和体检完成状态实时写到 stderr，`--quiet` 可关闭进度。Ping 全目标失败会保留逐目标 results 并返回聚合 error。
 
 ---
 
@@ -589,7 +589,7 @@ Suite 只有所有 enabled section 都为 `status=ok` 才成功。enabled 的空
 - 扩展项表格
 - 警告列表
 - 响应式布局
-- Suite HTML 额外展示 app/catalog metadata、hardware workloads、network identity、完整 route hops、ping、speed group/provider、IP quality、reachability、mail/media 及 detail/error
+- 体检 HTML 额外展示 app/catalog metadata、hardware workloads、network identity、完整 route hops、ping、speed group/provider、IP quality、reachability、mail/media 及 detail/error
 
 CLI 的 JSON/HTML 都先写入目标同目录的 mode `0600` 临时文件，写入完成后 fsync 并 rename 到目标路径，最终文件在 Unix 保持 `0600`；这样写入中途失败不会留下半份新报告。其他平台仍依赖系统 ACL。
 
@@ -605,18 +605,18 @@ vmbench history compare --last 3
 - **latency**：越低越好（绿色 = 更低延迟）
 - **throughput**：越高越好（绿色 = 更高吞吐）
 
-命令先识别 report kind，benchmark 与 Suite 不能混合。注意 v0.8.0 起根命令 `--only hardware` 产出 benchmark（run）报告，而旧 `vmbench suite --only hardware` 产出的是 suite 报告——这两类历史记录之间不能混合对比。Benchmark Compare 忽略带 error 的 metric，将 `ms avg` 按 latency 处理，不跨不兼容 throughput 单位计算 delta，并对迭代次数、mode、scope、硬件工具/iperf host 选择和重复 workload 给出可比性警告。
+命令先识别 report kind，benchmark 与体检不能混合。注意 v0.8.0 起根命令 `--only hardware` 产出 benchmark（run）报告，而旧 `vmbench suite --only hardware` 产出的是体检（旧称 suite）报告——这两类历史记录之间不能混合对比。Benchmark Compare 忽略带 error 的 metric，将 `ms avg` 按 latency 处理，不跨不兼容 throughput 单位计算 delta，并对迭代次数、mode、scope、硬件工具/iperf host 选择和重复 workload 给出可比性警告。
 
-Suite Compare 对齐两份或更多 Suite v1/v2 JSON 的 raw metrics。Route/Ping 结果记录实际 `probe_protocol/probe_tool`，并显式保留成功的零值 Ping 指标。只有 unit、实际 protocol/IP family、provider/probe tool、target/node identity，以及节点型证据所需的 catalog revision 都兼容时才输出 delta；HTTP status 等分类码不参与百分比 delta。不兼容时仍显示各报告值，但 delta 留空并给出 reason/warning。Route 指标还要求逐项显式为 `status=ok` 且 `destination_reached=true`；旧报告没有到达证据时不参与 delta。Route hop count 等中性证据只用于对照，不解释成性能提升。Mail 只有 `status=open` 的连接延迟进入比较；`refused/timeout/error` 耗时不作为成功 latency。未知扩展 section 继续按通用 raw-metric 规则提取，不套用 IP Quality 的端口状态门禁。
+体检 Compare 对齐两份或更多体检 v1/v2 JSON 的 raw metrics。Route/Ping 结果记录实际 `probe_protocol/probe_tool`，并显式保留成功的零值 Ping 指标。只有 unit、实际 protocol/IP family、provider/probe tool、target/node identity，以及节点型证据所需的 catalog revision 都兼容时才输出 delta；HTTP status 等分类码不参与百分比 delta。不兼容时仍显示各报告值，但 delta 留空并给出 reason/warning。Route 指标还要求逐项显式为 `status=ok` 且 `destination_reached=true`；旧报告没有到达证据时不参与 delta。Route hop count 等中性证据只用于对照，不解释成性能提升。Mail 只有 `status=open` 的连接延迟进入比较；`refused/timeout/error` 耗时不作为成功 latency。未知扩展 section 继续按通用 raw-metric 规则提取，不套用 IP Quality 的端口状态门禁。
 
-### Suite 报告结构
+### 体检报告结构
 
-Suite 报告使用独立的 schema-v2 envelope，并保留 v1 兼容字段：
+体检报告使用独立的 schema-v2 envelope，并保留 v1 兼容字段：
 
 ```
-SuiteReport
+CheckupReport
 ├── schema_version   # 2
-├── report_kind      # suite
+├── report_kind      # checkup（pre-v0.11.0 写 "suite"，读取时兼容）
 ├── report_id        # 唯一 ID
 ├── app              # version / commit / build_time
 ├── system           # 即使 network-only 也保留
@@ -625,7 +625,7 @@ SuiteReport
 ├── message         # 状态描述
 ├── started_time    # 开始时间戳
 ├── finished_time   # 结束时间戳
-├── config          # Suite 配置
+├── config          # 体检配置
 ├── hardware        # HardwareSection（内嵌 Report）
 ├── network_info    # NetworkInfoSection（IPv4/v6/ASN/NAT）
 ├── route           # RouteSection（路由追踪结果）
@@ -642,7 +642,7 @@ SuiteReport
 
 ### 本地历史
 
-历史目录按平台 data directory 选择，也可用 `VMBENCH_HISTORY_DIR` 覆盖，以 temp + fsync + rename 原子写入。Unix 使用目录 mode `0700`、记录 mode `0600`；其他平台依赖系统 ACL。`run` / `suite --save-history` 自动存储生成报告；`history add` 可导入旧报告，list/show/delete 管理记录，`compare --last N` 只接受同 report kind。
+历史目录按平台 data directory 选择，也可用 `VMBENCH_HISTORY_DIR` 覆盖，以 temp + fsync + rename 原子写入。Unix 使用目录 mode `0700`、记录 mode `0600`；其他平台依赖系统 ACL。基准与体检均支持 `--save-history` 自动存储生成报告；`history add` 可导入旧报告，list/show/delete 管理记录，`compare --last N` 只接受同 report kind。
 
 ---
 
@@ -659,7 +659,7 @@ vmbench          # 直接启动 TUI（无参数时的默认行为）
 ```
 Dashboard（主菜单）
 ├── → Run Benchmark → Config → Running(run) → Results
-│                          └→ Running(suite) → SuiteResults
+│                          └→ Running(checkup) → CheckupResults
 ├── → Compare（ComparePicker：历史选两条 / 查看单条 / 手输路径）
 └── → System Info（查看系统信息）
 ```
@@ -678,12 +678,12 @@ Dashboard（主菜单）
 
 - 垂直平铺的极简清单：首行「开始评测」光标默认停留（打开页面直接回车即跑），其下 9 个测试项一行一项（`空格`/`回车` 勾选，`1-9` 数字键快切），底部一个可展开的「高级设置」行（`←→` 循环改值：迭代次数 1-9 / IP v4·v6·dual / 超时 1·5·10·15m / 节点目录 内置·自动更新）
 - 默认全部测试项勾选；开始行实时显示启用项数与预计总时长（优先历史均值）
-- 硬件工具、workload 过滤、providers/route/media/IP 来源等细节不再暴露给用户，归一化时自动采用与 CLI/MCP 相同的文档化默认值；生效 section 恰好只有 hardware 时产出 run 报告，否则产出 suite 报告（与 CLI 同一规则）
+- 硬件工具、workload 过滤、providers/route/media/IP 来源等细节不再暴露给用户，归一化时自动采用与 CLI/MCP 相同的文档化默认值；生效 section 恰好只有 hardware 时产出 run 报告，否则产出体检报告（与 CLI 同一规则）
 
 #### Running（单一运行页，按 runKind 分流）
 
 - run 路径：实时显示每个 workload 的执行进度——当前 workload 名称、迭代迷你条、采样进度、已耗时与完成后按墙钟外推的 ETA；完成后自动跳转 Results 页面
-- suite 路径：实时显示 section 执行状态（start/done/fail/skip/partial）与已耗时；完成后自动跳转 SuiteResults 页面
+- 体检路径：实时显示 section 执行状态（start/done/fail/skip/partial）与已耗时；完成后自动跳转 CheckupResults 页面
 - `Esc` 触发取消确认弹窗（文案按 runKind 选择）
 
 #### Results
@@ -695,14 +695,14 @@ Dashboard（主菜单）
 - 每项显示：名称、分类、median time、throughput、latency、detail/error
 - 按 `s` 保存为 JSON 文件
 
-#### SuiteResults
+#### CheckupResults
 
 - 展示各 section 结果摘要和详细数据
 
 #### Compare
 
-- 入口先进入 ComparePicker：历史记录列表（最新在前）`spc` 标记 A/B，`c` 对比，`v` 查看单条（run → Results、suite → SuiteResults），`m` 手输路径
-- benchmark 报告在 TUI 内并排展示 delta；suite 报告用与 CLI 相同的 textgrid 对比
+- 入口先进入 ComparePicker：历史记录列表（最新在前）`spc` 标记 A/B，`c` 对比，`v` 查看单条（run → Results、体检 → CheckupResults），`m` 手输路径
+- benchmark 报告在 TUI 内并排展示 delta；体检报告用与 CLI 相同的 textgrid 对比
 - 颜色编码：绿色 = 改善，红色 = 退化
 
 ### 键盘快捷键
@@ -784,7 +784,7 @@ LLM 客户端（Claude / Cursor / Cline）
         ↕ MCP JSON-RPC over stdio
 vmbench mcp serve
         ↕ 内部 API
-vmbench.RunCore / suite.Run / sysinfo.Collect
+vmbench.RunCore / checkup.Run / sysinfo.Collect
 ```
 
 ### 启动方式
@@ -814,7 +814,7 @@ vmbench mcp serve --transport stdio
 
 列出 vmbench 的完整能力信息：
 - 版本号
-- Suite sections 列表
+- checkup sections 列表
 - 预设列表
 - 硬件工具列表
 - 速度提供商列表
@@ -828,7 +828,7 @@ vmbench mcp serve --transport stdio
 
 #### `vmbench_run`
 
-运行基准测试（v0.8.0 起合并原 `vmbench_run`/`vmbench_suite` 两个工具）：不带 section 参数时只跑 hardware（返回 run 报告），`preset` / `only` / `skip` 选择网络 section 后返回 suite 报告：
+运行基准测试（v0.8.0 起合并原 `vmbench_run`/`vmbench_suite` 两个工具）：不带 section 参数时只跑 hardware（返回 run 报告），`preset` / `only` / `skip` 选择网络 section 后返回体检报告：
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
@@ -848,10 +848,6 @@ vmbench mcp serve --transport stdio
 | `catalog_source` | string | "embedded" | embedded / auto / 显式 path |
 | `catalog_revision` | string | "" | 精确 revision pin |
 
-#### `vmbench_suite`（弃用别名）
-
-与 `vmbench_run` 路由到同一 handler、schema 完全一致，仅 Title 标记 `Deprecated: use vmbench_run`；计划 v0.9.0 删除。
-
 ### 安全边界
 
 | 约束 | 说明 |
@@ -863,15 +859,15 @@ vmbench mcp serve --transport stdio
 | 超时上限 | `timeout_ms` 最大 15 分钟（900000ms） |
 | 互斥运行 | Server 内部互斥锁，同一时间只允许一个 benchmark |
 | 默认保守 | `vmbench_run` 不带 section 参数时只跑 hardware |
-| 网络显式开启 | suite 通过 preset 或 only 显式启用 |
+| 网络显式开启 | checkup 通过 preset 或 only 显式启用 |
 | stdout 专用 | stdout 只写 JSON-RPC response，诊断信息写 stderr |
 | 原始指标 | 返回原始指标和结构化错误，不输出总分/等级 |
 
 参数缺省与显式非法值严格区分：省略 `iterations` 时默认为 1，省略 `timeout_ms` 时默认为 5 分钟；显式传入非正数、超过上限、非法 regex，或在合法枚举数组中混入未知 section/provider/tool/route preset 时，整个 tool call 以 `isError=true` 拒绝且不启动测量。
 
-参数校验失败只返回错误文本。测量已经启动后若 workload 或 suite section 失败，tool result 仍保留完整 `structuredContent.report` 和文本摘要，同时设置 `isError=true`，调用方可以读取结构化失败细节而不是丢失报告。
+参数校验失败只返回错误文本。测量已经启动后若 workload 或 checkup section 失败，tool result 仍保留完整 `structuredContent.report` 和文本摘要，同时设置 `isError=true`，调用方可以读取结构化失败细节而不是丢失报告。
 
-CLI、TUI、MCP 复用同一 Suite normalization/validation contract，避免相同输入在不同入口产生不同 sections、IP version、provider、timeout 或 catalog provenance。MCP capabilities 同步列出 `network_info` / `reachability` 和 catalog source/revision 字段。
+CLI、TUI、MCP 复用同一体检（checkup）normalization/validation 契约，避免相同输入在不同入口产生不同 sections、IP version、provider、timeout 或 catalog provenance。MCP capabilities 同步列出 `network_info` / `reachability` 和 catalog source/revision 字段。
 
 ---
 
@@ -992,14 +988,14 @@ report := vmbench.RunCore(context.Background(), vmbench.Options{
     Iterations: 3,
     OnEvent: func(evt vmbench.Event) {
         switch evt.Kind {
-        case vmbench.EventSuiteStart:
+        case vmbench.EventCheckupStart:
             fmt.Printf("▶ 开始: %s\n", evt.Workload)
-        case vmbench.EventSuiteProgress:
+        case vmbench.EventCheckupProgress:
             fmt.Printf("  进度: %s (%d/%d) %.0f%%\n",
                 evt.Workload, evt.Current, evt.Total, evt.Progress*100)
-        case vmbench.EventSuiteDone:
+        case vmbench.EventCheckupDone:
             fmt.Printf("✔ 完成: %s (%.2fs)\n", evt.Workload, evt.Duration.Seconds())
-        case vmbench.EventSuiteFail:
+        case vmbench.EventCheckupFail:
             fmt.Printf("✘ 失败: %s - %s\n", evt.Workload, evt.Err)
         case vmbench.EventBenchDone:
             fmt.Println("全部完成！")
@@ -1008,22 +1004,22 @@ report := vmbench.RunCore(context.Background(), vmbench.Options{
 })
 ```
 
-### 调用 Suite
+### 调用体检
 
 ```go
-import "github.com/cloudapp3/vmbench/suite"
+import "github.com/cloudapp3/vmbench/checkup"
 
-report := suite.Run(context.Background(), suite.Options{
+report := checkup.Run(context.Background(), checkup.Options{
     Preset:          "quick",
     CatalogSource:   "auto",
     CatalogRevision: "2026-07-13.1",
-    OnEvent: func(evt suite.Event) {
+    OnEvent: func(evt checkup.Event) {
         fmt.Printf("[%s] %s: %s\n", evt.Kind, evt.Section, evt.Message)
     },
 })
 ```
 
-`suite.Run` 在执行前通过共享 normalization/validation 解析 catalog；pin 或 schema 不匹配会返回结构化失败，不会改用另一 revision。调用 `vmbench.NormalizeOptions` / `suite.NormalizeOptions` 可在不运行 workload 的情况下得到 CLI/TUI/MCP 一致的规范化配置。
+`checkup.Run` 在执行前通过共享 normalization/validation 解析 catalog；pin 或 schema 不匹配会返回结构化失败，不会改用另一 revision。调用 `vmbench.NormalizeOptions` / `checkup.NormalizeOptions` 可在不运行 workload 的情况下得到 CLI/TUI/MCP 一致的规范化配置。
 
 ### 采集系统信息
 
@@ -1222,15 +1218,15 @@ type Options struct {
 
 | EventKind | 触发时机 | 携带数据 |
 |-----------|---------|---------|
-| `suite_start` | 每个 workload 首个 sample 进入前 | Workload 名称、总数；同名 workload 也逐项触发 |
-| `suite_progress` | 迭代进度更新 | 当前迭代、进度百分比、状态 |
-| `suite_done` | workload 成功完成 | Workload 名称、耗时 |
-| `suite_skip` | workload 被跳过 | Workload 名称 |
-| `suite_fail` | workload 执行失败 | Workload 名称、错误信息 |
+| `checkup_start` | 每个 workload 首个 sample 进入前 | Workload 名称、总数；同名 workload 也逐项触发 |
+| `checkup_progress` | 迭代进度更新 | 当前迭代、进度百分比、状态 |
+| `checkup_done` | workload 成功完成 | Workload 名称、耗时 |
+| `checkup_skip` | workload 被跳过 | Workload 名称 |
+| `checkup_fail` | workload 执行失败 | Workload 名称、错误信息 |
 | `bench_done` | 全部 workload 完成 | 进度 100% |
 | `bench_log` | 警告/日志信息 | 消息文本 |
 
-### Suite Section 事件
+### 体检 Section 事件
 
 | EventKind | 触发时机 |
 |-----------|---------|
@@ -1238,16 +1234,16 @@ type Options struct {
 | `section.done` | section 完成且 status=ok |
 | `section.fail` | enabled section 完成但 status≠ok（含 skipped/partial/error/空状态） |
 | `section.skip` | section 未启用 |
-| `suite.done` | 全部 section 完成 |
+| `checkup.done` | 全部 section 完成 |
 
-suite 路径默认把 section 生命周期通过 `OnEvent` 实时打印到 stderr，不污染 stdout；`--quiet` 不安装该 CLI 进度回调。TUI 继续订阅同一事件模型绘制进度页。
+体检路径默认把 section 生命周期通过 `OnEvent` 实时打印到 stderr，不污染 stdout；`--quiet` 不安装该 CLI 进度回调。TUI 继续订阅同一事件模型绘制进度页。
 
 ### Event 结构
 
 ```go
 type Event struct {
     Kind      EventKind    // 事件类型
-    Suite     string       // suite 名称
+    Checkup   string       // checkup/section 名称
     Workload  string       // workload 名称
     Category  string       // 分类
     Iteration int          // 当前迭代号
@@ -1311,8 +1307,8 @@ GOOS=windows GOARCH=amd64 go build -ldflags "..." -o vmbench-windows-amd64 ./cmd
 # 安装最新版本（默认）
 curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash
 
-# 自定义安装目录
-curl -fsSL ... | bash -s -- --dir /opt/bin
+# 系统级安装（/usr/local/bin）
+curl -fsSL ... | bash -s -- --system
 ```
 
 安装脚本功能：
@@ -1327,7 +1323,7 @@ curl -fsSL ... | bash -s -- --dir /opt/bin
 
 ### 运行平台
 
-| 平台 | 架构 | CLI | TUI | MCP | Suite |
+| 平台 | 架构 | CLI | TUI | MCP | 体检 |
 |------|------|:---:|:---:|:---:|:-----:|
 | Linux | amd64 | ✅ | ✅ | ✅ | ✅ |
 | Linux | arm64 | ✅ | ✅ | ✅ | ✅ |
@@ -1412,9 +1408,9 @@ vmbench/
 │   ├── html.go                     # HTML 可视化输出
 │   └── compare.go                  # 并排对比输出
 │
-├── suite/                          # VPS 综合测评
+├── checkup/                        # VPS 体检（综合测评）
 │   ├── types.go                    # Section/Report 类型定义
-│   ├── options.go                  # Suite 选项归一化
+│   ├── options.go                  # 体检选项归一化
 │   ├── config_validation.go        # CLI/TUI/MCP 共享校验 + catalog resolve
 │   ├── run.go                      # Section 编排执行
 │   ├── hardware.go                 # hardware section 实现
@@ -1427,7 +1423,7 @@ vmbench/
 │   ├── mail.go                     # mail section 实现
 │   └── media.go                    # media section 实现
 │
-├── suitecompare/                   # Suite raw metric compare
+├── checkupcompare/                 # 体检 raw metric compare
 │   └── compare.go                  # unit/protocol/provider/node/revision gate
 │
 ├── sysinfo/                        # 系统信息采集
@@ -1442,15 +1438,14 @@ vmbench/
 ├── tui/                            # Bubble Tea TUI
 │   ├── app.go                      # 主模型 + 页面路由
 │   ├── dashboard.go                # 主菜单
-│   ├── run_config.go               # 硬件跑分配置页
-│   ├── running.go                  # 实时进度页（ETA/迭代迷你条）
+│   ├── config_page.go              # ECS 式勾选清单配置页（run/checkup 统一入口）
+│   ├── running.go                  # 实时进度页（run/checkup 分流 + ETA）
 │   ├── results.go                  # 结果展示页（卡片/分组/平铺）
 │   ├── result_detail.go            # 单 workload 详情页
 │   ├── compare_picker.go           # 历史记录选择器
 │   ├── compare.go                  # 报告对比页
-│   ├── suite_config.go             # Suite 配置页（含摘要卡）
-│   ├── suite_running.go            # Suite 执行进度页
-│   ├── suite_results.go            # Suite 结果页
+│   ├── checkup_summary.go          # 体检摘要卡（启用项/预计时长）
+│   ├── checkup_results.go          # 体检结果页
 │   ├── scroll.go                   # 中央裁剪滚动
 │   ├── help.go                     # 按键注册表 + 帮助页
 │   ├── mouse.go                    # 滚轮 + 菜单点击

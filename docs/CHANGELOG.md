@@ -1,5 +1,15 @@
 # VMBench Changelog
 
+## v0.11.0（2026-09-09）
+
+### "suite" 全面更名为 "checkup"（BREAKING）
+
+- **报告种类与组合概念更名**：v0.8.0 合并进根命令的组合测评概念由 "suite" 更名为 **checkup**（中文「体检」）。报告种类、TUI 页面（CheckupResults）、事件（`checkup_start` → `checkup_done` 等）、MCP capabilities 键（`checkup_sections` / `checkup_presets`）与全部双语文档同步更名；tagline 的 "benchmark suite" 属工具集含义，改为 "benchmark toolkit"（中文「工具集」），与报告种类无关。
+- **`report_kind` 线格式**：体检报告现在写 `"report_kind": "checkup"`；读取侧兼容旧值 `"suite"`——`history add` / `compare` / 历史记录继续接受 v0.10.0 及更早版本的报告，历史记录里的旧 `kind: "suite"` 读取时归一化为 checkup，旧 run 记录不受影响。
+- **MCP `vmbench_suite` 弃用别名删除**（兑现 v0.8.0 公告）：`vmbench_run` 是唯一基准工具；旧客户端调用 `vmbench_suite` 会得到 unknown tool 错误。
+- **Go API（BREAKING）**：包路径 `suite/` → `checkup/`、`suitecompare/` → `checkupcompare/`，导出符号同步更名（`checkup.Run` / `checkup.Options` / `checkup.CheckupReport` / `history.KindCheckup` / `vmbench.EventCheckupStart` 等），旧 `Suite*` 标识符不再存在。
+- **顺带修复**：`install.sh` 安装完成的示例命令仍指向 v0.8.0 已删除的 `vmbench suite` 子命令（执行会以 exit 2 退出），改为根命令用法；`cmd/vmbench` 工具预检测试补上 `XDG_CACHE_HOME` 重定向，开发机已 fetch 过静态工具时测试不再误报。
+
 ## v0.10.0（2026-09-09）
 
 ### `vmbench uninstall`：二进制自卸载
@@ -8,6 +18,10 @@
 - **职责边界与 `install.sh` 委托协议配套**：二进制负责文件清理（数据/配置/工具缓存/本体），shell 侧负责 `# vmbench user install` PATH 条目与 systemd/launchd 服务停止；`install.sh --uninstall` 探测到子命令即委托并在委托前停服务，无终端时（如 `curl | bash`）非交互直接执行。自定义 `VMBENCH_HISTORY_DIR` 与 `VMBENCH_CONFIG` 重定向位置一律保留。
 - **安全护栏**：系统根目录（`/`、`/etc`、`/usr` 等）与 `$HOME` 拒绝删除；symlink、非目录、非常规文件拒绝；删除前逐项重验（TOCTOU）；dpkg/rpm 管理的二进制警告改用包管理器卸载；手动 service unit 检测提示。`tools fetch` 的静态工具缓存（`~/.cache/vmbench`）纳入清理（shell fallback 此前不清理该目录）。
 - **新增顶层 `uninstall` 包**（Plan/Execute/guards，`history.DefaultRoot`、`tui.ConfigPaths` 为配套导出）。
+
+### 文档
+
+- README 移除「自定义目录」`--dir /opt/bin` 示例，对齐 vmflow 安装引导：显式安装只展示 `--system`，`--dir PATH` 保留在 flags 说明中并注明「显式目录不改启动文件，需自行确保在 `PATH`」。`docs/capabilities.md` 同步、`vmbench-rs/install.sh` 示例改用 `/usr/local/bin`；默认目录策略不变（root `/usr/local/bin`，用户 `~/.local/bin`/`~/bin`）。
 
 ## v0.9.0（2026-09-09）
 

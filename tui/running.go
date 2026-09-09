@@ -12,26 +12,26 @@ import (
 
 	"github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/catalog"
+	"github.com/cloudapp3/vmbench/checkup"
 	"github.com/cloudapp3/vmbench/i18n"
-	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
 )
 
-type suiteEventMsg struct{ event suite.Event }
-type suiteStartMsg struct{ opts suite.Options }
-type suiteDoneMsg struct{ report suite.SuiteReport }
+type checkupEventMsg struct{ event checkup.Event }
+type checkupStartMsg struct{ opts checkup.Options }
+type checkupDoneMsg struct{ report checkup.CheckupReport }
 
-type suiteSection struct {
-	id        suite.SectionID
+type checkupSection struct {
+	id        checkup.SectionID
 	label     string
 	status    string
 	message   string
 	startedAt time.Time
 }
 
-// startBenchmark and startSuite share the single running page; m.runKind
-// picks which progress view renders ("run" workload grid vs "suite" section
+// startBenchmark and startCheckup share the single running page; m.runKind
+// picks which progress view renders ("run" workload grid vs "checkup" section
 // grid) and which cancel-modal copy is shown.
 func startBenchmark(m Model, opts vmbench.Options) (tea.Model, tea.Cmd) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -115,7 +115,7 @@ func updateWorkloadEvent(m Model, ev vmbench.Event) (tea.Model, tea.Cmd) {
 	}
 
 	switch ev.Kind {
-	case vmbench.EventSuiteStart:
+	case vmbench.EventCheckupStart:
 		for i := range m.workloads {
 			if m.workloads[i].name == ev.Workload {
 				m.workloads[i].status = "running"
@@ -131,7 +131,7 @@ func updateWorkloadEvent(m Model, ev vmbench.Event) (tea.Model, tea.Cmd) {
 		addLog("▸ start  " + ev.Workload)
 		return m, waitForEvent(m.eventCh)
 
-	case vmbench.EventSuiteProgress:
+	case vmbench.EventCheckupProgress:
 		// Run-wide sample counters plus the current workload's iteration
 		// mini progress (ev.Total is samples across the whole run).
 		m.runSamplesDone = ev.Current
@@ -147,7 +147,7 @@ func updateWorkloadEvent(m Model, ev vmbench.Event) (tea.Model, tea.Cmd) {
 		}
 		return m, waitForEvent(m.eventCh)
 
-	case vmbench.EventSuiteDone:
+	case vmbench.EventCheckupDone:
 		for i := range m.workloads {
 			if m.workloads[i].name == ev.Workload {
 				m.recordWorkloadDone(i)
@@ -160,7 +160,7 @@ func updateWorkloadEvent(m Model, ev vmbench.Event) (tea.Model, tea.Cmd) {
 		addLog("✓ " + i18n.PadCells(i18n.StatusLabel("done"), 7) + " " + ev.Workload + "  " + ev.Metric)
 		return m, waitForEvent(m.eventCh)
 
-	case vmbench.EventSuiteFail:
+	case vmbench.EventCheckupFail:
 		for i := range m.workloads {
 			if m.workloads[i].name == ev.Workload {
 				m.recordWorkloadDone(i)
@@ -178,7 +178,7 @@ func updateWorkloadEvent(m Model, ev vmbench.Event) (tea.Model, tea.Cmd) {
 		addLog("✗ " + i18n.PadCells(i18n.StatusLabel("fail"), 7) + " " + ev.Workload + "  " + errMsg)
 		return m, waitForEvent(m.eventCh)
 
-	case vmbench.EventSuiteSkip:
+	case vmbench.EventCheckupSkip:
 		for i := range m.workloads {
 			if m.workloads[i].name == ev.Workload {
 				m.workloads[i].status = "skip"
@@ -217,69 +217,69 @@ func updateRunning(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func newSuiteSections(sel suite.SectionSelector) []suiteSection {
+func newCheckupSections(sel checkup.SectionSelector) []checkupSection {
 	order := []struct {
-		id      suite.SectionID
+		id      checkup.SectionID
 		enabled bool
 	}{
-		{suite.SectionHardware, sel.Hardware},
-		{suite.SectionNetworkInfo, sel.NetworkInfo},
-		{suite.SectionRoute, sel.Route},
-		{suite.SectionPing, sel.Ping},
-		{suite.SectionSpeed, sel.Speed},
-		{suite.SectionIPQuality, sel.IPQuality},
-		{suite.SectionReachability, sel.Reachability},
-		{suite.SectionMail, sel.Mail},
-		{suite.SectionMedia, sel.Media},
+		{checkup.SectionHardware, sel.Hardware},
+		{checkup.SectionNetworkInfo, sel.NetworkInfo},
+		{checkup.SectionRoute, sel.Route},
+		{checkup.SectionPing, sel.Ping},
+		{checkup.SectionSpeed, sel.Speed},
+		{checkup.SectionIPQuality, sel.IPQuality},
+		{checkup.SectionReachability, sel.Reachability},
+		{checkup.SectionMail, sel.Mail},
+		{checkup.SectionMedia, sel.Media},
 	}
-	out := make([]suiteSection, 0, len(order))
+	out := make([]checkupSection, 0, len(order))
 	for _, o := range order {
 		if !o.enabled {
 			continue
 		}
-		out = append(out, suiteSection{id: o.id, label: i18n.SectionLabel(string(o.id)), status: "waiting"})
+		out = append(out, checkupSection{id: o.id, label: i18n.SectionLabel(string(o.id)), status: "waiting"})
 	}
 	return out
 }
 
-func startSuite(m Model, opts suite.Options) (tea.Model, tea.Cmd) {
+func startCheckup(m Model, opts checkup.Options) (tea.Model, tea.Cmd) {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
-	m.suiteEventCh = make(chan suite.Event, 50)
-	m.suiteSections = newSuiteSections(opts.Sections)
+	m.checkupEventCh = make(chan checkup.Event, 50)
+	m.checkupSections = newCheckupSections(opts.Sections)
 	m.eventLog = m.eventLog[:0]
 	m.startedAt = time.Now()
 	m.page = pageRunning
-	m.runKind = "suite"
+	m.runKind = "checkup"
 
 	return m, tea.Batch(
-		runSuiteCmd(ctx, opts, m.suiteEventCh),
-		waitForSuiteEvent(m.suiteEventCh),
+		runCheckupCmd(ctx, opts, m.checkupEventCh),
+		waitForCheckupEvent(m.checkupEventCh),
 		m.spinner.Tick,
 	)
 }
 
-func runSuiteCmd(ctx context.Context, opts suite.Options, ch chan<- suite.Event) tea.Cmd {
+func runCheckupCmd(ctx context.Context, opts checkup.Options, ch chan<- checkup.Event) tea.Cmd {
 	return func() tea.Msg {
-		opts.OnEvent = func(ev suite.Event) {
+		opts.OnEvent = func(ev checkup.Event) {
 			ch <- ev
 		}
-		report := suite.Run(ctx, opts)
-		return suiteDoneMsg{report: report}
+		report := checkup.Run(ctx, opts)
+		return checkupDoneMsg{report: report}
 	}
 }
 
-func waitForSuiteEvent(ch <-chan suite.Event) tea.Cmd {
+func waitForCheckupEvent(ch <-chan checkup.Event) tea.Cmd {
 	return func() tea.Msg {
 		ev, ok := <-ch
 		if !ok {
 			return nil
 		}
-		return suiteEventMsg{event: ev}
+		return checkupEventMsg{event: ev}
 	}
 }
 
-func updateSuiteEvent(m Model, ev suite.Event) (tea.Model, tea.Cmd) {
+func updateCheckupEvent(m Model, ev checkup.Event) (tea.Model, tea.Cmd) {
 	addLog := func(msg string) {
 		m.eventLog = append(m.eventLog, fmt.Sprintf("%s %s", time.Now().Format("15:04:05"), msg))
 		if len(m.eventLog) > 50 {
@@ -288,11 +288,11 @@ func updateSuiteEvent(m Model, ev suite.Event) (tea.Model, tea.Cmd) {
 	}
 
 	updateSection := func(status, msg string) {
-		for i := range m.suiteSections {
-			if m.suiteSections[i].id == ev.Section {
-				m.suiteSections[i].status = status
+		for i := range m.checkupSections {
+			if m.checkupSections[i].id == ev.Section {
+				m.checkupSections[i].status = status
 				if msg != "" {
-					m.suiteSections[i].message = msg
+					m.checkupSections[i].message = msg
 				}
 				return
 			}
@@ -300,20 +300,20 @@ func updateSuiteEvent(m Model, ev suite.Event) (tea.Model, tea.Cmd) {
 	}
 
 	switch ev.Kind {
-	case suite.EventSectionStart:
+	case checkup.EventSectionStart:
 		updateSection("running", "")
-		for i := range m.suiteSections {
-			if m.suiteSections[i].id == ev.Section {
-				m.suiteSections[i].startedAt = time.Now()
+		for i := range m.checkupSections {
+			if m.checkupSections[i].id == ev.Section {
+				m.checkupSections[i].startedAt = time.Now()
 				break
 			}
 		}
 		addLog("▸ start  " + string(ev.Section))
-	case suite.EventSectionDone:
+	case checkup.EventSectionDone:
 		updateSection("done", ev.Message)
 		clearSectionStartedAt(&m, ev.Section)
 		addLog("✓ " + i18n.PadCells(i18n.StatusLabel("done"), 7) + "   " + string(ev.Section) + "  " + ev.Message)
-	case suite.EventSectionFail:
+	case checkup.EventSectionFail:
 		status := strings.ToLower(strings.TrimSpace(ev.Status))
 		marker := "✗"
 		switch status {
@@ -328,20 +328,20 @@ func updateSuiteEvent(m Model, ev suite.Event) (tea.Model, tea.Cmd) {
 		}
 		updateSection(status, ev.Message)
 		addLog(marker + " " + i18n.PadCells(i18n.StatusLabel(status), 7) + "   " + string(ev.Section) + "  " + ev.Message)
-	case suite.EventSectionSkip:
+	case checkup.EventSectionSkip:
 		updateSection("skip", "")
 		clearSectionStartedAt(&m, ev.Section)
-	case suite.EventSuiteDone:
-		addLog("● " + i18n.T("tui.suiteRunning.complete") + "  " + ev.Message)
+	case checkup.EventCheckupDone:
+		addLog("● " + i18n.T("tui.checkupRunning.complete") + "  " + ev.Message)
 	}
-	return m, waitForSuiteEvent(m.suiteEventCh)
+	return m, waitForCheckupEvent(m.checkupEventCh)
 }
 
 // clearSectionStartedAt stops the elapsed timer for a finished section.
-func clearSectionStartedAt(m *Model, id suite.SectionID) {
-	for i := range m.suiteSections {
-		if m.suiteSections[i].id == id {
-			m.suiteSections[i].startedAt = time.Time{}
+func clearSectionStartedAt(m *Model, id checkup.SectionID) {
+	for i := range m.checkupSections {
+		if m.checkupSections[i].id == id {
+			m.checkupSections[i].startedAt = time.Time{}
 			return
 		}
 	}
@@ -405,10 +405,10 @@ func handleConfirm(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // viewRunning renders whichever progress shape the started benchmark uses:
 // the per-workload grid for the hardware run, the per-section grid for the
-// suite.
+// checkup.
 func viewRunning(m Model) string {
-	if m.runKind == "suite" {
-		return viewSuiteProgress(m)
+	if m.runKind == "checkup" {
+		return viewCheckupProgress(m)
 	}
 	return viewWorkloadProgress(m)
 }
@@ -499,15 +499,15 @@ func viewWorkloadProgress(m Model) string {
 	return viewWithCancelModal(m, view, width)
 }
 
-// viewSuiteProgress renders the per-section grid for a suite run.
-func viewSuiteProgress(m Model) string {
+// viewCheckupProgress renders the per-section grid for a checkup run.
+func viewCheckupProgress(m Model) string {
 	t := theme.Active
 	width := m.width
 
-	total := len(m.suiteSections)
+	total := len(m.checkupSections)
 	done := 0
 	failed := 0
-	for _, s := range m.suiteSections {
+	for _, s := range m.checkupSections {
 		switch s.status {
 		case "done":
 			done++
@@ -533,7 +533,7 @@ func viewSuiteProgress(m Model) string {
 
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(t.Primary)
 	header := lipgloss.JoinHorizontal(lipgloss.Bottom,
-		titleStyle.Render(i18n.T("tui.suiteRunning.title")),
+		titleStyle.Render(i18n.T("tui.checkupRunning.title")),
 		"    ",
 		lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.Tf("tui.running.elapsed", map[string]any{"Elapsed": elapsed.String()})),
 	)
@@ -545,7 +545,7 @@ func viewSuiteProgress(m Model) string {
 	progressLine := comp.ProgressLine(barWidth, ratio, i18n.T("tui.running.overall"), t.Primary) +
 		lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("  %d/%d  ✗%d", done, total, failed))
 	if m.height < 40 {
-		return viewSuiteProgressCompact(m, header, progressLine)
+		return viewCheckupProgressCompact(m, header, progressLine)
 	}
 
 	cardW := width - 4
@@ -554,8 +554,8 @@ func viewSuiteProgress(m Model) string {
 	}
 
 	var cards []string
-	for _, s := range m.suiteSections {
-		cards = append(cards, suiteSectionCard(m, s, cardW))
+	for _, s := range m.checkupSections {
+		cards = append(cards, checkupSectionCard(m, s, cardW))
 	}
 
 	var grid string
@@ -574,12 +574,12 @@ func viewSuiteProgress(m Model) string {
 	return viewWithCancelModal(m, view, width)
 }
 
-func viewSuiteProgressCompact(m Model, header, progressLine string) string {
+func viewCheckupProgressCompact(m Model, header, progressLine string) string {
 	t := theme.Active
 	lineWidth := m.width - 4
 	parts := []string{header, progressLine, ""}
-	for _, section := range m.suiteSections {
-		parts = append(parts, suiteSectionCompactLine(m, section, lineWidth))
+	for _, section := range m.checkupSections {
+		parts = append(parts, checkupSectionCompactLine(m, section, lineWidth))
 	}
 
 	if m.showLog && len(m.eventLog) > 0 {
@@ -587,27 +587,27 @@ func viewSuiteProgressCompact(m Model, header, progressLine string) string {
 		if len(logLines) > 2 {
 			logLines = logLines[len(logLines)-2:]
 		}
-		parts = append(parts, "", lipgloss.NewStyle().Bold(true).Foreground(t.Accent).Render(i18n.T("tui.suiteRunning.recentEvents")))
+		parts = append(parts, "", lipgloss.NewStyle().Bold(true).Foreground(t.Accent).Render(i18n.T("tui.checkupRunning.recentEvents")))
 		for _, line := range logLines {
 			parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(truncStr(line, lineWidth)))
 		}
 	}
 	if m.confirm {
-		prompt := lipgloss.NewStyle().Bold(true).Foreground(t.Danger).Render(i18n.T("tui.modal.cancelSuite")) +
-			lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.T("tui.modal.cancelSuiteCompact"))
+		prompt := lipgloss.NewStyle().Bold(true).Foreground(t.Danger).Render(i18n.T("tui.modal.cancelCheckup")) +
+			lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.T("tui.modal.cancelCheckupCompact"))
 		parts = append(parts, "", prompt)
 	}
 	return strings.Join(parts, "\n")
 }
 
-func suiteSectionCompactLine(m Model, s suiteSection, width int) string {
+func checkupSectionCompactLine(m Model, s checkupSection, width int) string {
 	labelWidth := comp.ColWidth(s.label, 20)
 	label := lipgloss.NewStyle().Bold(true).Foreground(sectionAccent(s.id)).Width(labelWidth).
 		Render(truncStr(s.label, labelWidth))
-	return label + suiteSectionStatus(m, s, width-labelWidth)
+	return label + checkupSectionStatus(m, s, width-labelWidth)
 }
 
-func suiteSectionStatus(m Model, s suiteSection, maxWidth int) string {
+func checkupSectionStatus(m Model, s checkupSection, maxWidth int) string {
 	if maxWidth < 8 {
 		maxWidth = 8
 	}
@@ -626,40 +626,40 @@ func suiteSectionStatus(m Model, s suiteSection, maxWidth int) string {
 			elapsed = " " + lipgloss.NewStyle().Foreground(theme.Active.Subtle).Render(
 				time.Since(s.startedAt).Truncate(time.Second).String())
 		}
-		return m.spinner.View() + " " + lipgloss.NewStyle().Foreground(theme.Active.Warning).Render(i18n.T("tui.suiteRunning.runningNow")) + elapsed
+		return m.spinner.View() + " " + lipgloss.NewStyle().Foreground(theme.Active.Warning).Render(i18n.T("tui.checkupRunning.runningNow")) + elapsed
 	default:
 		return comp.StatusPill(comp.StatusWaiting, i18n.StatusLabel("waiting"))
 	}
 }
 
-func suiteSectionCard(m Model, s suiteSection, width int) string {
+func checkupSectionCard(m Model, s checkupSection, width int) string {
 	card := comp.Card{
 		Title:  s.label,
-		Body:   suiteSectionStatus(m, s, 42),
+		Body:   checkupSectionStatus(m, s, 42),
 		Accent: sectionAccent(s.id),
 		Width:  width,
 	}
 	return card.Render()
 }
 
-func sectionAccent(id suite.SectionID) lipgloss.AdaptiveColor {
+func sectionAccent(id checkup.SectionID) lipgloss.AdaptiveColor {
 	t := theme.Active
 	switch id {
-	case suite.SectionHardware:
+	case checkup.SectionHardware:
 		return t.CategorySystem
-	case suite.SectionNetworkInfo:
+	case checkup.SectionNetworkInfo:
 		return t.Info
-	case suite.SectionRoute, suite.SectionPing:
+	case checkup.SectionRoute, checkup.SectionPing:
 		return t.CategoryNetwork
-	case suite.SectionSpeed:
+	case checkup.SectionSpeed:
 		return t.CategoryInteger
-	case suite.SectionIPQuality:
+	case checkup.SectionIPQuality:
 		return t.Accent
-	case suite.SectionReachability:
+	case checkup.SectionReachability:
 		return t.CategoryNetwork
-	case suite.SectionMail:
+	case checkup.SectionMail:
 		return t.CategoryFloat
-	case suite.SectionMedia:
+	case checkup.SectionMedia:
 		return t.CategoryDisk
 	default:
 		return t.Primary
@@ -694,10 +694,10 @@ func viewWithCancelModal(m Model, view string, width int) string {
 	title := i18n.T("tui.modal.cancelBenchmark")
 	body := i18n.T("tui.modal.cancelBenchmarkBody")
 	cancelLabel := i18n.T("tui.modal.cancelRun")
-	if m.runKind == "suite" {
-		title = i18n.T("tui.modal.cancelSuite")
-		body = i18n.T("tui.modal.cancelSuiteBody")
-		cancelLabel = i18n.T("tui.modal.cancelSuite")
+	if m.runKind == "checkup" {
+		title = i18n.T("tui.modal.cancelCheckup")
+		body = i18n.T("tui.modal.cancelCheckupBody")
+		cancelLabel = i18n.T("tui.modal.cancelCheckup")
 	}
 	modal := comp.Modal{
 		Title: title,

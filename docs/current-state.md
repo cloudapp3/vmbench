@@ -9,14 +9,14 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 - CLI：批量执行、导出 JSON / HTML / Console
 - TUI：交互式跑分、结果浏览、两份 benchmark 报告对比
 - MCP：通过 stdio 暴露给大模型客户端安全调用
-- Evidence：版本化节点、Suite v2、本地 history 和 compatible-only compare
+- Evidence：版本化节点、体检 v2、本地 history 和 compatible-only compare
 
 产品原则保持不变：
 
 - 只输出原始指标，不输出综合总分
 - 保留结构化错误和 detail
 - Compare 只基于 time / throughput / latency
-- Suite delta 只在 unit/protocol/provider/node/catalog revision 兼容时计算
+- 体检 delta 只在 unit/protocol/provider/node/catalog revision 兼容时计算
 - IP Quality 的 0-100 评分是业务诊断，不是 benchmark 总分
 
 ## 最新技术状态
@@ -24,8 +24,8 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 ### 1. Runner / workload 调度
 
 - workload 始终串行、隔离执行，不并发不同 benchmark，也不修改进程级 runtime/GC/线程状态
-- `vmbench` 根命令同时覆盖硬件基准与综合测评：不带 `--preset`/`--only`/`--skip` 只注册外部工具硬件 workload（run 报告），preset 或 `--only` 选择网络 section 后走综合测评（suite 报告）；网络诊断在同一命令面上提供
-- 硬件 workload 使用请求的 1-9 次迭代；suite 内的网络探测最多执行一次真实探测并记录实际 `iterations=1`
+- `vmbench` 根命令同时覆盖硬件基准与综合测评：不带 `--preset`/`--only`/`--skip` 只注册外部工具硬件 workload（run 报告），preset 或 `--only` 选择网络 section 后走综合测评（体检报告）；网络诊断在同一命令面上提供
+- 硬件 workload 使用请求的 1-9 次迭代；体检内的网络探测最多执行一次真实探测并记录实际 `iterations=1`
 - workload start event 在首个 sample 前逐项同步发射，done/fail 在当前 workload 返回后立即发射；同名 workload 也不会合并
 - CLI 对非法参数返回退出码 2；没有 workload 命中或任一 workload 失败时返回退出码 1
 
@@ -51,24 +51,24 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 - `nodecatalog/` 用 embedded/auto/path 三种 source 提供版本化节点；revision pin 在 probe 前检查，Ed25519 signed update 通过严格 schema 验证后才原子写入缓存
 - embedded snapshot 已覆盖成都、CERNET、CSTNET 与 IPv6 route/ping；节点 ID、protocol、ASN、流量预算和 revision 进入可追溯证据
 
-### 3. Suite 产品
+### 3. 体检产品
 
 - section：`hardware / network_info / route / ping / speed / ip_quality / reachability / mail / media`
 - preset：`quick / website / proxy / mail`
 - speed providers：`cloudflare / speedtest_net / speedtest_cn / iperf3`
 - speed 默认只启用 `cloudflare`；选择多个 provider 时顶层 summary 标记 `aggregation=best_per_metric`
-- suite 输出保留：
+- 体检输出保留：
   - `summary`
   - `groups`
   - `providers`
   - `sections`
-- Suite 使用 schema-v2 envelope：`report_kind/report_id/app/system/timestamps/duration/config`，同时保留 v1 compatibility fields
-- Suite 只有所有 enabled section 都为 `ok` 才成功；enabled 的空/skipped/partial/error 状态均使 CLI 返回退出码 1，disabled 才只发 skip event
+- 体检使用 schema-v2 envelope：`report_kind/report_id/app/system/timestamps/duration/config`，同时保留 v1 compatibility fields
+- 体检只有所有 enabled section 都为 `ok` 才成功；enabled 的空/skipped/partial/error 状态均使 CLI 返回退出码 1，disabled 才只发 skip event
 - 默认 timeout 为 5 分钟：hardware 按 workload 应用，其他网络 section 各自派生 timeout context，并把 deadline/cancel 写成结构化 error
 - Net Ping 全目标失败会保留逐目标 results 并返回聚合 error；iperf3 provider 无可用 host 直接失败
-- suite 事件驱动仍然是主线：start / done / fail / skip / suite.done
-- `vmbench compare` 自动识别 benchmark/Suite；Suite 只有在 unit/protocol/provider/target-node/catalog revision 兼容时才产生 delta，Route 另要求显式到达目标，Mail/IP Quality 端口延迟只接受 open
-- `history add/list/show/delete/compare --last N` 提供原子本地记录（Unix `0700/0600`）；run/suite 可用 `--save-history` 直接落盘
+- 体检事件驱动仍然是主线：start / done / fail / skip / checkup.done
+- `vmbench compare` 自动识别 benchmark/体检；体检只有在 unit/protocol/provider/target-node/catalog revision 兼容时才产生 delta，Route 另要求显式到达目标，Mail/IP Quality 端口延迟只接受 open
+- `history add/list/show/delete/compare --last N` 提供原子本地记录（Unix `0700/0600`）；基准/体检可用 `--save-history` 直接落盘
 
 ### 4. MCP
 
@@ -76,26 +76,26 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 - 首批 tools：
   - `vmbench_capabilities`
   - `vmbench_sysinfo`
-  - `vmbench_run`（完整基准面：hardware/suite 由 section 参数分流，`vmbench_suite` 为弃用别名）
+  - `vmbench_run`（完整基准面：hardware/体检由 section 参数分流）
 - 默认安全策略：
   - `vmbench_run` 不带 section 参数时只跑 `hardware`
   - `iterations` 默认 1，最大 9
   - `timeout_ms` 最大 15 分钟
 - MCP 严格区分省略值与显式非法值：非法 iterations/timeout/regex 或混入未知项的枚举数组直接拒绝，不启动测量
 - workload/section 测量失败仍返回完整 `structuredContent.report`，同时设置 `isError=true`
-- CLI/TUI/MCP 共享 Suite 配置字段与校验：iterations/timeout/filter、sections、IP version、tools/providers/iperf、route、catalog source/revision
+- CLI/TUI/MCP 共享体检配置字段与校验：iterations/timeout/filter、sections、IP version、tools/providers/iperf、route、catalog source/revision
 
 ### 5. TUI / 报告
 
 - 8 套主题，支持本地持久化
-- Dashboard / Config / Running / Results / SuiteResults / Compare / ComparePicker / ResultDetail / Help
-- Go TUI 只有单一"运行评测"入口，配置页是 ECS 式垂直勾选清单（不再分 RunConfig/SuiteConfig 两页，也没有独立 Multi-Core 入口）：首行「开始评测」光标默认停留、9 个测试项默认全勾、高级参数（迭代/IP 版本/超时/节点目录）收进可展开的高级行，工具与 providers 等细节交给归一化默认值；启动时按 section 集合分流 run/suite 报告，并使用与 CLI/MCP 相同的 catalog/config 模型；运行页按 runKind 分流 workload 网格与 section 网格
+- Dashboard / Config / Running / Results / CheckupResults / Compare / ComparePicker / ResultDetail / Help
+- Go TUI 只有单一"运行评测"入口，配置页是 ECS 式垂直勾选清单（不再分 RunConfig/SuiteConfig 两页，也没有独立 Multi-Core 入口）：首行「开始评测」光标默认停留、9 个测试项默认全勾、高级参数（迭代/IP 版本/超时/节点目录）收进可展开的高级行，工具与 providers 等细节交给归一化默认值；启动时按 section 集合分流 run/体检报告，并使用与 CLI/MCP 相同的 catalog/config 模型；运行页按 runKind 分流 workload 网格与 section 网格
 - Results 只展示原始时间、吞吐、延迟、detail/error
 - benchmark JSON 使用 schema v2；`run` 报告固定 `scope=hardware`、`extensions=false`，不再输出 iperf hosts 与 catalog provenance；旧版本网络报告的这些字段仍可被 compare/history 解析
 - 结果保留实际 iterations 与 `samples_ms`；processed 字段仅在明确为累计 bytes/ops 且 sample 语义一致时出现
-- TUI benchmark Compare 忽略 error metric；CLI/history Suite Compare 另检查 protocol/provider/node/catalog revision 与 Route 到达证据，并提示所有不兼容原因
+- TUI benchmark Compare 忽略 error metric；CLI/history 体检 Compare 另检查 protocol/provider/node/catalog revision 与 Route 到达证据，并提示所有不兼容原因
 - Console / JSON / HTML 是同一数据模型的不同视图
-- Suite HTML 已覆盖硬件 workload、网络身份、route hops/到达状态、ping connection state、speed/IP/reachability/mail/media 明细与结构化失败；TUI 在 IP Quality fail-closed 时保留 error、风险摘要和 Port 25 证据
+- 体检 HTML 已覆盖硬件 workload、网络身份、route hops/到达状态、ping connection state、speed/IP/reachability/mail/media 明细与结构化失败；TUI 在 IP Quality fail-closed 时保留 error、风险摘要和 Port 25 证据
 - sysinfo 采集向所有平台 collector 传递调用方 context；外部命令同时受 parent deadline 与 30 秒上限约束
 
 ## 文档入口
@@ -112,6 +112,6 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 1. 外部工具硬件测评
 2. 版本化节点 + network identity / route / ping / speed / reachability / media / mail / IP quality
 3. CLI + TUI + MCP 三入口
-4. Suite v2 + compatible-only compare + 本地 history + 结构化错误
+4. 体检 v2 + compatible-only compare + 本地 history + 结构化错误
 
 后续新增能力，应优先补到 `docs/product.md`、`docs/tech-stack.md` 和 `docs/CHANGELOG.md`，保持产品文档、技术文档和变更记录同步。

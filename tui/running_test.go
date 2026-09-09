@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/checkup"
 	"github.com/cloudapp3/vmbench/i18n"
-	"github.com/cloudapp3/vmbench/suite"
 )
 
 func runningTestModel(t *testing.T) Model {
@@ -61,9 +61,9 @@ func TestRunETARequiresCompletion(t *testing.T) {
 	}
 
 	// First workload starts, runs one iteration, completes.
-	feed(vmbench.Event{Kind: vmbench.EventSuiteStart, Workload: "CPU Single-Core (sysbench)"})
-	feed(vmbench.Event{Kind: vmbench.EventSuiteProgress, Workload: "CPU Single-Core (sysbench)", Iteration: 1, Current: 1, Total: 9})
-	feed(vmbench.Event{Kind: vmbench.EventSuiteDone, Workload: "CPU Single-Core (sysbench)", Metric: "532 events/sec"})
+	feed(vmbench.Event{Kind: vmbench.EventCheckupStart, Workload: "CPU Single-Core (sysbench)"})
+	feed(vmbench.Event{Kind: vmbench.EventCheckupProgress, Workload: "CPU Single-Core (sysbench)", Iteration: 1, Current: 1, Total: 9})
+	feed(vmbench.Event{Kind: vmbench.EventCheckupDone, Workload: "CPU Single-Core (sysbench)", Metric: "532 events/sec"})
 
 	if _, ok := runETA(m); !ok {
 		t.Fatal("ETA should be available after one completion with workloads remaining")
@@ -95,11 +95,11 @@ func TestRunETADisappearsWhenNothingRemains(t *testing.T) {
 func TestRunningIterationMiniBarAndElapsed(t *testing.T) {
 	m := runningTestModel(t)
 	updated, _ := m.Update(benchmarkEventMsg{event: vmbench.Event{
-		Kind: vmbench.EventSuiteStart, Workload: "CPU Single-Core (sysbench)",
+		Kind: vmbench.EventCheckupStart, Workload: "CPU Single-Core (sysbench)",
 	}})
 	m = updated.(Model)
 	updated, _ = m.Update(benchmarkEventMsg{event: vmbench.Event{
-		Kind: vmbench.EventSuiteProgress, Workload: "CPU Single-Core (sysbench)",
+		Kind: vmbench.EventCheckupProgress, Workload: "CPU Single-Core (sysbench)",
 		Iteration: 2, Current: 2, Total: 9,
 	}})
 	m = updated.(Model)
@@ -141,12 +141,12 @@ func TestRunningWorstCaseBounds(t *testing.T) {
 	}
 }
 
-func TestSuiteSectionElapsed(t *testing.T) {
+func TestCheckupSectionElapsed(t *testing.T) {
 	m := scrollTestModel(t, pageRunning, nil)
-	m.runKind = "suite"
-	m.suiteSections = []suiteSection{
-		{id: suite.SectionRoute, label: "Route", status: "running", startedAt: time.Now().Add(-4 * time.Second)},
-		{id: suite.SectionPing, label: "Ping", status: "waiting"},
+	m.runKind = "checkup"
+	m.checkupSections = []checkupSection{
+		{id: checkup.SectionRoute, label: "Route", status: "running", startedAt: time.Now().Add(-4 * time.Second)},
+		{id: checkup.SectionPing, label: "Ping", status: "waiting"},
 	}
 	m.startedAt = time.Now().Add(-10 * time.Second)
 
@@ -155,11 +155,11 @@ func TestSuiteSectionElapsed(t *testing.T) {
 		t.Fatalf("running section should show elapsed time:\n%s", view)
 	}
 
-	updated, _ := m.Update(suiteEventMsg{event: suite.Event{
-		Kind: suite.EventSectionDone, Section: suite.SectionRoute, Message: "ok",
+	updated, _ := m.Update(checkupEventMsg{event: checkup.Event{
+		Kind: checkup.EventSectionDone, Section: checkup.SectionRoute, Message: "ok",
 	}})
 	um := updated.(Model)
-	if !um.suiteSections[0].startedAt.IsZero() {
+	if !um.checkupSections[0].startedAt.IsZero() {
 		t.Fatal("section start timer should clear on done")
 	}
 }

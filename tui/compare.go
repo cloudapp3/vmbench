@@ -78,14 +78,14 @@ func viewCompare(m Model) string {
 		return lipgloss.NewStyle().Foreground(t.Danger).Render("  " + i18n.Tf("tui.compare.error", map[string]any{"Err": "not loaded"}))
 	}
 
-	// Suite comparisons arrive as pre-rendered textgrid output from
-	// suitecompare; the P0 clipping keeps the long table scrollable.
-	if m.compareKind == string(history.KindSuite) {
-		if m.suiteCompareText == "" {
+	// Checkup comparisons arrive as pre-rendered textgrid output from
+	// checkupcompare; the P0 clipping keeps the long table scrollable.
+	if m.compareKind == string(history.KindCheckup) {
+		if m.checkupCompareText == "" {
 			return lipgloss.NewStyle().Foreground(t.Muted).Render("  " + i18n.T("tui.compare.loading"))
 		}
 		title := lipgloss.NewStyle().Bold(true).Foreground(t.Primary).Render(i18n.T("tui.compare.title"))
-		return strings.Join([]string{title, "", m.suiteCompareText}, "\n")
+		return strings.Join([]string{title, "", m.checkupCompareText}, "\n")
 	}
 
 	docs := m.compareDocs

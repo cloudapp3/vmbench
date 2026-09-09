@@ -11,6 +11,9 @@ import (
 
 func TestHardwareToolPreflightSuggestsFetchForProvisionableTools(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
+	// Redirect the toolbin user cache too, so a developer machine that has
+	// already run `vmbench tools fetch` does not satisfy the lookup.
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	tools := []string{catalog.HardwareToolFio, catalog.HardwareToolMBW}
 
 	var output bytes.Buffer

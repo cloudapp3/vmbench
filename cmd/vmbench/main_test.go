@@ -21,6 +21,7 @@ func TestRunRejectsRemovedECSDiffCommands(t *testing.T) {
 }
 
 func TestRemovedRunSuiteCommandsReportMigration(t *testing.T) {
+	// "run" and "suite" are the removed pre-v0.8.0 subcommand names.
 	for _, command := range []string{"run", "suite"} {
 		output, code := captureStderr(t, func() int { return run([]string{command}) })
 		if code != 2 {

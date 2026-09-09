@@ -72,217 +72,217 @@ other = "工作负载明细"
 [report.compare.incompatibleUnits]
 other = "单位不兼容"
 
-[report.suite.title]
+[report.checkup.title]
 other = "VMBench 综合测试"
 
-[report.suite.status]
+[report.checkup.status]
 other = "状态"
 
-[report.suite.message]
+[report.checkup.message]
 other = "消息"
 
-[report.suite.preset]
+[report.checkup.preset]
 other = "预设"
 
-[report.suite.sections]
+[report.checkup.sections]
 other = "Section"
 
-[report.suite.stateStatus]
+[report.checkup.stateStatus]
 other = "状态"
 
-[report.suite.stateMessage]
+[report.checkup.stateMessage]
 other = "消息"
 
-[report.suite.warnings]
+[report.checkup.warnings]
 other = "警告"
 
-[report.suite.ipSummary]
+[report.checkup.ipSummary]
 other = "IP: {{.IP}} | 国家: {{.Country}} | ASN: {{.ASN}} | 组织: {{.Org}}"
 
-[report.suite.scoreSummary]
+[report.checkup.scoreSummary]
 other = "评分: {{.Total}}/{{.Max}} | 等级: {{.Level}}"
 
-[report.suite.sources]
+[report.checkup.sources]
 other = "来源: {{.Sources}}"
 
-[report.suite.securitycheck]
+[report.checkup.securitycheck]
 other = "securitycheck: {{.Status}}{{.Suffix}}"
 
-[report.suite.mediaSet]
+[report.checkup.mediaSet]
 other = "集合: {{.Set}}"
 
-[report.suite.col.target]
+[report.checkup.col.target]
 other = "目标"
 
-[report.suite.col.city]
+[report.checkup.col.city]
 other = "城市"
 
-[report.suite.col.carrier]
+[report.checkup.col.carrier]
 other = "运营商"
 
-[report.suite.col.resolved]
+[report.checkup.col.resolved]
 other = "解析地址"
 
-[report.suite.col.probe]
+[report.checkup.col.probe]
 other = "探测"
 
-[report.suite.col.hops]
+[report.checkup.col.hops]
 other = "跳数"
 
-[report.suite.col.reached]
+[report.checkup.col.reached]
 other = "到达"
 
-[report.suite.col.line]
+[report.checkup.col.line]
 other = "线路"
 
-[report.suite.col.status]
+[report.checkup.col.status]
 other = "状态"
 
-[report.suite.col.ip]
+[report.checkup.col.ip]
 other = "IP"
 
-[report.suite.col.connection]
+[report.checkup.col.connection]
 other = "连接"
 
-[report.suite.col.avg]
+[report.checkup.col.avg]
 other = "平均"
 
-[report.suite.col.jitter]
+[report.checkup.col.jitter]
 other = "抖动"
 
-[report.suite.col.loss]
+[report.checkup.col.loss]
 other = "丢包"
 
-[report.suite.col.group]
+[report.checkup.col.group]
 other = "分组"
 
-[report.suite.col.ok]
+[report.checkup.col.ok]
 other = "成功"
 
-[report.suite.col.fail]
+[report.checkup.col.fail]
 other = "失败"
 
-[report.suite.col.dl]
+[report.checkup.col.dl]
 other = "下载"
 
-[report.suite.col.ul]
+[report.checkup.col.ul]
 other = "上传"
 
-[report.suite.col.latency]
+[report.checkup.col.latency]
 other = "延迟"
 
-[report.suite.col.message]
+[report.checkup.col.message]
 other = "消息"
 
-[report.suite.col.provider]
+[report.checkup.col.provider]
 other = "提供方"
 
-[report.suite.col.kind]
+[report.checkup.col.kind]
 other = "类型"
 
-[report.suite.col.node]
+[report.checkup.col.node]
 other = "节点"
 
-[report.suite.col.field]
+[report.checkup.col.field]
 other = "字段"
 
-[report.suite.col.value]
+[report.checkup.col.value]
 other = "值"
 
-[report.suite.col.port]
+[report.checkup.col.port]
 other = "端口"
 
-[report.suite.col.method]
+[report.checkup.col.method]
 other = "方式"
 
-[report.suite.col.item]
+[report.checkup.col.item]
 other = "项目"
 
-[report.suite.col.region]
+[report.checkup.col.region]
 other = "区域"
 
-[report.suite.col.metric]
+[report.checkup.col.metric]
 other = "指标"
 
-[report.suite.col.throughput]
+[report.checkup.col.throughput]
 other = "吞吐"
 
-[report.suite.col.localInterface]
+[report.checkup.col.localInterface]
 other = "本地接口"
 
-[report.suite.col.ipVersion]
+[report.checkup.col.ipVersion]
 other = "IP 版本"
 
-[report.suite.col.address]
+[report.checkup.col.address]
 other = "地址"
 
-[report.suite.col.private]
+[report.checkup.col.private]
 other = "内网"
 
-[report.suite.col.publicIP]
+[report.checkup.col.publicIP]
 other = "公网 IP"
 
-[report.suite.col.version]
+[report.checkup.col.version]
 other = "版本"
 
-[report.suite.col.asn]
+[report.checkup.col.asn]
 other = "ASN"
 
-[report.suite.col.country]
+[report.checkup.col.country]
 other = "国家"
 
-[report.suite.col.organization]
+[report.checkup.col.organization]
 other = "组织"
 
-[report.suite.col.nat]
+[report.checkup.col.nat]
 other = "NAT"
 
-[report.suite.col.localIP]
+[report.checkup.col.localIP]
 other = "本地 IP"
 
-[report.suite.col.reason]
+[report.checkup.col.reason]
 other = "原因"
 
-[report.suite.col.relationship]
+[report.checkup.col.relationship]
 other = "关系"
 
-[report.suite.col.name]
+[report.checkup.col.name]
 other = "名称"
 
-[report.suite.col.source]
+[report.checkup.col.source]
 other = "来源"
 
-[report.suite.col.error]
+[report.checkup.col.error]
 other = "错误"
 
-[report.suite.col.category]
+[report.checkup.col.category]
 other = "分类"
 
-[report.suite.col.protocol]
+[report.checkup.col.protocol]
 other = "协议"
 
-[report.suite.col.endpoint]
+[report.checkup.col.endpoint]
 other = "端点"
 
-[report.suite.col.http]
+[report.checkup.col.http]
 other = "HTTP"
 
-[report.suiteCompare.title]
+[report.checkupCompare.title]
 other = "VMBench 综合测试对比"
 
-[report.suiteCompare.reportID]
+[report.checkupCompare.reportID]
 other = "报告 ID"
 
-[report.suiteCompare.legacyUnknown]
+[report.checkupCompare.legacyUnknown]
 other = "旧版/未知"
 
-[report.suiteCompare.catalog]
+[report.checkupCompare.catalog]
 other = "节点目录"
 
-[report.suiteCompare.rawMetrics]
+[report.checkupCompare.rawMetrics]
 other = "原始指标"
 
-[report.suiteCompare.section]
+[report.checkupCompare.section]
 other = "Section"
 
 [report.sh.title]

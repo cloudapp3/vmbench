@@ -1,0 +1,31 @@
+# Checkup section display labels (machine IDs stay English).
+
+[checkup.section.hardware]
+other = "Hardware"
+
+[checkup.section.network_info]
+other = "Network Info"
+
+[checkup.section.route]
+other = "Route"
+
+[checkup.section.ping]
+other = "Ping"
+
+[checkup.section.speed]
+other = "Speed"
+
+[checkup.section.ip_quality]
+other = "IP Quality"
+
+[checkup.section.reachability]
+other = "Reachability"
+
+[checkup.section.mail]
+other = "Mail Ports"
+
+[checkup.section.media]
+other = "Media Unlock"
+
+[status.unknown]
+other = "unknown"

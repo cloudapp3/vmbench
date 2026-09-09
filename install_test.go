@@ -118,7 +118,7 @@ func TestInstallScriptInstallsOnlyBinary(t *testing.T) {
 	if _, err := os.Lstat(filepath.Join(installDir, testArchiveExtraEntry)); !os.IsNotExist(err) {
 		t.Fatalf("installer unexpectedly created %s: %v", testArchiveExtraEntry, err)
 	}
-	if !strings.Contains(out, `"`+filepath.Join(installDir, "vmbench")+`" suite --preset quick`) {
+	if !strings.Contains(out, `"`+filepath.Join(installDir, "vmbench")+`" --preset quick`) {
 		t.Fatalf("installer output does not use the quick-start flow:\n%s", out)
 	}
 }
@@ -581,7 +581,7 @@ func TestInstallScriptSystemModeUsesSudoForTargetWrites(t *testing.T) {
 	targetPath := filepath.Join(installDir, "vmbench")
 	privilegedCommand := `"` + sudoPath + `" "` + targetPath + `"`
 	if !strings.Contains(out, "Verify the root-owned system installation with:\n  "+privilegedCommand+" version") ||
-		!strings.Contains(out, `"`+targetPath+`" suite --preset quick`) {
+		!strings.Contains(out, `"`+targetPath+`" --preset quick`) {
 		t.Fatalf("system install did not report root startup commands:\n%s", out)
 	}
 }
@@ -628,7 +628,7 @@ func TestInstallScriptRootSystemModeDoesNotUseSudo(t *testing.T) {
 	targetPath := filepath.Join(installDir, "vmbench")
 	assertFileContent(t, targetPath, "test-binary\n")
 	if strings.Contains(out, "root-owned system installation") ||
-		!strings.Contains(out, `"`+targetPath+`" suite --preset quick`) {
+		!strings.Contains(out, `"`+targetPath+`" --preset quick`) {
 		t.Fatalf("root system install did not report a direct startup command:\n%s", out)
 	}
 }

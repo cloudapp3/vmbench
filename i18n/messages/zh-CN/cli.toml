@@ -1,7 +1,7 @@
 # CLI 界面: 用法、参数、错误、提示、进度、表格与 sysinfo 标签。
 
 [cli.usage.tagline]
-other = "vmbench — 跨平台 CPU 与网络基准测试套件"
+other = "vmbench — 跨平台 CPU 与网络基准测试工具集"
 
 [cli.usage.header]
 other = "用法:"
@@ -292,10 +292,10 @@ other = '错误: 未知 IP 质量来源 "{{.Value}}" (可用: {{.Available}})'
 other = '错误: "{{.Value}}" 中没有有效的测速提供方 (可用: {{.Available}})'
 
 [cli.error.unknownPreset]
-other = '错误: 未知 suite 预设 "{{.Value}}" (可用: {{.Available}})'
+other = '错误: 未知体检预设 "{{.Value}}" (可用: {{.Available}})'
 
 [cli.error.noSectionsEnabled]
-other = "错误: 至少需要保留一个启用的 suite section"
+other = "错误: 至少需要保留一个启用的体检 section"
 
 [cli.error.compareNeedsTwo]
 other = "错误: 至少需要 2 个 JSON 报告文件"

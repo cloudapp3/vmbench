@@ -45,7 +45,7 @@ type MediaProbeOptions struct {
 	// Set selects the region/platform set: all, globe, tw, hk, jp, kr, na,
 	// sa, eu, afr, sea, oce, ai, or a comma-separated combination.
 	Set string
-	// IPVersion uses the suite convention v4/v6/dual and defaults to dual.
+	// IPVersion uses the checkup convention v4/v6/dual and defaults to dual.
 	IPVersion string
 }
 
@@ -69,7 +69,7 @@ func ValidateMediaSet(set string) error {
 	return err
 }
 
-// normalizeMediaIPVersion maps suite IP versions onto UnlockTests values.
+// normalizeMediaIPVersion maps checkup IP versions onto UnlockTests values.
 func normalizeMediaIPVersion(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "v4", "ipv4", "4":

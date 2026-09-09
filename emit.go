@@ -16,17 +16,17 @@ func emitRunDetailEvent(opts Options, result gbbench.BenchResult, detail *gbbenc
 	if detail == nil {
 		return
 	}
-	kind := EventSuiteDone
+	kind := EventCheckupDone
 	var eventErr error
 	message := metricText(detail)
 	if strings.TrimSpace(detail.Error) != "" {
-		kind = EventSuiteFail
+		kind = EventCheckupFail
 		eventErr = errString(detail.Error)
 		message = detail.Error
 	}
 	emitEvent(opts, Event{
 		Kind:      kind,
-		Suite:     workloadKey(result.Workload),
+		Checkup:   workloadKey(result.Workload),
 		Workload:  strings.TrimSpace(result.Workload),
 		Category:  strings.TrimSpace(result.Category),
 		Iteration: detail.Iterations,

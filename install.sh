@@ -327,8 +327,8 @@ print_path_hint() {
   fi
 
   log ""
-  log "Run a quick benchmark suite with:"
-  log "  \"${target_path}\" suite --preset quick"
+  log "Run a quick checkup with:"
+  log "  \"${target_path}\" --preset quick"
 }
 
 # stop_service stops and verifies a user-created native service before removing

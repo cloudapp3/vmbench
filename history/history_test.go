@@ -18,8 +18,9 @@ func TestInspectRecognizesCurrentAndLegacyReports(t *testing.T) {
 	}{
 		{name: "current run", json: `{"report_kind":"run","results":{"workloads":[]}}`, kind: KindRun},
 		{name: "legacy run", json: `{"timestamp":"2026-07-13T01:02:03Z","results":{"workloads":[]}}`, kind: KindRun},
-		{name: "current suite", json: `{"report_kind":"suite","config":{},"future_section":{"enabled":true}}`, kind: KindSuite},
-		{name: "legacy suite", json: `{"version":1,"started_time":1700000000,"config":{},"hardware":{"enabled":true}}`, kind: KindSuite},
+		{name: "current checkup", json: `{"report_kind":"checkup","config":{},"future_section":{"enabled":true}}`, kind: KindCheckup},
+		{name: "legacy suite kind (pre-v0.11.0)", json: `{"report_kind":"suite","config":{},"future_section":{"enabled":true}}`, kind: KindCheckup},
+		{name: "legacy checkup", json: `{"version":1,"started_time":1700000000,"config":{},"hardware":{"enabled":true}}`, kind: KindCheckup},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -37,6 +38,60 @@ func TestInspectRecognizesCurrentAndLegacyReports(t *testing.T) {
 	}
 }
 
+// TestListNormalizesLegacyCheckupRecordKind stores a record exactly as a
+// pre-v0.11.0 release would have written it (kind "suite" on the record and
+// report_kind "suite" in the embedded report) and verifies it reads back as
+// the current checkup kind.
+func TestListNormalizesLegacyCheckupRecordKind(t *testing.T) {
+	dir := t.TempDir()
+	store, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := []byte(`{"schema_version":2,"report_kind":"suite","report_id":"legacy-checkup","started_at":"2026-07-13T01:00:00Z","config":{},"ping":{"enabled":true}}`)
+	meta, err := Inspect(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta.Kind != KindCheckup {
+		t.Fatalf("legacy report kind = %q, want %q", meta.Kind, KindCheckup)
+	}
+	added := time.Date(2026, 7, 13, 1, 0, 0, 0, time.UTC)
+	record := Record{
+		StorageVersion: storageVersion,
+		Kind:           kindLegacySuite,
+		AddedAt:        added,
+		ReportTime:     added,
+		SourceReportID: "legacy-checkup",
+		SchemaVersion:  meta.SchemaVersion,
+		Report:         append(json.RawMessage(nil), legacy...),
+	}
+	if record.ID, err = store.availableID(added, legacy, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.writeRecord(record); err != nil {
+		t.Fatal(err)
+	}
+
+	records, err := store.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("records = %d, want 1", len(records))
+	}
+	if records[0].Kind != KindCheckup {
+		t.Fatalf("stored kind = %q, want normalized %q", records[0].Kind, KindCheckup)
+	}
+	got, err := store.Get(records[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Kind != KindCheckup {
+		t.Fatalf("loaded kind = %q, want normalized %q", got.Kind, KindCheckup)
+	}
+}
+
 func TestStoreLifecycleAndOrdering(t *testing.T) {
 	dir := t.TempDir()
 	store, err := Open(dir)
@@ -44,7 +99,7 @@ func TestStoreLifecycleAndOrdering(t *testing.T) {
 		t.Fatal(err)
 	}
 	older := []byte(`{"timestamp":"2026-07-12T01:00:00Z","results":{"workloads":[]}}`)
-	newer := []byte(`{"schema_version":2,"report_kind":"suite","report_id":"suite-new","started_at":"2026-07-13T01:00:00Z","config":{},"ping":{"enabled":true}}`)
+	newer := []byte(`{"schema_version":2,"report_kind":"checkup","report_id":"checkup-new","started_at":"2026-07-13T01:00:00Z","config":{},"ping":{"enabled":true}}`)
 	oldRecord, err := store.Add(older, "baseline")
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +108,7 @@ func TestStoreLifecycleAndOrdering(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if oldRecord.Kind != KindRun || newRecord.Kind != KindSuite || newRecord.SourceReportID != "suite-new" {
+	if oldRecord.Kind != KindRun || newRecord.Kind != KindCheckup || newRecord.SourceReportID != "checkup-new" {
 		t.Fatalf("stored records = %+v %+v", oldRecord, newRecord)
 	}
 

@@ -1,6 +1,6 @@
 # vmbench 中文说明
 
-vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，提供 CLI、TUI、版本化网络节点、JSON/HTML、Suite 对比和本地历史能力。
+vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，提供 CLI、TUI、版本化网络节点、JSON/HTML、体检（checkup）报告对比和本地历史能力。
 
 ## 最新梳理
 
@@ -38,11 +38,11 @@ vmbench --hardware-tool sysbench,openssl,fio,dd
 
 # VPS 综合测评（preset 或 only/skip 选择 section）
 vmbench --preset quick
-vmbench --preset website --json suite.json --html suite.html
+vmbench --preset website --json checkup.json --html checkup.html
 vmbench --only ping,mail
 vmbench --only hardware --hardware-tool dd,stream,mbw
 vmbench --node-catalog auto --node-revision 2026-07-13.1 --save-history
-vmbench --quiet --json suite.json
+vmbench --quiet --json checkup.json
 
 # 报告对比
 vmbench compare a.json b.json
@@ -81,9 +81,9 @@ VMBENCH_LANG=zh-CN vmbench --help    # 强制中文
 vmbench tui --lang en                # 单次指定英文
 ```
 
-JSON 字段名、状态枚举 token（`ok`/`fail`/...）、suite section ID、workload 名称（与 `--filter` 匹配耦合）以及适配器错误信息在任何语言下保持英文；翻译只发生在渲染层。
+JSON 字段名、状态枚举 token（`ok`/`fail`/...）、checkup section ID、workload 名称（与 `--filter` 匹配耦合）以及适配器错误信息在任何语言下保持英文；翻译只发生在渲染层。
 
-## Suite sections
+## 体检 sections
 
 | Section | 说明 |
 |---|---|
@@ -97,9 +97,9 @@ JSON 字段名、状态枚举 token（`ok`/`fail`/...）、suite section ID、wo
 | `mail` | 顺序探测邮件端口，区分 open/refused/timeout/error |
 | `media` | 流媒体 / AI 服务解锁检测 |
 
-Suite speed 默认只启用 Cloudflare。Suite 只有每个 enabled section 都是 `ok` 时成功；enabled 的空状态、`skipped`、`partial`、`error` 都使 CLI 返回非零，disabled 才只发 skip event。多个 speed provider 的顶层 summary 使用 `aggregation=best_per_metric`，下载、上传和延迟可能来自不同 provider。
+体检 speed 默认只启用 Cloudflare。体检只有每个 enabled section 都是 `ok` 时成功；enabled 的空状态、`skipped`、`partial`、`error` 都使 CLI 返回非零，disabled 才只发 skip event。多个 speed provider 的顶层 summary 使用 `aggregation=best_per_metric`，下载、上传和延迟可能来自不同 provider。
 
-默认 timeout 为 5 分钟：hardware 按 workload 应用，其余网络 section 各自派生 timeout context。Suite CLI 默认在 stderr 实时显示每个 section 的 running/最终状态；`--quiet` 关闭进度，但不改变 Console/JSON/HTML 报告。
+默认 timeout 为 5 分钟：hardware 按 workload 应用，其余网络 section 各自派生 timeout context。体检 CLI 默认在 stderr 实时显示每个 section 的 running/最终状态；`--quiet` 关闭进度，但不改变 Console/JSON/HTML 报告。
 
 TCP Ping 将连接成功和 TCP RST/refused 都视为收到目标响应，计入 RTT/received 而不算丢包；`connection_state` 为 `open|refused|mixed|no_response`，真正 timeout/无响应才计入 loss。全部目标失败仍保留逐目标结果并返回聚合错误。Route 结果记录 `resolved_target`、`destination_reached` 和 `status=ok|partial|error`：有有效 hop 但没有到达解析目标时是 `partial`。Mail 对 8 个内置端口顺序连接，逐项状态为 `open|refused|timeout|error`；DNS 失败保持为探测 `error`，Compare 只使用 `open` 连接延迟。选择 iperf3 provider 却没有可用 host 也会直接失败。
 
@@ -125,10 +125,10 @@ vmbench
 Dashboard 支持：
 
 - 单一"运行评测"入口：先进入 ECS 式垂直勾选清单——首行「开始评测」光标默认停留（打开页面直接回车即跑），9 个测试项默认全勾、一行一项（`空格`/`回车` 勾选，`1-9` 数字键快切），开始行实时显示启用项数与按历史均值估算的总时长
-- 高级参数（迭代次数 / IP 版本 / 超时 / 节点目录）收进底部可展开的「高级设置」行，`←→` 循环改值；硬件工具、workload 过滤、providers/route/media/IP 来源等细节不再暴露，自动采用与 CLI/MCP 相同的文档化默认值；启动时若生效 section 恰好只有 hardware 则产出 run 报告，否则产出 suite 报告（与 CLI 同一规则）
+- 高级参数（迭代次数 / IP 版本 / 超时 / 节点目录）收进底部可展开的「高级设置」行，`←→` 循环改值；硬件工具、workload 过滤、providers/route/media/IP 来源等细节不再暴露，自动采用与 CLI/MCP 相同的文档化默认值；启动时若生效 section 恰好只有 hardware 则产出 run 报告，否则产出体检报告（与 CLI 同一规则）
 - 打开系统信息
-- 比较报告：从历史记录选两条（或手输路径），run 报告出 delta 表，suite 报告用与 CLI 相同的 textgrid 对比，也可查看单条历史记录
-- Running 页按 runKind 分流：硬件基准显示迭代迷你条、采样进度与完成后按墙钟外推的 ETA，suite 显示 section 网格与已耗时；Results 三视图（卡片/分组/平铺）+ `d` 进单 workload 详情（指标/采样/错误/原始输出）
+- 比较报告：从历史记录选两条（或手输路径），run 报告出 delta 表，体检报告用与 CLI 相同的 textgrid 对比，也可查看单条历史记录
+- Running 页按 runKind 分流：硬件基准显示迭代迷你条、采样进度与完成后按墙钟外推的 ETA，体检显示 section 网格与已耗时；Results 三视图（卡片/分组/平铺）+ `d` 进单 workload 详情（指标/采样/错误/原始输出）
 - 全页滚动（`PgUp/PgDn`、`Home/End`、鼠标滚轮）、`?` 帮助页、Dashboard 菜单支持鼠标点击
 - 按 `t` 循环切换 8 种颜色主题，退出后持久化到本地配置
 
@@ -144,7 +144,7 @@ Dashboard 支持：
 - `geekbench`：可选 CPU upstream score，不默认跑，不作为 vmbench 总分
 - `winsat`：Windows CPU / 内存 / 磁盘（Windows 默认，也可显式选择）
 
-硬件测评（默认硬件选择或 suite 组合里启用 hardware）会在执行前提示当前 filter 会命中的缺失工具，Linux 还会输出已知 Debian/Ubuntu 安装命令与 `vmbench tools fetch` 静态二进制获取提示。未被 filter 选中的 adapter 不产生误导提示；实际缺失的工具不会触发进程内 fallback 或被静默跳过，而是进入结构化 `error` 字段。官方源码和 release 主包默认不内置第三方二进制工具；`vmbench tools fetch`（fio、sysbench，Linux amd64/arm64）可从本仓库 `tools` release 的独立资产按编译期 SHA-256 pin 下载静态构建并安装到用户缓存目录（`~/.cache/vmbench/binaries/`），不改动系统软件包，`--url` 可指定镜像。Linux 本地 fallback 另可从解析后的 vmbench 可执行文件相邻 `binaries/` 或同目录加载，例如 `<exe-dir>/binaries/sysbench_x64`，不会搜索当前工作目录。
+硬件测评（默认硬件选择或体检组合里启用 hardware）会在执行前提示当前 filter 会命中的缺失工具，Linux 还会输出已知 Debian/Ubuntu 安装命令与 `vmbench tools fetch` 静态二进制获取提示。未被 filter 选中的 adapter 不产生误导提示；实际缺失的工具不会触发进程内 fallback 或被静默跳过，而是进入结构化 `error` 字段。官方源码和 release 主包默认不内置第三方二进制工具；`vmbench tools fetch`（fio、sysbench，Linux amd64/arm64）可从本仓库 `tools` release 的独立资产按编译期 SHA-256 pin 下载静态构建并安装到用户缓存目录（`~/.cache/vmbench/binaries/`），不改动系统软件包，`--url` 可指定镜像。Linux 本地 fallback 另可从解析后的 vmbench 可执行文件相邻 `binaries/` 或同目录加载，例如 `<exe-dir>/binaries/sysbench_x64`，不会搜索当前工作目录。
 
 ## 报告与网络失败语义
 
@@ -154,8 +154,8 @@ Dashboard 支持：
 - MCP 省略 iterations/timeout 时使用 1 次/5 分钟默认值；显式非法数值、regex 或混入未知项的枚举数组直接以 `isError=true` 拒绝。测量失败仍保留完整 `structuredContent.report` 并标记 `isError=true`。
 - Go traceroute 依赖系统 `traceroute` / `tcptraceroute` / `tracepath` / `tracert`；逐目标保留解析地址、是否到达和状态，命令缺失或无有效 hop 会结构化报错，未到目标但有 hops 则为 `partial`。
 - IP Quality 只有在元数据、公网 IPv4、DNSBL 和 Port 25 探测均得到确定结论时才生成 0-100 风险 score，不确定时 fail-closed 并保留 error/detail。
-- Suite JSON 使用 schema-v2 envelope，包含 report/app/system/time/config/catalog provenance，并保留旧 v1 字段；Route 包含 `resolved_target/destination_reached/status`，Ping 包含 `connection_state`。Suite HTML 展示硬件 workload、网络身份、完整 route hops、各网络 section 明细和 error。
-- `vmbench compare` 自动识别 benchmark/Suite，支持两份以上报告；Suite 只有 unit、protocol、provider、target/node 和所需 catalog revision 兼容时才计算 delta。Route 还必须显式包含 `status=ok` 与 `destination_reached=true`，旧报告缺少到达证据时不计算 delta。
+- 体检 JSON 使用 schema-v2 envelope，包含 report/app/system/time/config/catalog provenance，并保留旧 v1 字段；Route 包含 `resolved_target/destination_reached/status`，Ping 包含 `connection_state`。体检 HTML 展示硬件 workload、网络身份、完整 route hops、各网络 section 明细和 error。
+- `vmbench compare` 自动识别 benchmark/体检，支持两份以上报告；体检只有 unit、protocol、provider、target/node 和所需 catalog revision 兼容时才计算 delta。Route 还必须显式包含 `status=ok` 与 `destination_reached=true`，旧报告缺少到达证据时不计算 delta。
 - CLI 的 `--json` / `--html` 使用同目录临时文件、fsync、rename 原子导出，Unix mode 为 `0600`。`--save-history [--history-tag TAG]` 可写入原子本地历史（Unix 目录 `0700`、文件 `0600`）；`history add/list/show/delete/compare --last N` 管理和比较同类型报告。
 
 ## 文档

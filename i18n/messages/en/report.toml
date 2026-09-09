@@ -72,224 +72,224 @@ other = "Workload Details"
 [report.compare.incompatibleUnits]
 other = "incompatible units"
 
-[report.suite.title]
-other = "VMBench Suite"
+[report.checkup.title]
+other = "VMBench Checkup"
 
-[report.suite.status]
+[report.checkup.status]
 other = "Status"
 
-[report.suite.message]
+[report.checkup.message]
 other = "Message"
 
-[report.suite.preset]
+[report.checkup.preset]
 other = "Preset"
 
-[report.suite.sections]
+[report.checkup.sections]
 other = "Sections"
 
-[report.suite.stateStatus]
+[report.checkup.stateStatus]
 other = "status"
 
-[report.suite.stateMessage]
+[report.checkup.stateMessage]
 other = "message"
 
-[report.suite.warnings]
+[report.checkup.warnings]
 other = "Warnings"
 
-[report.suite.ipSummary]
+[report.checkup.ipSummary]
 other = "ip: {{.IP}} | country: {{.Country}} | asn: {{.ASN}} | org: {{.Org}}"
 
-[report.suite.scoreSummary]
+[report.checkup.scoreSummary]
 other = "score: {{.Total}}/{{.Max}} | level: {{.Level}}"
 
-[report.suite.sources]
+[report.checkup.sources]
 other = "sources: {{.Sources}}"
 
-[report.suite.securitycheck]
+[report.checkup.securitycheck]
 other = "securitycheck: {{.Status}}{{.Suffix}}"
 
-[report.suite.mediaSet]
+[report.checkup.mediaSet]
 other = "set: {{.Set}}"
 
-[report.suite.col.target]
+[report.checkup.col.target]
 other = "Target"
 
-[report.suite.col.city]
+[report.checkup.col.city]
 other = "City"
 
-[report.suite.col.carrier]
+[report.checkup.col.carrier]
 other = "Carrier"
 
-[report.suite.col.resolved]
+[report.checkup.col.resolved]
 other = "Resolved"
 
-[report.suite.col.probe]
+[report.checkup.col.probe]
 other = "Probe"
 
-[report.suite.col.hops]
+[report.checkup.col.hops]
 other = "Hops"
 
-[report.suite.col.reached]
+[report.checkup.col.reached]
 other = "Reached"
 
-[report.suite.col.line]
+[report.checkup.col.line]
 other = "Line"
 
-[report.suite.col.status]
+[report.checkup.col.status]
 other = "Status"
 
-[report.suite.col.ip]
+[report.checkup.col.ip]
 other = "IP"
 
-[report.suite.col.connection]
+[report.checkup.col.connection]
 other = "Connection"
 
-[report.suite.col.avg]
+[report.checkup.col.avg]
 other = "Avg"
 
-[report.suite.col.jitter]
+[report.checkup.col.jitter]
 other = "Jitter"
 
-[report.suite.col.loss]
+[report.checkup.col.loss]
 other = "Loss"
 
-[report.suite.col.group]
+[report.checkup.col.group]
 other = "Group"
 
-[report.suite.col.ok]
+[report.checkup.col.ok]
 other = "Ok"
 
-[report.suite.col.fail]
+[report.checkup.col.fail]
 other = "Fail"
 
-[report.suite.col.dl]
+[report.checkup.col.dl]
 other = "DL"
 
-[report.suite.col.ul]
+[report.checkup.col.ul]
 other = "UL"
 
-[report.suite.col.latency]
+[report.checkup.col.latency]
 other = "Latency"
 
-[report.suite.col.message]
+[report.checkup.col.message]
 other = "Message"
 
-[report.suite.col.provider]
+[report.checkup.col.provider]
 other = "Provider"
 
-[report.suite.col.kind]
+[report.checkup.col.kind]
 other = "Kind"
 
-[report.suite.col.node]
+[report.checkup.col.node]
 other = "Node"
 
-[report.suite.col.field]
+[report.checkup.col.field]
 other = "Field"
 
-[report.suite.col.value]
+[report.checkup.col.value]
 other = "Value"
 
-[report.suite.col.port]
+[report.checkup.col.port]
 other = "Port"
 
-[report.suite.col.method]
+[report.checkup.col.method]
 other = "Method"
 
-[report.suite.col.item]
+[report.checkup.col.item]
 other = "Item"
 
-[report.suite.col.region]
+[report.checkup.col.region]
 other = "Region"
 
-[report.suite.col.metric]
+[report.checkup.col.metric]
 other = "Metric"
 
-[report.suite.col.throughput]
+[report.checkup.col.throughput]
 other = "Throughput"
 
-[report.suite.col.localInterface]
+[report.checkup.col.localInterface]
 other = "Local interface"
 
-[report.suite.col.ipVersion]
+[report.checkup.col.ipVersion]
 other = "IP version"
 
-[report.suite.col.address]
+[report.checkup.col.address]
 other = "Address"
 
-[report.suite.col.private]
+[report.checkup.col.private]
 other = "Private"
 
-[report.suite.col.publicIP]
+[report.checkup.col.publicIP]
 other = "Public IP"
 
-[report.suite.col.version]
+[report.checkup.col.version]
 other = "Version"
 
-[report.suite.col.asn]
+[report.checkup.col.asn]
 other = "ASN"
 
-[report.suite.col.country]
+[report.checkup.col.country]
 other = "Country"
 
-[report.suite.col.organization]
+[report.checkup.col.organization]
 other = "Organization"
 
-[report.suite.col.nat]
+[report.checkup.col.nat]
 other = "NAT"
 
-[report.suite.col.localIP]
+[report.checkup.col.localIP]
 other = "Local IP"
 
-[report.suite.col.reason]
+[report.checkup.col.reason]
 other = "Reason"
 
-[report.suite.col.relationship]
+[report.checkup.col.relationship]
 other = "Relationship"
 
-[report.suite.col.name]
+[report.checkup.col.name]
 other = "Name"
 
-[report.suite.col.source]
+[report.checkup.col.source]
 other = "Source"
 
-[report.suite.col.error]
+[report.checkup.col.error]
 other = "Error"
 
-[report.suite.col.category]
+[report.checkup.col.category]
 other = "Category"
 
-[report.suite.col.protocol]
+[report.checkup.col.protocol]
 other = "Protocol"
 
-[report.suite.col.endpoint]
+[report.checkup.col.endpoint]
 other = "Endpoint"
 
-[report.suite.col.http]
+[report.checkup.col.http]
 other = "HTTP"
 
-[report.suiteCompare.title]
-other = "VMBench Suite Compare"
+[report.checkupCompare.title]
+other = "VMBench Checkup Compare"
 
-[report.suiteCompare.reportID]
+[report.checkupCompare.reportID]
 other = "Report ID"
 
-[report.suiteCompare.legacyUnknown]
+[report.checkupCompare.legacyUnknown]
 other = "legacy/unknown"
 
-[report.suiteCompare.catalog]
+[report.checkupCompare.catalog]
 other = "Catalog"
 
-[report.suiteCompare.rawMetrics]
+[report.checkupCompare.rawMetrics]
 other = "Raw Metrics"
 
-[report.suiteCompare.section]
+[report.checkupCompare.section]
 other = "Section"
 
 [report.sh.title]
-other = "VMBench Suite Report"
+other = "VMBench Checkup Report"
 
 [report.sh.hero]
-other = "VMBench Suite"
+other = "VMBench Checkup"
 
 [report.sh.heroSub]
 other = "Raw measurements and structured diagnostics"

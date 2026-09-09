@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cloudapp3/vmbench/checkup"
 	gbreport "github.com/cloudapp3/vmbench/report"
-	"github.com/cloudapp3/vmbench/suite"
 )
 
 func TestNormalizeBenchArgsRejectsInvalidValues(t *testing.T) {
@@ -61,8 +61,8 @@ func TestNormalizeBenchArgsSelectsKind(t *testing.T) {
 	}
 
 	presetPlan, _ := normalizeBenchArgs(benchArgs{Preset: "quick"})
-	if presetPlan.Kind != benchKindSuite {
-		t.Fatalf("preset=quick kind = %q, want %q", presetPlan.Kind, benchKindSuite)
+	if presetPlan.Kind != benchKindCheckup {
+		t.Fatalf("preset=quick kind = %q, want %q", presetPlan.Kind, benchKindCheckup)
 	}
 }
 
@@ -77,13 +77,13 @@ func TestFailedReportsRemainStructuredToolErrors(t *testing.T) {
 		t.Fatalf("run summary = %q, want failed status", runResult.Content[0].Text)
 	}
 
-	suiteReport := suite.SuiteReport{
-		Speed: suite.SpeedSection{SectionState: suite.SectionState{Enabled: true, Status: "partial"}},
+	checkupReport := checkup.CheckupReport{
+		Speed: checkup.SpeedSection{SectionState: checkup.SectionState{Enabled: true, Status: "partial"}},
 	}
-	suiteResult := okToolResult(formatSuiteSummary(suiteReport), map[string]any{"report": suiteReport})
-	suiteResult.IsError = suiteReport.HasFailures()
-	if !suiteResult.IsError || suiteResult.StructuredContent == nil {
-		t.Fatalf("suite result = %+v, want structured error", suiteResult)
+	checkupResult := okToolResult(formatCheckupSummary(checkupReport), map[string]any{"report": checkupReport})
+	checkupResult.IsError = checkupReport.HasFailures()
+	if !checkupResult.IsError || checkupResult.StructuredContent == nil {
+		t.Fatalf("checkup result = %+v, want structured error", checkupResult)
 	}
 }
 
@@ -114,14 +114,14 @@ func TestNormalizeBenchArgsUsesCanonicalSectionsAndCatalog(t *testing.T) {
 	if len(warnings) != 0 {
 		t.Fatalf("identity warnings = %v", warnings)
 	}
-	if identityOnly.Kind != benchKindSuite {
-		t.Fatalf("identity kind = %q, want %q", identityOnly.Kind, benchKindSuite)
+	if identityOnly.Kind != benchKindCheckup {
+		t.Fatalf("identity kind = %q, want %q", identityOnly.Kind, benchKindCheckup)
 	}
-	if !identityOnly.Suite.Sections.NetworkInfo || !identityOnly.Suite.Sections.Reachability || identityOnly.Suite.Sections.Speed {
-		t.Fatalf("identity sections = %+v", identityOnly.Suite.Sections)
+	if !identityOnly.Checkup.Sections.NetworkInfo || !identityOnly.Checkup.Sections.Reachability || identityOnly.Checkup.Sections.Speed {
+		t.Fatalf("identity sections = %+v", identityOnly.Checkup.Sections)
 	}
-	if identityOnly.Suite.CatalogRevision != "" || identityOnly.Suite.ResolvedCatalog != nil {
-		t.Fatalf("non-node suite retained catalog: %+v", identityOnly.Suite)
+	if identityOnly.Checkup.CatalogRevision != "" || identityOnly.Checkup.ResolvedCatalog != nil {
+		t.Fatalf("non-node checkup retained catalog: %+v", identityOnly.Checkup)
 	}
 
 	pingOnly, warnings := normalizeBenchArgs(benchArgs{
@@ -133,8 +133,8 @@ func TestNormalizeBenchArgsUsesCanonicalSectionsAndCatalog(t *testing.T) {
 	if len(warnings) != 0 {
 		t.Fatalf("ping warnings = %v", warnings)
 	}
-	if pingOnly.Suite.ResolvedCatalog == nil || pingOnly.Suite.CatalogRevision == "" || len(pingOnly.Suite.NodeIDs) == 0 {
-		t.Fatalf("ping catalog provenance = %+v", pingOnly.Suite)
+	if pingOnly.Checkup.ResolvedCatalog == nil || pingOnly.Checkup.CatalogRevision == "" || len(pingOnly.Checkup.NodeIDs) == 0 {
+		t.Fatalf("ping catalog provenance = %+v", pingOnly.Checkup)
 	}
 }
 
@@ -149,9 +149,9 @@ func TestNormalizeBenchArgsRejectCatalogRevisionMismatch(t *testing.T) {
 	}
 }
 
-func TestCallToolRoutesSuiteAliasToBench(t *testing.T) {
+func TestCallToolRoutesBenchTool(t *testing.T) {
 	s := &Server{}
-	for _, name := range []string{"vmbench_run", "vmbench_suite"} {
+	for _, name := range []string{"vmbench_run"} {
 		res, err := s.callTool(context.Background(), name, json.RawMessage(`{"iterations":0}`))
 		if err != nil {
 			t.Fatalf("callTool(%s) error = %v", name, err)
@@ -162,31 +162,14 @@ func TestCallToolRoutesSuiteAliasToBench(t *testing.T) {
 	}
 }
 
-func TestToolSpecsExposeMergedSchemaWithDeprecatedAlias(t *testing.T) {
+func TestToolSpecsExposeMergedSchema(t *testing.T) {
 	schemas := map[string]map[string]any{}
-	titles := map[string]string{}
 	for _, spec := range toolSpecs() {
 		schemas[spec.Name] = spec.InputSchema
-		titles[spec.Name] = spec.Title
 	}
 	runSchema, ok := schemas["vmbench_run"]
 	if !ok {
 		t.Fatal("vmbench_run spec missing")
-	}
-	if !strings.Contains(titles["vmbench_suite"], "Deprecated") {
-		t.Fatalf("vmbench_suite title = %q, want deprecated marker", titles["vmbench_suite"])
-	}
-	// The deprecated alias must expose the identical schema.
-	aliasJSON, err := json.Marshal(schemas["vmbench_suite"])
-	if err != nil {
-		t.Fatal(err)
-	}
-	runJSON, err := json.Marshal(runSchema)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(aliasJSON) != string(runJSON) {
-		t.Fatalf("vmbench_suite schema differs from vmbench_run:\n%s\n%s", aliasJSON, runJSON)
 	}
 
 	properties, _ := runSchema["properties"].(map[string]any)

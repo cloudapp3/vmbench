@@ -11,11 +11,11 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/cloudapp3/vmbench/checkup"
+	"github.com/cloudapp3/vmbench/checkupcompare"
 	"github.com/cloudapp3/vmbench/history"
 	"github.com/cloudapp3/vmbench/i18n"
 	gbreport "github.com/cloudapp3/vmbench/report"
-	"github.com/cloudapp3/vmbench/suite"
-	"github.com/cloudapp3/vmbench/suitecompare"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
 )
@@ -58,16 +58,16 @@ type historyListMsg struct {
 	err     error
 }
 
-type suiteCompareMsg struct {
+type checkupCompareMsg struct {
 	text string
 	err  error
 }
 
 type recordViewMsg struct {
-	kind  history.Kind
-	run   *gbreport.Document
-	suite *suite.SuiteReport
-	err   error
+	kind    history.Kind
+	run     *gbreport.Document
+	checkup *checkup.CheckupReport
+	err     error
 }
 
 func loadHistoryCmd() tea.Cmd {
@@ -88,22 +88,22 @@ func loadHistoryCmd() tea.Cmd {
 }
 
 // compareRecordsCmd routes by record kind: run reports load into the delta
-// table, suite reports render through suitecompare.
+// table, checkup reports render through checkupcompare.
 func compareRecordsCmd(a, b history.Record) tea.Cmd {
 	return func() tea.Msg {
 		if a.Kind != b.Kind {
-			return suiteCompareMsg{err: fmt.Errorf("%s", i18n.T("tui.compare.mixedKinds"))}
+			return checkupCompareMsg{err: fmt.Errorf("%s", i18n.T("tui.compare.mixedKinds"))}
 		}
-		if a.Kind == history.KindSuite {
+		if a.Kind == history.KindCheckup {
 			var buf bytes.Buffer
-			if err := suitecompare.WriteCompare(&buf, [][]byte{a.Report, b.Report}); err != nil {
-				return suiteCompareMsg{err: err}
+			if err := checkupcompare.WriteCompare(&buf, [][]byte{a.Report, b.Report}); err != nil {
+				return checkupCompareMsg{err: err}
 			}
-			return suiteCompareMsg{text: buf.String()}
+			return checkupCompareMsg{text: buf.String()}
 		}
 		docs, err := loadCompareDocsFiles(a.Report, b.Report)
 		if err != nil {
-			return suiteCompareMsg{err: err}
+			return checkupCompareMsg{err: err}
 		}
 		return compareLoadedMsg{docs: docs}
 	}
@@ -124,12 +124,12 @@ func loadCompareDocsFiles(a, b []byte) ([]gbreport.Document, error) {
 // pages.
 func viewRecordCmd(rec history.Record) tea.Cmd {
 	return func() tea.Msg {
-		if rec.Kind == history.KindSuite {
-			var rep suite.SuiteReport
+		if rec.Kind == history.KindCheckup {
+			var rep checkup.CheckupReport
 			if err := json.Unmarshal(rec.Report, &rep); err != nil {
 				return recordViewMsg{err: err}
 			}
-			return recordViewMsg{kind: rec.Kind, suite: &rep}
+			return recordViewMsg{kind: rec.Kind, checkup: &rep}
 		}
 		var doc gbreport.Document
 		if err := json.Unmarshal(rec.Report, &doc); err != nil {
@@ -165,7 +165,7 @@ func updateComparePicker(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.compareKind = string(s.records[s.a].Kind)
 			m.compareLoading = true
-			m.suiteCompareText = ""
+			m.checkupCompareText = ""
 			return m, compareRecordsCmd(s.records[s.a], s.records[s.b])
 		case "v":
 			if len(s.records) > 0 {
@@ -247,7 +247,7 @@ func pickerTextInput(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.compareA, m.compareB = a, b
 		m.compareKind = string(history.KindRun)
 		m.compareLoading = true
-		m.suiteCompareText = ""
+		m.checkupCompareText = ""
 		return m, loadCompareCmd(a, b)
 	case "esc":
 		s.inputFocus = 0
@@ -312,7 +312,7 @@ func viewComparePicker(m Model) string {
 	cols := []comp.TableColumn{
 		{Title: "", Width: 3},
 		{Title: i18n.T("tui.compare.col.time"), Width: comp.ColWidth(i18n.T("tui.compare.col.time"), 14)},
-		{Title: i18n.T("tui.compare.col.kind"), Width: comp.ColWidth(i18n.T("tui.compare.col.kind"), 6)},
+		{Title: i18n.T("tui.compare.col.kind"), Width: comp.ColWidth(i18n.T("tui.compare.col.kind"), 8)},
 		{Title: i18n.T("tui.compare.col.tag"), Width: comp.ColWidth(i18n.T("tui.compare.col.tag"), 14)},
 		{Title: i18n.T("tui.compare.col.id"), Width: comp.ColWidth(i18n.T("tui.compare.col.id"), 22)},
 	}

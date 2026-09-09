@@ -6,13 +6,13 @@
 
 ```text
 Dashboard -> Config -> Running(run) -> Results -> ResultDetail
-Dashboard -> Config -> Running(suite) -> SuiteResults
+Dashboard -> Config -> Running(checkup) -> CheckupResults
 Dashboard -> ComparePicker -> Compare
 Dashboard -> System Info
 任意页 -> Help（? 切换，Esc 返回来源页）
 ```
 
-v0.8.0 起 run/suite 合并为单一配置页与单一运行页：启动时按报告种类规则分流——生效 section 恰好只有 hardware 走 run 路径（run 报告），否则走 suite 路径（suite 报告），与 CLI/MCP 共用同一规则（`suite.SectionSelector.HardwareOnly`）。
+v0.8.0 起 run/suite 合并为单一配置页与单一运行页：启动时按报告种类规则分流——生效 section 恰好只有 hardware 走 run 路径（run 报告），否则走体检路径（体检报告），与 CLI/MCP 共用同一规则（`checkup.SectionSelector.HardwareOnly`）。
 
 `vmbench mcp serve` 是给大模型客户端使用的后台 stdio server，不进入 TUI 页面路由。
 
@@ -60,14 +60,14 @@ v0.8.0 起 run/suite 合并为单一配置页与单一运行页：启动时按�
 - Runtime：iterations（1-9，默认 3）、timeout、IP version
 - Hardware Tools：多选，默认平台推荐集合；决定 workload 集合
 - Filter：All / CPU / Disk / Memory / Custom（Custom 为正则手输，语义与 CLI `--filter` 一致，匹配 workload Name/Category）
-- Speed Providers / Route Presets / Media Sets / IP Sources：suite 细节选项（media `all` 与地区互斥，`securitycheck` opt-in）
+- Speed Providers / Route Presets / Media Sets / IP Sources：体检细节选项（media `all` 与地区互斥，`securitycheck` opt-in）
 - Advanced：iperf hosts、catalog source/revision
 - Preflight：工具/过滤/section/preset 变化后异步检查所选工具缺失情况，warning 卡非阻塞（对齐 CLI 行为）
 - Start：按钮行；没有启用 section 时置灰并提示
 
-页面顶部实时显示 "N workloads planned"——该计数镜像 runner 的工具×过滤逻辑，Running 页预填的 workload 列表来自同一来源，不会出现永远 waiting 的幽灵行。摘要卡（`tui/suite_summary.go`）显示启用 section 数、节点目录规模、计划 workload 数和预计总时长（优先历史均值，无历史退回静态粗估；经 `catalogStatsMsg` / `historyStatsMsg` 异步加载，View 无 IO）。
+页面顶部实时显示 "N workloads planned"——该计数镜像 runner 的工具×过滤逻辑，Running 页预填的 workload 列表来自同一来源，不会出现永远 waiting 的幽灵行。摘要卡（`tui/checkup_summary.go`）显示启用 section 数、节点目录规模、计划 workload 数和预计总时长（优先历史均值，无历史退回静态粗估；经 `catalogStatsMsg` / `historyStatsMsg` 异步加载，View 无 IO）。
 
-TUI 不维护另一套隐式默认值，而是构造与 CLI/MCP 相同的规范化配置：Start 时 hardware-only 选择构造 `vmbench.Options` 并经 `NormalizeOptions` 校验（run 报告），其余构造 `suite.Options` 并经 `suite.NormalizeOptions` 校验（suite 报告）。
+TUI 不维护另一套隐式默认值，而是构造与 CLI/MCP 相同的规范化配置：Start 时 hardware-only 选择构造 `vmbench.Options` 并经 `NormalizeOptions` 校验（run 报告），其余构造 `checkup.Options` 并经 `checkup.NormalizeOptions` 校验（体检报告）。
 
 按键：
 
@@ -85,13 +85,13 @@ TUI 不维护另一套隐式默认值，而是构造与 CLI/MCP 相同的规范�
 run 路径（硬件基准）展示：
 
 - 当前阶段与 ETA（首个 workload 完成后显示 `~xx left`，按已完成 workload 墙钟均值外推）
-- 采样进度（`n/m samples`，来自 `EventSuiteProgress`）
+- 采样进度（`n/m samples`，来自 `EventCheckupProgress`）
 - workload 状态、迭代迷你条（`▰▱ 2/3`）与当前 workload 已耗时（墙钟）
 - workload 完成后的原始 metric
 
 Go runner 始终串行执行 workload；进度总数按各 workload 的实际迭代次数计算。硬件 workload 使用配置的迭代数，网络 workload 限制为一次真实探测。旧的 `multi/all` mode 不会产生第二轮结果或并发不同 workload。
 
-suite 路径展示 9 个 section 的卡片网格（start/done/fail/skip/partial 状态与已耗时），事件写入共享的 event log viewport。两种路径共用取消 modal（文案按 runKind 选择）。
+体检路径展示 9 个 section 的卡片网格（start/done/fail/skip/partial 状态与已耗时），事件写入共享的 event log viewport。两种路径共用取消 modal（文案按 runKind 选择）。
 
 Go TUI 使用 spinner、progress bar、event log viewport 和取消 modal 展示执行状态。
 
@@ -102,7 +102,7 @@ Go TUI 使用 spinner、progress bar、event log viewport 和取消 modal 展示
 - done
 - fail
 - skip
-- partial（suite section，独立样式并计入终态非成功数量）
+- partial（体检 section，独立样式并计入终态非成功数量）
 
 按键：
 
@@ -156,11 +156,11 @@ Go TUI 支持交互式视图切换：
 - `Esc` / `Enter` / `d`：返回 Results（光标保留）
 - `q`：退出
 
-## SuiteResults
+## CheckupResults
 
-Go TUI 在终端低于 40 行时使用紧凑布局：Config 只展开当前聚焦字段，Running 与 SuiteResults 对每个 section 使用单行状态摘要；在 `80x24` 下页面宽高均受终端边界约束，字段导航、启动和取消仍可操作。更高终端继续显示完整卡片与详细结果。
+Go TUI 在终端低于 40 行时使用紧凑布局：Config 只展开当前聚焦字段，Running 与 CheckupResults 对每个 section 使用单行状态摘要；在 `80x24` 下页面宽高均受终端边界约束，字段导航、启动和取消仍可操作。更高终端继续显示完整卡片与详细结果。
 
-Go 主线覆盖 `hardware / network_info / route / ping / speed / ip_quality / reachability / mail / media` 九个 section。Network Info 展示虚拟化、公网 IP、ASN/provider 和 NAT 证据；Reachability 展示 website/Telegram 的 protocol/latency/status/error。所有这些状态都不会折算为 benchmark 总分。Suite 只有所有 enabled section 都是 `ok` 时成功；enabled 的空状态、`skipped`、`partial`、`error` 均表示失败，disabled section 才只发 skip event。Running 页保留 `PARTIAL` 独立样式但将它计入终态非成功数量，不伪装成 `ERROR` 或成功；网络 section timeout/cancel 也会显示为结构化 `error` message。
+Go 主线覆盖 `hardware / network_info / route / ping / speed / ip_quality / reachability / mail / media` 九个 section。Network Info 展示虚拟化、公网 IP、ASN/provider 和 NAT 证据；Reachability 展示 website/Telegram 的 protocol/latency/status/error。所有这些状态都不会折算为 benchmark 总分。体检只有所有 enabled section 都是 `ok` 时成功；enabled 的空状态、`skipped`、`partial`、`error` 均表示失败，disabled section 才只发 skip event。Running 页保留 `PARTIAL` 独立样式但将它计入终态非成功数量，不伪装成 `ERROR` 或成功；网络 section timeout/cancel 也会显示为结构化 `error` message。
 
 Route/Ping 的结构化结果会区分 catalog protocol 与实际 `probe_protocol/probe_tool`。Route 另记录 `resolved_target`、`destination_reached` 和 `status=ok|partial|error`；TUI Route 卡片使用同一有效状态，跑满 hops 但未到目标会显示 `PARTIAL`，不会伪装为成功。Ping 将 TCP RST/refused 视为收到目标响应并以 `status=ok` 展示，报告中的 `connection_state=open|refused|mixed|no_response` 保留端口状态差异，真正无响应才是 loss。Mail 卡片消费顺序探测产生的 `open|refused|timeout|error`，只有 `open` 显示为可达。IP Quality fail-closed 且没有 score 时，结果卡仍展示 section error、RiskSummary 和 Port 25 状态/消息。CLI/history Compare 直接使用报告中的实际协议、工具和 IP family 做兼容门槛。
 
@@ -170,9 +170,9 @@ Compare 入口先进入选择器页（`tui/compare_picker.go`）：
 
 - 历史列表：来自 `history` store（最新在前，重验证每条记录，上限 50 条），列为 marker/time/kind/tag/id，异步加载
 - `↑↓` 移动，`spc`/`Enter` 标记 A/B（最多两条，第三条顶掉最旧），`c` 发起对比
-- `v` 查看单条记录（run -> Results 页、suite -> SuiteResults 页，`Esc` 返回 picker）
+- `v` 查看单条记录（run -> Results 页、体检 -> CheckupResults 页，`Esc` 返回 picker）
 - `m` 切换手输路径模式（A/B 两个 textinput，`Tab` 换框、`Esc` 退回列表）——供 `-compare-a/-b` flag 预填或直接粘贴文件路径
-- kind 路由：两条 run 记录 -> benchmark delta 表；两条 suite 记录 -> `suitecompare` 的 textgrid 输出（等宽渲染，可滚动）；混合 kind -> toast 拒绝
+- kind 路由：两条 run 记录 -> benchmark delta 表；两条体检记录 -> `checkupcompare` 的 textgrid 输出（等宽渲染，可滚动）；混合 kind -> toast 拒绝
 - flag 直达：`-compare-a` 与 `-compare-b` 同时给出时跳过 picker 直接加载对比
 
 Compare 页展示（benchmark 文档）：
@@ -189,7 +189,7 @@ Compare 页展示（benchmark 文档）：
 - latency 越低越好
 - throughput 越高越好
 
-CLI/history 的 Suite delta 额外要求 unit、protocol、provider、target/node identity 和所需 catalog revision 一致；Route 还要求显式 `status=ok` 且 `destination_reached=true`。不兼容或缺到达证据时不显示伪 delta。TUI benchmark Compare 仍按 workload 的 time/throughput/latency 规则工作；Suite 对比在 TUI 内以 textgrid 快照呈现，不再要求用户退出到 CLI。
+CLI/history 的体检 delta 额外要求 unit、protocol、provider、target/node identity 和所需 catalog revision 一致；Route 还要求显式 `status=ok` 且 `destination_reached=true`。不兼容或缺到达证据时不显示伪 delta。TUI benchmark Compare 仍按 workload 的 time/throughput/latency 规则工作；体检对比在 TUI 内以 textgrid 快照呈现，不再要求用户退出到 CLI。
 
 Compare/ComparePicker 按键：`Esc` 返回上一级（Compare -> Picker -> Dashboard），`r`（Compare 页）返回 picker 重选。
 

@@ -22,8 +22,12 @@ import (
 type Kind string
 
 const (
-	KindRun   Kind = "run"
-	KindSuite Kind = "suite"
+	KindRun     Kind = "run"
+	KindCheckup Kind = "checkup"
+
+	// kindLegacySuite is the wire value written by pre-v0.11.0 releases for
+	// checkup reports. It is accepted when reading, never written.
+	kindLegacySuite Kind = "suite"
 
 	storageVersion = 1
 )
@@ -113,7 +117,7 @@ func Open(dir string) (*Store, error) {
 	return &Store{Dir: filepath.Clean(dir)}, nil
 }
 
-// Inspect validates a report and identifies legacy and current run/suite JSON.
+// Inspect validates a report and identifies legacy and current run/checkup JSON.
 func Inspect(data []byte) (Metadata, error) {
 	var object map[string]json.RawMessage
 	if err := json.Unmarshal(data, &object); err != nil {
@@ -284,11 +288,11 @@ func detectKind(object map[string]json.RawMessage) (Kind, error) {
 				return KindRun, nil
 			}
 			return "", errors.New("report_kind is run but results.workloads is missing")
-		case KindSuite:
-			if hasSuiteShape(object) {
-				return KindSuite, nil
+		case KindCheckup, kindLegacySuite:
+			if hasCheckupShape(object) {
+				return KindCheckup, nil
 			}
-			return "", errors.New("report_kind is suite but config or sections are missing")
+			return "", errors.New("report_kind is checkup but config or sections are missing")
 		default:
 			return "", fmt.Errorf("unsupported report_kind %q", explicit)
 		}
@@ -297,10 +301,10 @@ func detectKind(object map[string]json.RawMessage) (Kind, error) {
 	if hasRunShape(object) {
 		return KindRun, nil
 	}
-	if hasSuiteShape(object) {
-		return KindSuite, nil
+	if hasCheckupShape(object) {
+		return KindCheckup, nil
 	}
-	return "", errors.New("JSON is not a recognized vmbench run or suite report")
+	return "", errors.New("JSON is not a recognized vmbench run or checkup report")
 }
 
 func hasRunShape(object map[string]json.RawMessage) bool {
@@ -316,7 +320,7 @@ func hasRunShape(object map[string]json.RawMessage) bool {
 	return exists
 }
 
-func hasSuiteShape(object map[string]json.RawMessage) bool {
+func hasCheckupShape(object map[string]json.RawMessage) bool {
 	if _, hasConfig := object["config"]; !hasConfig {
 		return false
 	}
@@ -433,6 +437,10 @@ func (s *Store) readRecord(path string) (Record, error) {
 	}
 	if record.StorageVersion != storageVersion || !validID.MatchString(record.ID) || len(record.Report) == 0 {
 		return Record{}, fmt.Errorf("invalid history file %s", path)
+	}
+	if record.Kind == kindLegacySuite {
+		// Records written before v0.11.0 store the legacy kind value.
+		record.Kind = KindCheckup
 	}
 	meta, err := Inspect(record.Report)
 	if err != nil || meta.Kind != record.Kind {

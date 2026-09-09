@@ -1,7 +1,7 @@
 # CLI surface: usage, flags, errors, notices, progress, tables, sysinfo labels.
 
 [cli.usage.tagline]
-other = "vmbench — cross-platform CPU and network benchmark suite"
+other = "vmbench — cross-platform CPU and network benchmark toolkit"
 
 [cli.usage.header]
 other = "Usage:"
@@ -292,10 +292,10 @@ other = 'error: unknown IP quality source "{{.Value}}" (available: {{.Available}
 other = 'error: no valid speed providers in "{{.Value}}" (available: {{.Available}})'
 
 [cli.error.unknownPreset]
-other = 'error: unknown suite preset "{{.Value}}" (available: {{.Available}})'
+other = 'error: unknown checkup preset "{{.Value}}" (available: {{.Available}})'
 
 [cli.error.noSectionsEnabled]
-other = "error: at least one suite section must remain enabled"
+other = "error: at least one checkup section must remain enabled"
 
 [cli.error.compareNeedsTwo]
 other = "error: at least 2 JSON report files required"

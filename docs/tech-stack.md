@@ -35,15 +35,15 @@ vmbench/
 │   └── vmbench-rendertest/ # TUI 渲染快照(build tag rendertest)
 ├── mcp/                # MCP JSON-RPC stdio server + tools/list/tools/call
 ├── report/             # JSON/HTML/console/compare
-├── suite/              # VPS composite suite + section event
-├── suitecompare/       # Suite raw metric alignment + compatibility gate
+├── checkup/            # VPS checkup（体检）+ section events
+├── checkupcompare/     # checkup raw metric alignment + compatibility gate
 ├── sysinfo/            # 系统信息采集
 ├── tui/                # Bubble Tea TUI
 │   ├── theme/          # 8 主题 + AdaptiveColor
 │   ├── comp/           # 组件库:card/progress/spinner/...
 │   ├── dashboard.go
 │   ├── running.go / results.go / compare.go
-│   ├── suite_config.go / suite_running.go / suite_results.go
+│   ├── config_page.go / checkup_summary.go / checkup_results.go
 │   └── config.go       # TUI 主题持久化
 ├── run.go              # RunCore 编排
 ├── config_validation.go # run 共享校验/归一化 + catalog resolve
@@ -62,7 +62,7 @@ cmd/vmbench/mcp.go
      -> initialize / ping / tools/list / tools/call
         -> vmbench_capabilities
         -> vmbench_sysinfo  -> sysinfo.Collect
-        -> vmbench_run      -> vmbench.RunCore | suite.Run（按 section 集合分流）
+        -> vmbench_run      -> vmbench.RunCore | checkup.Run（按 section 集合分流）
 ```
 
 实现约束：
@@ -70,8 +70,8 @@ cmd/vmbench/mcp.go
 - 不新增第三方依赖，避免扩大 release 体积和供应链风险。
 - stdout 只写 JSON-RPC response；stderr 用于 server 诊断。
 - tool input schema 使用 enum 限定 section、preset、hardware tool 和 speed provider。
-- CLI、TUI、MCP 复用同一 Suite 参数归一化/校验契约；各入口按场景暴露字段子集，TUI 覆盖 iterations、timeout、hardware tools、speed providers（含三网 provider）、iperf hosts、IP version、sections、route selection、media sets、IP quality sources、`catalog_source`、`catalog_revision`，CLI/MCP 另可传 filter 等自动化参数。
-- Go TUI 在低于 40 行时为 Config、Running、SuiteResults 切换紧凑布局；`80x24` 下使用当前字段卡或逐 section 单行摘要，并保持完整卡片布局用于更高终端。
+- CLI、TUI、MCP 复用同一体检参数归一化/校验契约；各入口按场景暴露字段子集，TUI 覆盖 iterations、timeout、hardware tools、speed providers（含三网 provider）、iperf hosts、IP version、sections、route selection、media sets、IP quality sources、`catalog_source`、`catalog_revision`，CLI/MCP 另可传 filter 等自动化参数。
+- Go TUI 在低于 40 行时为 Config、Running、CheckupResults 切换紧凑布局；`80x24` 下使用当前字段卡或逐 section 单行摘要，并保持完整卡片布局用于更高终端。
 - catalog source 只接受 `embedded`、`auto` 或显式路径；revision pin 在探测前校验。
 - MCP 默认 `iterations=1`，不带 section 参数时 `vmbench_run` 只跑 `hardware`（与 CLI 默认一致）。
 - 省略 `timeout_ms` 时默认 5 分钟；显式非正或超出 15 分钟上限的 iterations/timeout、非法 regex，以及混入未知值的 section/provider/tool/route preset 数组都会使整个 tool call 校验失败，不启动测量。
@@ -115,10 +115,10 @@ cmd/vmbench/mcp.go
 Runner 行为：
 
 - workload 始终串行、隔离执行，不并发不同 benchmark，也不修改进程级 `GOMAXPROCS`、GC 或线程绑定状态。线程数和队列深度由 sysbench/fio/OpenSSL/WinSAT 各自参数定义。
-- 硬件 workload 使用请求的 1-9 次迭代并聚合中位数；`bench/netio` workload 通过 `IterationLimiter` 限制为一次真实探测（suite 场景），并在结果中记录实际 `iterations: 1`。
-- `vmbench` 根命令统一承载硬件基准与综合测评：不带 `--preset`/`--only`/`--skip` 只注册外部工具硬件 workload（run 报告），选择网络 section 后走 `suite.Run`（suite 报告）；网络诊断（route/speed/IP 质量等）都在同一命令面上。
+- 硬件 workload 使用请求的 1-9 次迭代并聚合中位数；`bench/netio` workload 通过 `IterationLimiter` 限制为一次真实探测（体检场景），并在结果中记录实际 `iterations: 1`。
+- `vmbench` 根命令统一承载硬件基准与综合测评：不带 `--preset`/`--only`/`--skip` 只注册外部工具硬件 workload（run 报告），选择网络 section 后走 `checkup.Run`（体检报告）；网络诊断（route/speed/IP 质量等）都在同一命令面上。
 - CLI 对非法 filter/iteration/tool 直接返回参数错误；没有 workload 命中或任一 workload 失败时，run 路径返回退出码 1。
-- `OnWorkloadStart` 在每个 workload 的首个 sample 进入前同步触发，`OnWorkloadDone` 在该 workload 返回后立即触发；`RunCore` 据此逐项发射 `suite_start` 与 `suite_done` / `suite_fail`，不等待整批结束。同名 workload 也会逐项发射，不按名称去重。
+- `OnWorkloadStart` 在每个 workload 的首个 sample 进入前同步触发，`OnWorkloadDone` 在该 workload 返回后立即触发；`RunCore` 据此逐项发射 `checkup_start` 与 `checkup_done` / `checkup_fail`，不等待整批结束。同名 workload 也会逐项发射，不按名称去重。
 
 ## Hardware 外部工具模型
 
@@ -131,7 +131,7 @@ Runner 行为：
 | Memory | `sysbench memory` read/write/rnd-read / optional `stream` / optional `mbw` / optional `winsat mem` | MiB/s / ops/s / ns/op / MB/s |
 | Disk | `fio` 4K random read/write Q1/Q32 + 1M sequential read/write Q1/Q8 / optional `dd` / optional `winsat disk` | MiB/s / IOPS / ns/op / MB/s |
 
-`catalog.ExternalHardwareDefinitionsForTools` 按 `hardware_tools` 注册外部工具 workload。默认值按平台选择：Linux 为 `sysbench,openssl,fio`，macOS 为 `openssl`，Windows 为 `winsat`；其余 adapter 可通过 `--hardware-tool` 显式启用。`catalog.MissingHardwareToolsForFilter` 先用与 runner 相同的 Definition Name/Category 正则语义筛选 adapter，再解析实际命令；`run` 和启用 hardware 的 `suite` 只在 stderr 提示当前 filter 会运行但缺失的工具，并在 Linux 上给出已知的 Debian/Ubuntu 包安装命令。预检只提前暴露环境问题：受影响 workload 仍作为 `error` 写入 console/JSON/HTML/TUI，不会被静默跳过。`MissingHardwareTools` 保留为无 filter 的兼容入口。
+`catalog.ExternalHardwareDefinitionsForTools` 按 `hardware_tools` 注册外部工具 workload。默认值按平台选择：Linux 为 `sysbench,openssl,fio`，macOS 为 `openssl`，Windows 为 `winsat`；其余 adapter 可通过 `--hardware-tool` 显式启用。`catalog.MissingHardwareToolsForFilter` 先用与 runner 相同的 Definition Name/Category 正则语义筛选 adapter，再解析实际命令；`run` 路径和启用 hardware 的体检只在 stderr 提示当前 filter 会运行但缺失的工具，并在 Linux 上给出已知的 Debian/Ubuntu 包安装命令。预检只提前暴露环境问题：受影响 workload 仍作为 `error` 写入 console/JSON/HTML/TUI，不会被静默跳过。`MissingHardwareTools` 保留为无 filter 的兼容入口。
 
 Linux 默认集中的 `sysbench` 内存 workload 拆为顺序读带宽、顺序写带宽、随机读延迟三项；`fio` 磁盘 workload 拆为 4K random read/write Q1/Q32 和 1M sequential read/write Q1/Q8 八项。runner 会在每次 iteration 后采集外部工具解析出的吞吐和延迟，再对样本取中位数，避免多次迭代时只使用最后一次外部工具解析值。可选 `dd` read 在 Linux 使用 `iflag=direct` 避免页缓存产生虚假吞吐；其他平台无法保证 uncached direct read，因此 fail-closed 并提示改用 fio。
 
@@ -181,7 +181,7 @@ Linux 默认集中的 `sysbench` 内存 workload 拆为顺序读带宽、顺序�
 
 `uninstall/` 与 `install.sh --uninstall` 的委托协议配套：安装脚本探测 `vmbench uninstall --help` 退出码 0 即委托二进制卸载（并在委托前 fail-closed 地停掉手动创建的 native service），探测失败退回 shell 清理。包内是 `Plan → Execute` 两段：Plan 解析数据根（`history.DefaultRoot`，忽略 `VMBENCH_HISTORY_DIR`，重定向目录标记为保留）、TUI 配置（`tui.ConfigPaths`，`VMBENCH_CONFIG` 重定向时只删文件不删目录）、toolbin 缓存根（`~/.cache/vmbench`）与运行中二进制（排最后），同时产出 dpkg/rpm 归属警告与手动 service unit 提示；Execute 对每项删除前重验（拒绝 symlink、非目录、受保护路径；已消失路径幂等跳过），二进制仅在其余项全部成功后删除，失败即保留以便重跑。保护名单覆盖系统根目录（`/`、`/etc`、`/usr` 等）与 `$HOME`。Windows 经分离 `cmd /c ping` 延迟删除运行中的 exe。
 
-## Suite Sections
+## 体检 Sections
 
 ```text
 hardware
@@ -202,12 +202,12 @@ vmbench --preset quick|website|proxy|mail
 vmbench --only ping,mail
 vmbench --skip media
 vmbench --ip-version v4|v6|dual
-vmbench --quiet --json suite.json
+vmbench --quiet --json checkup.json
 ```
 
-CLI 默认通过 `suite.Options.OnEvent` 把 `section.start`、完成/失败状态和 `suite.done` 实时写到 stderr，因此 JSON/HTML 输出路径和 stdout console 内容不受进度文本污染；`--quiet` 只关闭这条进度流。
+CLI 默认通过 `checkup.Options.OnEvent` 把 `section.start`、完成/失败状态和 `checkup.done` 实时写到 stderr，因此 JSON/HTML 输出路径和 stdout console 内容不受进度文本污染；`--quiet` 只关闭这条进度流。
 
-`--preset` 在 `suite.Options.Preset` 中记录，并在 `Config.preset` 输出到 JSON/HTML/Console。预设只负责 section 编排：
+`--preset` 在 `checkup.Options.Preset` 中记录，并在 `Config.preset` 输出到 JSON/HTML/Console。预设只负责 section 编排：
 
 | Preset | Sections |
 |---|---|
@@ -223,7 +223,7 @@ CLI 默认通过 `suite.Options.OnEvent` 把 `section.start`、完成/失败状�
 3. `--skip` 和 `--no-*` 在最终 section 集合上继续关闭指定 section。
 4. `--ip-version`、`--route-presets` 等显式参数优先于 preset 默认值。
 
-`speed` section 还支持 `suite.Options.SpeedProviders`：
+`speed` section 还支持 `checkup.Options.SpeedProviders`：
 
 | Provider | 说明 |
 |---|---|
@@ -241,7 +241,7 @@ CLI 默认通过 `suite.Options.OnEvent` 把 `section.start`、完成/失败状�
 - `speed.providers[]`：每个 provider 的下载 / 上传 / 延迟 / 状态 / 错误
 - `config.speed_providers`：本次启用的 provider 列表
 
-Suite 只把 enabled 且 `status=ok` 的 section 视为成功。enabled section 的空状态、`skipped`、`partial`、`error` 都使 `SuiteReport.HasFailures()` 为 true、总体 `status=failed` 并发射 `section.fail`；只有 disabled section 发射 `section.skip` 且不单独构成失败。没有任何 enabled section 也视为失败。
+体检只把 enabled 且 `status=ok` 的 section 视为成功。enabled section 的空状态、`skipped`、`partial`、`error` 都使 `CheckupReport.HasFailures()` 为 true、总体 `status=failed` 并发射 `section.fail`；只有 disabled section 发射 `section.skip` 且不单独构成失败。没有任何 enabled section 也视为失败。
 
 `Options.Timeout` 默认 5 分钟。hardware 将它作为每个 workload 的 timeout，不再额外套 section deadline；其余网络 section 各自从调用方 context 派生 section timeout，deadline/cancel 会覆盖 section 为 `error` 并写入结构化 message，调用方更早的 deadline 始终优先。选择 iperf3 provider 却没有可用 host 时，speed provider/section 直接返回 error。
 
@@ -255,15 +255,15 @@ vmbench workload 事件:
 
 | EventKind | 触发时机 |
 |---|---|
-| `suite_start` | 每个 workload 首个 sample 进入前；同名实例也逐项触发 |
-| `suite_progress` | 迭代进度 |
-| `suite_done` | 当前 workload 完成后立即发射 |
-| `suite_skip` | workload 跳过 |
-| `suite_fail` | workload 失败 |
+| `checkup_start` | 每个 workload 首个 sample 进入前；同名实例也逐项触发 |
+| `checkup_progress` | 迭代进度 |
+| `checkup_done` | 当前 workload 完成后立即发射 |
+| `checkup_skip` | workload 跳过 |
+| `checkup_fail` | workload 失败 |
 | `bench_done` | run 完成 |
 | `bench_log` | 警告/日志 |
 
-Suite section 事件(`suite.Event`):
+体检 section 事件(`checkup.Event`):
 
 | EventKind | 触发时机 |
 |---|---|
@@ -271,19 +271,19 @@ Suite section 事件(`suite.Event`):
 | `section.done` | section 完成且 status=ok |
 | `section.fail` | enabled section 完成但 status≠ok（包括 skipped/partial/error/空状态） |
 | `section.skip` | section 未启用 |
-| `suite.done` | 全部 section 完成 |
+| `checkup.done` | 全部 section 完成 |
 
-事件只携带原始 metric,不携带总分/等级。TUI 通过 `suite.Options.OnEvent` 回调订阅，CLI 则用同一回调在 stderr 输出 section 生命周期；`--quiet` 时不安装 CLI 进度回调。
+事件只携带原始 metric,不携带总分/等级。TUI 通过 `checkup.Options.OnEvent` 回调订阅，CLI 则用同一回调在 stderr 输出 section 生命周期；`--quiet` 时不安装 CLI 进度回调。
 
 ## 报告与对比
 
 - JSON：机器可解析
 - HTML：人类可读
 - Console：终端表格
-- Compare：自动识别 benchmark/Suite JSON，按 raw metric 对齐两份或更多报告
+- Compare：自动识别 benchmark/体检 JSON，按 raw metric 对齐两份或更多报告
 - History：本地 add/list/show/delete 与 `compare --last N`
 
-Suite JSON 使用 schema v2 envelope：`schema_version=2`、`report_kind=suite`、唯一 `report_id`、app build、system、UTC timestamps/duration、规范化 config、catalog provenance 与九个 section。旧 `version=1` 和 Unix time 字段继续保留，避免破坏旧 consumer。Suite HTML 从同一结构渲染硬件 workload、network identity、route hops、ping、provider-level speed、IP quality、reachability、mail、media、warning/error；network-only Suite 也包含 system/app/catalog 元数据。CLI 的 JSON/HTML 导出在目标同目录创建 mode `0600` 临时文件，写入后执行 fsync 并 rename 替换，最终再次收紧为 `0600`；非 Unix 平台还依赖系统 ACL。
+体检 JSON 使用 schema v2 envelope：`schema_version=2`、`report_kind=checkup`（pre-v0.11.0 写 `suite`，读取时兼容）、唯一 `report_id`、app build、system、UTC timestamps/duration、规范化 config、catalog provenance 与九个 section。旧 `version=1` 和 Unix time 字段继续保留，避免破坏旧 consumer。体检 HTML 从同一结构渲染硬件 workload、network identity、route hops、ping、provider-level speed、IP quality、reachability、mail、media、warning/error；network-only 体检也包含 system/app/catalog 元数据。CLI 的 JSON/HTML 导出在目标同目录创建 mode `0600` 临时文件，写入后执行 fsync 并 rename 替换，最终再次收紧为 `0600`；非 Unix 平台还依赖系统 ACL。
 
 对比规则：
 
@@ -293,11 +293,11 @@ Suite JSON 使用 schema v2 envelope：`schema_version=2`、`report_kind=suite`�
 
 Benchmark Compare 会忽略带 `error` 的 metric；`ms avg` 按 latency 处理（越低越好）；throughput 单位不兼容时不计算 delta。迭代次数、mode、scope、hardware tool 或 iperf host 选择不同，或单份报告出现重复 workload 时会输出可比性警告。
 
-Suite Compare 同时检查 unit、实际 protocol/IP family、provider/probe tool、target/node identity，以及节点型指标所需的 catalog revision。只有全部兼容才计算 delta；不兼容时仍对齐展示原始值，并输出明确 reason/warning。Route 指标额外要求逐项显式为 `status=ok` 且 `destination_reached=true`，缺少新到达证据的旧报告 fail-closed 为 unavailable。HTTP status 等分类码不参与百分比 delta。硬件 time/latency 越低越好、throughput 越高越好；route hop count 等中性证据只展示，不伪造“提升”。不同 report kind 不允许混合比较，IP Quality PortProbe 的状态门禁不会影响未知扩展 section。
+体检 Compare 同时检查 unit、实际 protocol/IP family、provider/probe tool、target/node identity，以及节点型指标所需的 catalog revision。只有全部兼容才计算 delta；不兼容时仍对齐展示原始值，并输出明确 reason/warning。Route 指标额外要求逐项显式为 `status=ok` 且 `destination_reached=true`，缺少新到达证据的旧报告 fail-closed 为 unavailable。HTTP status 等分类码不参与百分比 delta。硬件 time/latency 越低越好、throughput 越高越好；route hop count 等中性证据只展示，不伪造“提升”。不同 report kind 不允许混合比较，IP Quality PortProbe 的状态门禁不会影响未知扩展 section。
 
 Mail Compare 只比较 `status=open` 的成功连接延迟；`refused/timeout/error` 的耗时分别是拒绝响应、超时阈值或失败开销，不作为可比较 latency。
 
-`history/` 按平台 data directory 保存独立 JSON record，使用临时文件 + fsync + rename 原子落盘；Unix 目录 mode `0700`、文件 mode `0600`，其他平台依赖系统 ACL。`--save-history` 可从 run/suite 直接写入，`--history-tag` 只作标签；`history compare --last N` 要求最近 N 份记录属于同一 report kind。
+`history/` 按平台 data directory 保存独立 JSON record，使用临时文件 + fsync + rename 原子落盘；Unix 目录 mode `0700`、文件 mode `0600`，其他平台依赖系统 ACL。`--save-history` 可从基准/体检直接写入，`--history-tag` 只作标签；`history compare --last N` 要求最近 N 份记录属于同一 report kind。
 
 ## 构建一致性
 

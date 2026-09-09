@@ -1,10 +1,10 @@
-# TUI surface: menus, hints, modals, tables, suite config and results.
+# TUI surface: menus, hints, modals, tables, checkup config and results.
 
 [tui.menu.benchmark]
 other = "Run Benchmark"
 
 [tui.menu.benchmarkDesc]
-other = "Hardware-first, with optional VPS suite sections"
+other = "Hardware-first, with optional VPS checkup sections"
 
 [tui.menu.compare]
 other = "Compare Reports"
@@ -111,8 +111,8 @@ other = "Benchmark Running"
 other = "Benchmark Results"
 [tui.help.sec.compare]
 other = "Compare Reports"
-[tui.help.sec.suiteResults]
-other = "Suite Results"
+[tui.help.sec.checkupResults]
+other = "Checkup Results"
 
 [tui.hint.digits]
 other = "toggle section 1-9"
@@ -153,13 +153,13 @@ other = "Cancel run"
 [tui.modal.keepRunning]
 other = "Keep running"
 
-[tui.modal.cancelSuite]
-other = "Cancel suite?"
+[tui.modal.cancelCheckup]
+other = "Cancel checkup?"
 
-[tui.modal.cancelSuiteBody]
+[tui.modal.cancelCheckupBody]
 other = "Running section will be aborted."
 
-[tui.modal.cancelSuiteCompact]
+[tui.modal.cancelCheckupCompact]
 other = "  y cancel  ·  n keep running"
 
 [tui.results.noResults]
@@ -228,11 +228,11 @@ other = "~{{.Eta}} left"
 [tui.running.samples]
 other = "{{.Done}}/{{.Total}} samples"
 
-[tui.suiteSummary.minutes]
+[tui.checkupSummary.minutes]
 other = "{{.Minutes}}m"
-[tui.suiteSummary.minutesSeconds]
+[tui.checkupSummary.minutesSeconds]
 other = "{{.Minutes}}m{{.Seconds}}s"
-[tui.suiteSummary.seconds]
+[tui.checkupSummary.seconds]
 other = "{{.Seconds}}s"
 
 [tui.detail.title]
@@ -302,7 +302,7 @@ other = "enter two report paths, tab to switch, enter to compare"
 other = "pick two records first"
 
 [tui.compare.mixedKinds]
-other = "cannot compare a run report with a suite report"
+other = "cannot compare a run report with a checkup report"
 
 [tui.compare.noHistory]
 other = "No history records yet. Run a benchmark with --save-history or vmbench history add."
@@ -388,17 +388,17 @@ other = "Arch"
 [tui.sys.cache]
 other = "Cache"
 
-[tui.suiteRunning.title]
-other = "◈ Running Suite"
+[tui.checkupRunning.title]
+other = "◈ Running Checkup"
 
-[tui.suiteRunning.recentEvents]
+[tui.checkupRunning.recentEvents]
 other = "Recent events"
 
-[tui.suiteRunning.runningNow]
+[tui.checkupRunning.runningNow]
 other = "running..."
 
-[tui.suiteRunning.complete]
-other = "suite complete"
+[tui.checkupRunning.complete]
+other = "checkup complete"
 
 [tui.config.title]
 other = "◈ Benchmark Configuration"
@@ -475,23 +475,23 @@ other = "port 25/587 probes"
 [tui.config.sectionDesc.media]
 other = "Netflix · Disney+ · YouTube"
 
-[tui.suiteResults.title]
-other = "◈ Suite Report"
+[tui.checkupResults.title]
+other = "◈ Checkup Report"
 
-[tui.suiteResults.noResults]
-other = "No suite results."
+[tui.checkupResults.noResults]
+other = "No checkup results."
 
-[tui.suiteResults.noSections]
+[tui.checkupResults.noSections]
 other = "No enabled sections."
 
-[tui.suiteResults.noIdentityEvidence]
+[tui.checkupResults.noIdentityEvidence]
 other = "no identity evidence"
 
-[tui.suiteResults.noProviders]
+[tui.checkupResults.noProviders]
 other = "no providers"
 
-[tui.suiteResults.noData]
+[tui.checkupResults.noData]
 other = "no data"
 
-[tui.suiteResults.moreItems]
+[tui.checkupResults.moreItems]
 other = "... +{{.Count}} more (see JSON/HTML report)"

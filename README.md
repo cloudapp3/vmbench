@@ -1,6 +1,6 @@
 # vmbench
 
-Cross-platform VPS benchmark suite written in Go, with a TUI interface.
+Cross-platform VPS benchmark toolkit written in Go, with a TUI interface.
 
 [![CI](https://github.com/cloudapp3/vmbench/actions/workflows/ci.yml/badge.svg)](https://github.com/cloudapp3/vmbench/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/cloudapp3/vmbench.svg)](https://pkg.go.dev/github.com/cloudapp3/vmbench)
@@ -10,7 +10,7 @@ vmbench measures CPU / memory / disk with **external tools only** (sysbench, fio
 
 Documentation: [中文说明](docs/README.zh-CN.md) · [Full capability reference](docs/capabilities.md) · [Tech stack](docs/tech-stack.md) · [Changelog](docs/CHANGELOG.md)
 
-[Quick start](#quick-start) · [Install](#install) · [Commands](#commands) · [Flags](#common-flags) · [VPS Suite](#vps-suite) · [TUI](#tui) · [Documentation](#documentation)
+[Quick start](#quick-start) · [Install](#install) · [Commands](#commands) · [Flags](#common-flags) · [VPS Checkup](#vps-checkup) · [TUI](#tui) · [Documentation](#documentation)
 
 ## Quick Start
 
@@ -33,9 +33,6 @@ vmbench update                   # self-update from GitHub Releases
 The one-liner above installs the **latest release** for your OS/arch and verifies its SHA-256 against `checksums.txt`. Without `--dir`, the install directory is picked automatically: an existing installation in `~/.local/bin`, `~/bin`, or `/usr/local/bin` is reused; a root install uses `/usr/local/bin`; an unprivileged user prefers `~/.local/bin` or `~/bin` when either is already on `PATH`. For an automatic home-directory install that is not yet on `PATH`, the installer adds an idempotent entry to the current shell's startup file (`.zshrc`, `.bashrc`, or `.profile`) and prints the exact reload command; other shells get a warning.
 
 ```bash
-# Custom directory (never modifies shell startup files; prints a PATH hint)
-curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash -s -- --dir /opt/bin
-
 # System-wide install (uses sudo only for target checks and writes)
 curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh | bash -s -- --system
 
@@ -43,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh |
 go install github.com/cloudapp3/vmbench/cmd/vmbench@latest
 ```
 
-Other installer flags: `--version vX.Y.Z` pins a release, `--no-modify-path` keeps shell startup files untouched, `--print-install-dir` prints the selected directory for scripts, and `--skip-verify` skips checksum verification. `VMBENCH_INSTALL_DIR` mirrors `--dir`; `GITHUB_TOKEN`/`GH_TOKEN` helps with API rate limits or private releases.
+Other installer flags: `--version vX.Y.Z` pins a release, `--no-modify-path` keeps shell startup files untouched, `--print-install-dir` prints the selected directory for scripts, and `--skip-verify` skips checksum verification. `--dir PATH` (mirrored by `VMBENCH_INSTALL_DIR`) selects a custom directory; explicit directories never modify shell startup files, so make sure the directory is on `PATH`. `GITHUB_TOKEN`/`GH_TOKEN` helps with API rate limits or private releases.
 
 ### Uninstall
 
@@ -73,12 +70,12 @@ Downloads are SHA-256 verified against the release `checksums.txt`, then atomica
 | Command | Description |
 |---------|-------------|
 | `vmbench` | Interactive TUI (no flags) — or run the benchmark when flags are present |
-| `vmbench [flags]` | Run the benchmark: hardware only by default, suite sections via preset / only / skip |
+| `vmbench [flags]` | Run the benchmark: hardware only by default, checkup sections via preset / only / skip |
 | `vmbench nodes <command>` | List / verify / update / health-check the versioned node catalog |
 | `vmbench mcp serve [--transport stdio]` | Expose vmbench tools to LLM clients via MCP stdio |
 | `vmbench list` | List available workloads |
 | `vmbench sysinfo [--json]` | Show system information |
-| `vmbench compare <a.json> <b.json> [...]` | Auto-detect and compare benchmark or Suite reports |
+| `vmbench compare <a.json> <b.json> [...]` | Auto-detect and compare benchmark or checkup reports |
 | `vmbench history <command>` | Add / list / show / delete / compare local reports |
 | `vmbench update [--check] [--version TAG]` | Self-update from GitHub Releases (SHA-256 verified) |
 | `vmbench version` | Show version |
@@ -104,11 +101,11 @@ Downloads are SHA-256 verified against the release `checksums.txt`, then atomica
 | `--save-history` | false | Save the report to local history (`--history-tag` to label) |
 | `--lang` | auto | `en` or `zh-CN` (also `VMBENCH_LANG`) |
 
-Without `--preset` / `--only` / `--skip` the run is hardware-only; network sections are opt-in via a preset or explicit selection. When the effective selection is exactly the `hardware` section the output is a benchmark (run-kind) report — identical to pre-v0.8.0 `vmbench run` — otherwise a composite suite report. Full flag tables: `vmbench --help` or the [capability reference](docs/capabilities.md).
+Without `--preset` / `--only` / `--skip` the run is hardware-only; network sections are opt-in via a preset or explicit selection. When the effective selection is exactly the `hardware` section the output is a benchmark (run-kind) report — identical to pre-v0.8.0 `vmbench run` — otherwise a composite checkup report. Full flag tables: `vmbench --help` or the [capability reference](docs/capabilities.md).
 
-## VPS Suite
+## VPS Checkup
 
-The suite keeps the YABS-style one-command experience with ECS-style modular sections:
+The checkup keeps the YABS-style one-command experience with ECS-style modular sections:
 
 | Section | Purpose |
 |---------|---------|
@@ -134,17 +131,17 @@ vmbench --only hardware --hardware-tool geekbench
 vmbench --node-catalog auto --save-history --history-tag weekly
 ```
 
-Suite succeeds only when every enabled section ends `status=ok`; enabled empty / skipped / partial / error states all fail the run. Reports keep the resolved node catalog source/revision and selected node IDs.
+The checkup succeeds only when every enabled section ends `status=ok`; enabled empty / skipped / partial / error states all fail the run. Reports keep the resolved node catalog source/revision and selected node IDs.
 
 ## TUI
 
 Launch with `vmbench` (no arguments):
 
 - **Dashboard** with benchmark / compare / sysinfo entry points; mouse clicks and wheel scrolling everywhere
-- **Config**: one page for the same normalized fields as CLI/MCP — preset pills lead with Hardware Only (the CLI default) plus Custom and the suite presets; section toggles reveal tool, filter, speed, route, media, and IP-source cards on demand, with a live planned-duration summary, missing-tool preflight, and `1-9` section jumps
-- **Running**: one progress page for both kinds — workload grid for hardware runs, section grid for suite runs, cancel modal included
+- **Config**: one page for the same normalized fields as CLI/MCP — preset pills lead with Hardware Only (the CLI default) plus Custom and the checkup presets; section toggles reveal tool, filter, speed, route, media, and IP-source cards on demand, with a live planned-duration summary, missing-tool preflight, and `1-9` section jumps
+- **Running**: one progress page for both kinds — workload grid for hardware runs, section grid for checkup runs, cancel modal included
 - **Results**: cards / grouped / flat views; `d` opens per-workload detail with metrics, samples, errors, and raw tool output
-- **Compare picker**: browse history, view a record, or compare two — benchmark deltas in-TUI, suite via the same output as the CLI
+- **Compare picker**: browse history, view a record, or compare two — benchmark deltas in-TUI, checkup via the same output as the CLI
 - **Themes**: press `t` on Dashboard to cycle; the choice is saved locally
 
 Keys: `?` help · `↑↓` navigate · `Enter` select · `Tab` switch view · `d` detail · `s` save · `Esc` back · `q` quit. Every page scrolls with `PgUp/PgDn`, `Home/End`, and the mouse wheel; fits an 80x24 terminal.
@@ -159,7 +156,7 @@ CLI, TUI, and console/HTML report labels are localized in English and Simplified
 |------------|:-----:|:-----:|:-------:|
 | CLI / TUI / JSON / HTML / compare | ✅ | ✅ | ✅ |
 | Default hardware tools | ✅ sysbench / fio / openssl | ⚠️ openssl (others via package manager) | ⚠️ WinSAT |
-| Suite network diagnostics | ✅ | ✅ | ⚠️ partial / environment-dependent |
+| Checkup network diagnostics | ✅ | ✅ | ⚠️ partial / environment-dependent |
 | MCP stdio server | ✅ | ✅ | ✅ |
 
 Missing `fio` or `sysbench` on a Linux host can be fixed without touching system packages:
@@ -176,7 +173,7 @@ Network sections depend on local routing, DNS, firewall, IPv6, and sandbox permi
 
 | Topic | Where |
 |-------|-------|
-| Full capability reference (中文): CLI flags, suite, node catalog, MCP, report formats, Go API | [docs/capabilities.md](docs/capabilities.md) |
+| Full capability reference (中文): CLI flags, checkup, node catalog, MCP, report formats, Go API | [docs/capabilities.md](docs/capabilities.md) |
 | 中文快速说明 | [docs/README.zh-CN.md](docs/README.zh-CN.md) |
 | MCP tools, client config, safety defaults | [MCP 大模型接入](docs/capabilities.md#9-mcp-大模型接入) |
 | Node catalog trust model and commands | [版本化 Node Catalog](docs/capabilities.md#版本化-node-catalog) |

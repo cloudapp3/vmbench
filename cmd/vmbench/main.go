@@ -17,11 +17,11 @@ import (
 
 	"github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/catalog"
+	"github.com/cloudapp3/vmbench/checkup"
+	"github.com/cloudapp3/vmbench/checkupcompare"
 	"github.com/cloudapp3/vmbench/history"
 	"github.com/cloudapp3/vmbench/i18n"
 	gbreport "github.com/cloudapp3/vmbench/report"
-	"github.com/cloudapp3/vmbench/suite"
-	"github.com/cloudapp3/vmbench/suitecompare"
 	"github.com/cloudapp3/vmbench/sysinfo"
 	"github.com/cloudapp3/vmbench/toolbin"
 	"github.com/cloudapp3/vmbench/tui"
@@ -177,7 +177,7 @@ func printBenchDetails(w io.Writer, fs *flag.FlagSet) {
 
 func formatPresetHelp() string {
 	var b strings.Builder
-	for i, spec := range suite.Presets() {
+	for i, spec := range checkup.Presets() {
 		if i > 0 {
 			b.WriteByte('\n')
 		}
@@ -188,7 +188,7 @@ func formatPresetHelp() string {
 
 func formatSpeedProviderHelp() string {
 	var b strings.Builder
-	for i, spec := range suite.SpeedProviders() {
+	for i, spec := range checkup.SpeedProviders() {
 		if i > 0 {
 			b.WriteByte('\n')
 		}
@@ -223,11 +223,11 @@ func progressPrinter(enabled bool) vmbench.EventHandler {
 	var prev string
 	return func(ev vmbench.Event) {
 		switch ev.Kind {
-		case vmbench.EventSuiteStart:
+		case vmbench.EventCheckupStart:
 			fmt.Fprintf(os.Stderr, "  %s ", i18n.PadCells(ev.Workload, 28))
-		case vmbench.EventSuiteDone:
+		case vmbench.EventCheckupDone:
 			fmt.Fprintf(os.Stderr, "%s %s\n", i18n.PadCells(i18n.T("cli.progress.done"), 5), ev.Metric)
-		case vmbench.EventSuiteFail:
+		case vmbench.EventCheckupFail:
 			fmt.Fprintf(os.Stderr, "%s %s\n", i18n.PadCells(i18n.T("cli.progress.fail"), 5), ev.Err)
 		case vmbench.EventBenchDone:
 			if prev != "" {
@@ -241,24 +241,24 @@ func progressPrinter(enabled bool) vmbench.EventHandler {
 	}
 }
 
-func suiteProgressPrinter(enabled bool) suite.EventHandler {
-	return suiteProgressPrinterTo(os.Stderr, enabled)
+func checkupProgressPrinter(enabled bool) checkup.EventHandler {
+	return checkupProgressPrinterTo(os.Stderr, enabled)
 }
 
-func suiteProgressPrinterTo(w io.Writer, enabled bool) suite.EventHandler {
+func checkupProgressPrinterTo(w io.Writer, enabled bool) checkup.EventHandler {
 	if !enabled || w == nil {
 		return nil
 	}
-	return func(event suite.Event) {
+	return func(event checkup.Event) {
 		section := strings.TrimSpace(string(event.Section))
 		status := i18n.StatusLabel(firstNonEmpty(event.Status, "unknown"))
 		switch event.Kind {
-		case suite.EventSectionStart:
-			fmt.Fprintf(w, "  [suite] %s %s\n", i18n.PadCells(section, 16), i18n.T("cli.progress.running"))
-		case suite.EventSectionDone, suite.EventSectionFail:
-			fmt.Fprintf(w, "  [suite] %s %s %s\n", i18n.PadCells(section, 16), i18n.PadCells(status, 7), strings.TrimSpace(event.Message))
-		case suite.EventSuiteDone:
-			fmt.Fprintf(w, "  [suite] %s %s %s\n", i18n.PadCells(i18n.T("cli.progress.complete"), 16), i18n.PadCells(status, 7), strings.TrimSpace(event.Message))
+		case checkup.EventSectionStart:
+			fmt.Fprintf(w, "  [checkup] %s %s\n", i18n.PadCells(section, 16), i18n.T("cli.progress.running"))
+		case checkup.EventSectionDone, checkup.EventSectionFail:
+			fmt.Fprintf(w, "  [checkup] %s %s %s\n", i18n.PadCells(section, 16), i18n.PadCells(status, 7), strings.TrimSpace(event.Message))
+		case checkup.EventCheckupDone:
+			fmt.Fprintf(w, "  [checkup] %s %s %s\n", i18n.PadCells(i18n.T("cli.progress.complete"), 16), i18n.PadCells(status, 7), strings.TrimSpace(event.Message))
 		}
 	}
 }
@@ -531,8 +531,8 @@ func writeReportComparison(w io.Writer, rawReports [][]byte) error {
 			return fmt.Errorf("cannot compare mixed report kinds: report 1 is %s, report %d is %s", kind, i+1, meta.Kind)
 		}
 	}
-	if kind == history.KindSuite {
-		return suitecompare.WriteCompare(w, rawReports)
+	if kind == history.KindCheckup {
+		return checkupcompare.WriteCompare(w, rawReports)
 	}
 	docs := make([]gbreport.Document, len(rawReports))
 	for i, raw := range rawReports {

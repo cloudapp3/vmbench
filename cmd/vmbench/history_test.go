@@ -29,8 +29,8 @@ func TestParseHistoryAddArgsSupportsTrailingTag(t *testing.T) {
 func TestWriteReportComparisonDetectsKindsAndRejectsMixed(t *testing.T) {
 	runA := []byte(`{"timestamp":"2026-07-12T01:00:00Z","system":{},"config":{},"results":{"workloads":[]}}`)
 	runB := []byte(`{"timestamp":"2026-07-13T01:00:00Z","system":{},"config":{},"results":{"workloads":[]}}`)
-	suiteA := []byte(`{"version":1,"config":{},"hardware":{"enabled":true,"status":"ok"}}`)
-	suiteB := []byte(`{"report_kind":"suite","config":{},"hardware":{"enabled":true,"status":"ok"}}`)
+	checkupA := []byte(`{"version":1,"config":{},"hardware":{"enabled":true,"status":"ok"}}`)
+	checkupB := []byte(`{"report_kind":"checkup","config":{},"hardware":{"enabled":true,"status":"ok"}}`)
 
 	var output bytes.Buffer
 	if err := writeReportComparison(&output, [][]byte{runA, runB}); err != nil {
@@ -40,13 +40,13 @@ func TestWriteReportComparisonDetectsKindsAndRejectsMixed(t *testing.T) {
 		t.Fatalf("run comparison output = %s", output.String())
 	}
 	output.Reset()
-	if err := writeReportComparison(&output, [][]byte{suiteA, suiteB}); err != nil {
+	if err := writeReportComparison(&output, [][]byte{checkupA, checkupB}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "VMBench Suite Compare") {
-		t.Fatalf("suite comparison output = %s", output.String())
+	if !strings.Contains(output.String(), "VMBench Checkup Compare") {
+		t.Fatalf("checkup comparison output = %s", output.String())
 	}
-	if err := writeReportComparison(&output, [][]byte{runA, suiteA}); err == nil || !strings.Contains(err.Error(), "mixed report kinds") {
+	if err := writeReportComparison(&output, [][]byte{runA, checkupA}); err == nil || !strings.Contains(err.Error(), "mixed report kinds") {
 		t.Fatalf("mixed comparison error = %v", err)
 	}
 }
@@ -61,7 +61,7 @@ func TestHistoryCompareRejectsMixedLatestReports(t *testing.T) {
 	if _, err := store.Add([]byte(`{"timestamp":"2026-07-12T01:00:00Z","results":{"workloads":[]}}`), "run"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Add([]byte(`{"report_kind":"suite","started_at":"2026-07-13T01:00:00Z","config":{},"hardware":{"enabled":true}}`), "suite"); err != nil {
+	if _, err := store.Add([]byte(`{"report_kind":"checkup","started_at":"2026-07-13T01:00:00Z","config":{},"hardware":{"enabled":true}}`), "checkup"); err != nil {
 		t.Fatal(err)
 	}
 	if code := run([]string{"history", "compare", "--last", "2"}); code != 2 {
@@ -69,13 +69,13 @@ func TestHistoryCompareRejectsMixedLatestReports(t *testing.T) {
 	}
 }
 
-func TestHistoryCLILifecycleAndSuiteCompare(t *testing.T) {
+func TestHistoryCLILifecycleAndCheckupCompare(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("VMBENCH_HISTORY_DIR", filepath.Join(dir, "history"))
 	basePath := filepath.Join(dir, "base.json")
 	candidatePath := filepath.Join(dir, "candidate.json")
-	writeSuiteHistoryFixture(t, basePath, "suite-base", "2026-07-15T01:00:00Z", 20)
-	writeSuiteHistoryFixture(t, candidatePath, "suite-candidate", "2026-07-16T01:00:00Z", 10)
+	writeCheckupHistoryFixture(t, basePath, "checkup-base", "2026-07-15T01:00:00Z", 20)
+	writeCheckupHistoryFixture(t, candidatePath, "checkup-candidate", "2026-07-16T01:00:00Z", 10)
 
 	output, code := captureStdout(t, func() int {
 		return run([]string{"history", "add", basePath, "--tag", "baseline"})
@@ -108,14 +108,14 @@ func TestHistoryCLILifecycleAndSuiteCompare(t *testing.T) {
 	output, code = captureStdout(t, func() int {
 		return run([]string{"history", "show", candidateID})
 	})
-	if code != 0 || !strings.Contains(output, `"report_id": "suite-candidate"`) {
+	if code != 0 || !strings.Contains(output, `"report_id": "checkup-candidate"`) {
 		t.Fatalf("history show exit = %d, output = %s", code, output)
 	}
 
 	output, code = captureStdout(t, func() int {
 		return run([]string{"history", "compare", "--last", "2"})
 	})
-	for _, want := range []string{"VMBench Suite Compare", "node-a/latency", "▲+50.0%"} {
+	for _, want := range []string{"VMBench Checkup Compare", "node-a/latency", "▲+50.0%"} {
 		if code != 0 || !strings.Contains(output, want) {
 			t.Fatalf("history compare exit = %d, output missing %q:\n%s", code, want, output)
 		}
@@ -173,11 +173,11 @@ func TestRunHardwareOnlyOmitsCatalogAndNetworkProvenance(t *testing.T) {
 	}
 }
 
-func writeSuiteHistoryFixture(t *testing.T, path, reportID, startedAt string, latency int) {
+func writeCheckupHistoryFixture(t *testing.T, path, reportID, startedAt string, latency int) {
 	t.Helper()
 	report := fmt.Sprintf(`{
   "schema_version": 2,
-  "report_kind": "suite",
+  "report_kind": "checkup",
   "report_id": %q,
   "started_at": %q,
   "catalog_revision": "catalog-1",

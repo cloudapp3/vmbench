@@ -9,19 +9,19 @@ import (
 type EventKind string
 
 const (
-	EventSuiteStart    EventKind = "suite_start"
-	EventSuiteProgress EventKind = "suite_progress"
-	EventSuiteDone     EventKind = "suite_done"
-	EventSuiteSkip     EventKind = "suite_skip"
-	EventSuiteFail     EventKind = "suite_fail"
-	EventBenchDone     EventKind = "bench_done"
-	EventBenchLog      EventKind = "bench_log"
+	EventCheckupStart    EventKind = "checkup_start"
+	EventCheckupProgress EventKind = "checkup_progress"
+	EventCheckupDone     EventKind = "checkup_done"
+	EventCheckupSkip     EventKind = "checkup_skip"
+	EventCheckupFail     EventKind = "checkup_fail"
+	EventBenchDone       EventKind = "bench_done"
+	EventBenchLog        EventKind = "bench_log"
 )
 
 // Event is one state/progress update emitted during RunCore.
 type Event struct {
 	Kind      EventKind
-	Suite     string
+	Checkup   string
 	Workload  string
 	Category  string
 	Iteration int

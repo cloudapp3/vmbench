@@ -9,9 +9,9 @@ import (
 	"os"
 
 	"github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/checkup"
 	"github.com/cloudapp3/vmbench/i18n"
 	gbreport "github.com/cloudapp3/vmbench/report"
-	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/sysinfo"
 	"github.com/cloudapp3/vmbench/tui"
 	"github.com/cloudapp3/vmbench/tui/theme"
@@ -21,7 +21,7 @@ func main() {
 	page := "dashboard"
 	width := 140
 	reportPath := ""
-	suiteReportPath := ""
+	checkupReportPath := ""
 	compareA := ""
 	compareB := ""
 	for i := 1; i < len(os.Args); i++ {
@@ -35,9 +35,9 @@ func main() {
 		case "--report":
 			i++
 			reportPath = os.Args[i]
-		case "--suite-report":
+		case "--checkup-report":
 			i++
-			suiteReportPath = os.Args[i]
+			checkupReportPath = os.Args[i]
 		case "--compare-a":
 			i++
 			compareA = os.Args[i]
@@ -70,18 +70,18 @@ func main() {
 		m = tui.WithReportForRender(m, &report)
 	}
 
-	if suiteReportPath != "" {
-		data, err := os.ReadFile(suiteReportPath)
+	if checkupReportPath != "" {
+		data, err := os.ReadFile(checkupReportPath)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		var sr suite.SuiteReport
+		var sr checkup.CheckupReport
 		if err := json.Unmarshal(data, &sr); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		m = tui.WithSuiteReportForRender(m, &sr)
+		m = tui.WithCheckupReportForRender(m, &sr)
 	}
 
 	fmt.Println(tui.RenderViewForTest(m))

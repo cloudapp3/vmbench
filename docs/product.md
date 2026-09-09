@@ -10,7 +10,7 @@ vmbench 是一款跨平台 VPS 测评工具，用 Go 编写，强调：
 - 结构化报告
 - TUI / CLI 双入口，TUI 内支持主题切换、全页滚动、帮助页、鼠标操作、历史记录对比与 workload 详情
 - 适合自动化采集和横向对比
-- `run` 只测硬件，`suite` 提供类似 YABS 的一键完整测评（含全部网络诊断）
+- 一条命令双形态：不带参数只测硬件，`--preset` / `--only` 选择网络 section 后提供类似 YABS 的一键完整体检（含全部网络诊断）
 - 结构像 ECS：按模块、按场景、按原始指标展示
 
 ## 核心能力
@@ -22,7 +22,7 @@ vmbench 是一款跨平台 VPS 测评工具，用 Go 编写，强调：
 - **流媒体检测**：UnlockTests 全平台 200+ 流媒体/AI 服务解锁状态（可按地区子集运行）
 - **速度测试**：Cloudflare / Speedtest.net / Speedtest.cn / iperf3，以及三网（电信/联通/移动）provider
 - **报告输出**：console / JSON / HTML
-- **结果对比**：自动识别 benchmark/Suite，按兼容的原始指标比较两份或更多报告
+- **结果对比**：自动识别 benchmark/体检，按兼容的原始指标比较两份或更多报告
 - **本地历史**：安全保存、查询、删除并比较最近 N 份报告
 - **MCP 调用**：通过 `vmbench mcp serve --transport stdio` 暴露给大模型客户端
 
@@ -60,7 +60,7 @@ vmbench 输出的是原始测量数据：
 
 不输出综合评分、等级或 category score。
 
-Suite JSON 使用 schema v2 envelope：`report_kind`、`report_id`、app build、system、timestamps/duration、规范化 config、catalog provenance 和九个 section，同时保留旧 `version`/Unix time 字段给 v1 consumer。Route 结果包含 `resolved_target/destination_reached/status`，Ping 结果包含 `connection_state`。Suite HTML 展示硬件 workload、网络身份、完整 route hops、ping、speed provider、IP quality、网站/TG、mail、media 及其 detail/error，而不是只给 section 摘要。
+体检 JSON 使用 schema v2 envelope：`report_kind`、`report_id`、app build、system、timestamps/duration、规范化 config、catalog provenance 和九个 section，同时保留旧 `version`/Unix time 字段给 v1 consumer。Route 结果包含 `resolved_target/destination_reached/status`，Ping 结果包含 `connection_state`。体检 HTML 展示硬件 workload、网络身份、完整 route hops、ping、speed provider、IP quality、网站/TG、mail、media 及其 detail/error，而不是只给 section 摘要。
 
 ## 界面语言
 
@@ -76,7 +76,7 @@ vmbench --preset quick
 vmbench --preset website
 vmbench --only ping,mail
 vmbench --ip-version dual
-vmbench --quiet --json suite.json
+vmbench --quiet --json checkup.json
 vmbench --node-catalog auto --node-revision 2026-07-13.1 --save-history
 vmbench mcp serve --transport stdio
 vmbench compare a.json b.json
@@ -85,9 +85,9 @@ vmbench nodes list --node-catalog embedded
 vmbench nodes health --node-catalog auto --ip-family v6
 ```
 
-`vmbench` 一个命令覆盖硬件基准与综合测评：不带 `--preset` / `--only` / `--skip` 时只编排 sysbench / fio / OpenSSL / WinSAT 等外部工具的硬件基准（run 报告，固定 `scope=hardware`、`extensions=false`），preset 或 `--only` 选择网络 section 后走综合测评（suite 报告），网络诊断（route、speed、IP 质量等）都在同一命令面上。所有 workload 串行隔离执行，线程数和队列深度由适配器定义。硬件测评会在执行前检查当前 filter 实际涉及的工具是否可解析，但缺失工具不会被静默跳过。
+`vmbench` 一个命令覆盖硬件基准与综合测评：不带 `--preset` / `--only` / `--skip` 时只编排 sysbench / fio / OpenSSL / WinSAT 等外部工具的硬件基准（run 报告，固定 `scope=hardware`、`extensions=false`），preset 或 `--only` 选择网络 section 后走综合测评（体检报告），网络诊断（route、speed、IP 质量等）都在同一命令面上。所有 workload 串行隔离执行，线程数和队列深度由适配器定义。硬件测评会在执行前检查当前 filter 实际涉及的工具是否可解析，但缺失工具不会被静默跳过。
 
-## Suite 场景预设
+## 体检场景预设
 
 不带 section 参数时默认只跑 hardware（等价 v0.7.0 的 `vmbench run`）；`--preset` 用于按 VPS 使用场景选择 section，让新用户保持一键体验，也让自动化任务可以稳定复用同一组维度。
 
@@ -119,9 +119,9 @@ vmbench --only hardware --hardware-tool geekbench
 
 `speed` section 的输出会按 provider 分组展示下载、上传、延迟、状态和错误信息，便于区分 Cloudflare / Ookla / speedtest.cn / iperf3 的失败原因。`china_isp` 使用版本化 catalog 中的 `isp_download` 节点（speedtest.cn 直连端点，数据来自 MIT 的 speedtest.cn-CN-ID），按电信/联通/移动顺序下载，同运营商节点依次 fallback；`speedtest_isp` 将 Ookla `speedtest` CLI 固定到按运营商的 speedtest.net 节点 ID（数据来自 MIT 的 speedtest.net-CN-ID），需要本机安装 speedtest CLI。流媒体与 IP 质量可分别用 `--media-set jp,kr` 与 `--ip-quality-source builtin,securitycheck` 收敛范围（securityCheck 二进制需自行安装，缺失时记录 `unavailable` 而不影响 section）。
 
-Suite 只有在每个 enabled section 都是 `status=ok` 时成功。enabled section 的空状态、`skipped`、`partial`、`error` 都会使总体失败并让 CLI 返回非零；disabled section 才只发 `section.skip`。选择 iperf3 provider 但没有可用 host 会直接返回 speed error。
+体检只有在每个 enabled section 都是 `status=ok` 时成功。enabled section 的空状态、`skipped`、`partial`、`error` 都会使总体失败并让 CLI 返回非零；disabled section 才只发 `section.skip`。选择 iperf3 provider 但没有可用 host 会直接返回 speed error。
 
-默认 timeout 仍为 5 分钟：hardware 按 workload 应用，其余网络 section 各自派生 section timeout；调用方 cancel/deadline 会写成结构化 section error。Suite CLI 默认把 section 的 running/完成状态实时写到 stderr，`--quiet` 可关闭进度而不改变报告。
+默认 timeout 仍为 5 分钟：hardware 按 workload 应用，其余网络 section 各自派生 section timeout；调用方 cancel/deadline 会写成结构化 section error。体检 CLI 默认把 section 的 running/完成状态实时写到 stderr，`--quiet` 可关闭进度而不改变报告。
 
 Ping 会保留逐目标结果，全部目标失败时额外返回聚合错误。TCP connect 成功和 TCP RST/refused 都证明目标已响应，均计入 `received` 和延迟而不计为丢包；`connection_state` 区分 `open/refused/mixed/no_response`。Route 会先解析实际目标并记录 `resolved_target`；只有到达该地址才是 `status=ok`，已有有效 hop 但未到达为 `partial`，无有效证据或探测失败为 `error`。Mail 对内置端口逐个顺序连接，避免共享目标对并发突发限流，逐项状态为 `open/refused/timeout/error`；DNS 失败保持为探测 `error`，不会伪装成端口 timeout。
 
@@ -144,7 +144,7 @@ vmbench nodes health --node-catalog auto --kind route --ip-family v6 --json
 
 更新流程要求显式 Ed25519 公钥，先验证 detached signature 和严格 schema，再原子替换缓存；Unix 文件 mode 为 `0600`。签名、revision 或 schema 不满足时 fail-closed，不启动探测也不覆盖旧缓存。
 
-`vmbench` 可用 `--save-history [--history-tag TAG]` 保存报告；也可用 `history add/list/show/delete` 管理已有 JSON，`history compare --last N` 比较最近 N 份同类型报告。CLI 的 `--json` / `--html` 导出和 history 都先写同目录临时文件、sync 后 rename；Unix 导出/历史文件 mode 为 `0600`，其他平台仍应依赖系统 ACL 保护。报告可能包含 hostname、公网 IP 和 route hops，任何未来 upload/share 都必须显式授权并支持脱敏。Route/Ping 报告区分 catalog protocol 与实际 `probe_protocol/probe_tool`；Suite Compare 只有在 unit、实际 protocol/IP family、provider/probe tool、target/node 以及需要时 catalog revision 全部兼容时才计算 delta。不兼容值仍展示，但明确给出 reason。Route 还必须显式为 `status=ok` 且 `destination_reached=true`，旧报告没有到达证据时不计算 delta。Mail 只比较 `status=open` 的成功连接延迟，拒绝、超时和错误耗时不参与 latency delta。
+`vmbench` 可用 `--save-history [--history-tag TAG]` 保存报告；也可用 `history add/list/show/delete` 管理已有 JSON，`history compare --last N` 比较最近 N 份同类型报告。CLI 的 `--json` / `--html` 导出和 history 都先写同目录临时文件、sync 后 rename；Unix 导出/历史文件 mode 为 `0600`，其他平台仍应依赖系统 ACL 保护。报告可能包含 hostname、公网 IP 和 route hops，任何未来 upload/share 都必须显式授权并支持脱敏。Route/Ping 报告区分 catalog protocol 与实际 `probe_protocol/probe_tool`；体检 Compare 只有在 unit、实际 protocol/IP family、provider/probe tool、target/node 以及需要时 catalog revision 全部兼容时才计算 delta。不兼容值仍展示，但明确给出 reason。Route 还必须显式为 `status=ok` 且 `destination_reached=true`，旧报告没有到达证据时不计算 delta。Mail 只比较 `status=open` 的成功连接延迟，拒绝、超时和错误耗时不参与 latency delta。
 
 ## 自升级
 
@@ -162,10 +162,9 @@ vmbench nodes health --node-catalog auto --kind route --ip-family v6 --json
 
 | Tool | 说明 |
 |---|---|
-| `vmbench_capabilities` | 输出版本、suite sections、presets、hardware tools、speed providers、workload 列表 |
+| `vmbench_capabilities` | 输出版本、checkup sections、presets、hardware tools、speed providers、workload 列表 |
 | `vmbench_sysinfo` | 输出当前主机系统信息和 warning |
-| `vmbench_run` | 运行基准（MCP 默认 `iterations=1`；不带 section 参数只跑 hardware，preset/only/skip 选择网络 section 后返回 suite 报告） |
-| `vmbench_suite` | 弃用别名：与 `vmbench_run` 完全同 schema、同 handler，计划 v0.9.0 删除 |
+| `vmbench_run` | 运行基准（MCP 默认 `iterations=1`；不带 section 参数只跑 hardware，preset/only/skip 选择网络 section 后返回体检报告） |
 
 MCP 输出仍然遵守 vmbench 的产品原则：只返回原始指标和结构化诊断，不输出 benchmark 总分、等级或 category score。IP Quality 的风险评分属于业务诊断，不是 benchmark 总分。
 
@@ -174,8 +173,8 @@ MCP 输出仍然遵守 vmbench 的产品原则：只返回原始指标和结构�
 - stdout 只写 MCP JSON-RPC，日志/错误写 stderr。
 - 不接受任意 shell 命令。
 - `hardware_tools`、section、preset、speed provider 都限制在内置枚举。
-- CLI、TUI、MCP 共同使用规范化后的 Suite 配置字段：iterations、timeout、hardware tools、speed providers、iperf hosts、IP version、sections、route selection、`catalog_source`、`catalog_revision`。
-- 三个入口复用同一校验/归一化契约，但按交互场景暴露字段子集；Go TUI 在低于 40 行时使用紧凑 Suite 视图，配置、运行和结果页可在 `80x24` 内完整操作和查看状态。
+- CLI、TUI、MCP 共同使用规范化后的体检配置字段：iterations、timeout、hardware tools、speed providers、iperf hosts、IP version、sections、route selection、`catalog_source`、`catalog_revision`。
+- 三个入口复用同一校验/归一化契约，但按交互场景暴露字段子集；Go TUI 在低于 40 行时使用紧凑体检视图，配置、运行和结果页可在 `80x24` 内完整操作和查看状态。
 - catalog source 只接受 `embedded`、`auto` 或显式路径；revision pin 不匹配会在网络 probe 前失败。
 - 省略 `iterations` / `timeout_ms` 时分别默认 1 / 5 分钟；显式非正或超出上限的值、非法 regex、混入未知项的枚举数组会使整个调用失败，不会静默丢弃非法项后继续测量。
 - `iterations` 最大 9，`timeout_ms` 最大 15 分钟。
@@ -192,7 +191,7 @@ report := vmbench.RunCore(context.Background(), vmbench.Options{
 })
 ```
 
-`RunCore` 只执行硬件基准；需要网络诊断时使用 `suite.Run`（catalog source/revision 等参数见 suite 包）。报告 JSON 当前为 schema v2，每项保留实际迭代次数、`samples_ms`、吞吐、延迟和结构化错误；`bytes_processed` / `ops_processed` 只在 workload 明确报告累计字节/操作数时出现，不会从 events/s、IOPS、MB/s 或 score 猜测。任一选中 workload 失败时 CLI 返回非零状态。
+`RunCore` 只执行硬件基准；需要网络诊断时使用 `checkup.Run`（catalog source/revision 等参数见 checkup 包）。报告 JSON 当前为 schema v2，每项保留实际迭代次数、`samples_ms`、吞吐、延迟和结构化错误；`bytes_processed` / `ops_processed` 只在 workload 明确报告累计字节/操作数时出现，不会从 events/s、IOPS、MB/s 或 score 猜测。任一选中 workload 失败时 CLI 返回非零状态。
 
 ## 设计原则
 

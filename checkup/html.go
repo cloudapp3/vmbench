@@ -1,0 +1,287 @@
+package checkup
+
+import (
+	"fmt"
+	"html/template"
+	"io"
+	"net"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/cloudapp3/vmbench/i18n"
+)
+
+var htmlTemplate = template.Must(template.New("checkup-report").Funcs(template.FuncMap{
+	"defaultText": func(value, fallback string) string {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+		return fallback
+	},
+	"formatUnix": func(value int64) string {
+		if value <= 0 {
+			return "-"
+		}
+		return time.Unix(value, 0).UTC().Format(time.RFC3339)
+	},
+	"formatTime": func(value time.Time) string {
+		if value.IsZero() {
+			return "-"
+		}
+		return value.UTC().Format(time.RFC3339)
+	},
+	"formatDurationMS": func(value int64) string {
+		if value < 0 {
+			return "-"
+		}
+		return (time.Duration(value) * time.Millisecond).String()
+	},
+	"formatFloat": func(value float64, suffix string) string {
+		if value <= 0 {
+			return "-"
+		}
+		if value >= 100 {
+			return fmt.Sprintf("%.0f %s", value, suffix)
+		}
+		return fmt.Sprintf("%.2f %s", value, suffix)
+	},
+	"formatThroughput": func(value float64, unit string) string {
+		if value <= 0 {
+			return "-"
+		}
+		unit = strings.TrimSpace(unit)
+		if unit == "" {
+			return fmt.Sprintf("%.2f", value)
+		}
+		return fmt.Sprintf("%.2f %s", value, unit)
+	},
+	"formatBytes": func(value uint64) string {
+		const (
+			kib = uint64(1024)
+			mib = kib * 1024
+			gib = mib * 1024
+			tib = gib * 1024
+		)
+		switch {
+		case value >= tib:
+			return fmt.Sprintf("%.2f TiB", float64(value)/float64(tib))
+		case value >= gib:
+			return fmt.Sprintf("%.2f GiB", float64(value)/float64(gib))
+		case value >= mib:
+			return fmt.Sprintf("%.2f MiB", float64(value)/float64(mib))
+		case value >= kib:
+			return fmt.Sprintf("%.2f KiB", float64(value)/float64(kib))
+		default:
+			return fmt.Sprintf("%d B", value)
+		}
+	},
+	"statusClass": func(status string) string {
+		switch strings.ToLower(strings.TrimSpace(status)) {
+		case "ok", "reachable", "open", "available", "direct":
+			return "ok"
+		case "restricted", "partial", "refused", "mixed", "timeout":
+			return "warn"
+		case "error", "failed", "no_response", "unreachable", "blocked", "invalid", "http_error":
+			return "err"
+		default:
+			return "muted"
+		}
+	},
+	"boolText": func(value bool) string {
+		return i18n.YesNo(value)
+	},
+	"t":       i18n.T,
+	"langTag": i18n.LanguageTag,
+	"sectionLabel": func(id string) string {
+		return i18n.SectionLabel(id)
+	},
+	"mediaStatus": func(item MediaServiceResult) string {
+		if item.RawStatus == "Restricted" {
+			return "restricted"
+		}
+		return item.Status
+	},
+	"traceStatus": func(value RouteRun) string {
+		return value.EffectiveStatus()
+	},
+	"traceReached": traceDestinationReachedText,
+	"sectionNames": func(value SectionSelector) string {
+		return strings.Join(value.Names(), ", ")
+	},
+	"formatEndpoint": func(host string, port int) string {
+		host = strings.TrimSpace(host)
+		if host == "" || port <= 0 {
+			return host
+		}
+		return net.JoinHostPort(host, strconv.Itoa(port))
+	},
+}).Parse(`<!doctype html>
+<html lang="{{ langTag }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ t "report.sh.title" }}</title>
+<style>
+:root { color-scheme:light; --bg:#f6f7f9; --surface:#fff; --line:#dfe3e8; --text:#17202a; --muted:#65717e; --ok:#08783f; --okbg:#eaf7ef; --warn:#7a5200; --warnbg:#fff6d8; --err:#a72b2b; --errbg:#fff0f0; --accent:#1565c0; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+main { width:min(1500px,calc(100% - 32px)); margin:24px auto 48px; }
+h1,h2,h3 { margin:0; letter-spacing:0; }
+h1 { font-size:28px; }
+h2 { margin-bottom:12px; font-size:19px; }
+h3 { margin:18px 0 8px; font-size:15px; }
+p { margin:6px 0; }
+.hero,.section { margin-bottom:16px; padding:18px; background:var(--surface); border:1px solid var(--line); border-radius:8px; }
+.hero-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-top:14px; }
+.metric { min-width:0; padding-top:8px; border-top:2px solid var(--line); }
+.metric strong { display:block; overflow-wrap:anywhere; font-size:17px; }
+.label,.small { color:var(--muted); font-size:12px; }
+.badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:700; }
+.badge.ok { color:var(--ok); background:var(--okbg); }
+.badge.warn { color:var(--warn); background:var(--warnbg); }
+.badge.err { color:var(--err); background:var(--errbg); }
+.badge.muted { color:var(--muted); background:#edf0f3; }
+.table-wrap { width:100%; overflow-x:auto; }
+table { width:100%; border-collapse:collapse; }
+th,td { padding:9px 8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; overflow-wrap:anywhere; }
+th { color:var(--muted); background:#fafbfc; font-size:11px; text-transform:uppercase; }
+tr:last-child td { border-bottom:0; }
+code { font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; color:#303b46; }
+.error { color:var(--err); }
+.subsection { margin-top:18px; padding-top:14px; border-top:1px solid var(--line); }
+ul { margin:8px 0 0; padding-left:20px; }
+@media (max-width:640px) { main { width:100%; margin:0; } .hero,.section { margin:0; border-width:0 0 1px; border-radius:0; padding:14px; } .hero-head { display:block; } .hero-head .badge { margin-top:8px; } th,td { padding:8px 6px; } }
+</style>
+</head>
+<body><main>
+<section class="hero">
+  <div class="hero-head">
+    <div><h1>{{ t "report.sh.hero" }}</h1><p class="small">{{ t "report.sh.heroSub" }}</p></div>
+    <span class="badge {{ statusClass .Status }}">{{ defaultText .Status (t "common.unknown") }}</span>
+  </div>
+  <p>{{ defaultText .Message "-" }}</p>
+  <div class="grid">
+    <div class="metric"><span class="label">{{ t "report.sh.reportID" }}</span><strong><code>{{ defaultText .ReportID (t "status.legacy") }}</code></strong></div>
+    <div class="metric"><span class="label">{{ t "report.sh.schema" }}</span><strong>{{ .SchemaVersion }}</strong></div>
+    <div class="metric"><span class="label">{{ t "report.sh.app" }}</span><strong>{{ defaultText .App.Version (t "common.unknown") }}</strong></div>
+    <div class="metric"><span class="label">{{ t "report.sh.started" }}</span><strong>{{ if .StartedAt.IsZero }}{{ formatUnix .StartedTime }}{{ else }}{{ formatTime .StartedAt }}{{ end }}</strong></div>
+    <div class="metric"><span class="label">{{ t "report.sh.finished" }}</span><strong>{{ if .FinishedAt.IsZero }}{{ formatUnix .FinishedTime }}{{ else }}{{ formatTime .FinishedAt }}{{ end }}</strong></div>
+    <div class="metric"><span class="label">{{ t "report.sh.duration" }}</span><strong>{{ formatDurationMS .DurationMS }}</strong></div>
+  </div>
+</section>
+
+<section class="section">
+  <h2>{{ t "report.sh.sysConfig" }}</h2>
+  <div class="grid">
+    <div class="metric"><span class="label">{{ t "report.sh.host" }}</span><strong>{{ defaultText .System.OS.Hostname "-" }}</strong><span class="small">{{ defaultText .System.OS.Name (t "report.sh.unknownOS") }} / {{ defaultText .System.OS.Kernel (t "report.sh.unknownKernel") }}</span></div>
+    <div class="metric"><span class="label">{{ t "report.label.cpu" }}</span><strong>{{ defaultText .System.CPU.Model "-" }}</strong><span class="small">{{ .System.CPU.PhysicalCores }} cores / {{ .System.CPU.LogicalCores }} threads / {{ defaultText .System.CPU.Arch "-" }}</span></div>
+    <div class="metric"><span class="label">{{ t "report.label.memory" }}</span><strong>{{ formatBytes .System.Memory.TotalBytes }}</strong><span class="small">{{ defaultText .System.Memory.Type (t "report.sh.typeUnknown") }} / {{ .System.Memory.FreqMHz }} MHz / {{ .System.Memory.Channels }} channels</span></div>
+    <div class="metric"><span class="label">{{ t "report.sh.virtualization" }}</span><strong>{{ defaultText .System.Virtualization.System (t "common.unknown") }}</strong><span class="small">{{ t "report.sh.role" }} {{ defaultText .System.Virtualization.Role (t "common.unknown") }}</span></div>
+    <div class="metric"><span class="label">{{ t "report.checkup.preset" }}</span><strong>{{ defaultText .Config.Preset (t "status.custom") }}</strong><span class="small">IP {{ defaultText .Config.IPVersion "v4" }} / {{ .Config.Iterations }} iterations</span></div>
+    <div class="metric"><span class="label">{{ t "report.checkup.sections" }}</span><strong>{{ sectionNames .Config.Sections }}</strong><span class="small">timeout {{ .Config.TimeoutMS }} ms</span></div>
+    <div class="metric"><span class="label">{{ t "report.sh.nodeCatalog" }}</span><strong>{{ defaultText .Config.CatalogRevision (t "report.sh.notUsed") }}</strong><span class="small">source {{ defaultText .Config.CatalogSource "-" }} / {{ len .Config.NodeIDs }} selected nodes</span></div>
+  </div>
+  {{ if .Config.NodeIDs }}<p class="small"><strong>{{ t "report.sh.selectedNodeIDs" }}:</strong> {{ range .Config.NodeIDs }}<code>{{ . }}</code> {{ end }}</p>{{ end }}
+  <p class="small">Build commit {{ defaultText .App.Commit "unknown" }} / build time {{ defaultText .App.BuildTime "unknown" }}</p>
+</section>
+
+<section class="section">
+  <h2>{{ t "report.sh.sectionStatus" }}</h2>
+  <div class="table-wrap"><table><thead><tr><th>{{ t "report.sh.section" }}</th><th>{{ t "report.sh.enabled" }}</th><th>{{ t "report.checkup.col.status" }}</th><th>{{ t "report.checkup.col.message" }}</th></tr></thead><tbody>
+    <tr><td>{{ sectionLabel "hardware" }}</td><td>{{ boolText .Hardware.Enabled }}</td><td><span class="badge {{ statusClass .Hardware.Status }}">{{ defaultText .Hardware.Status "unknown" }}</span></td><td>{{ defaultText .Hardware.Message "-" }}</td></tr>
+    <tr><td>{{ sectionLabel "network_info" }}</td><td>{{ boolText .NetworkInfo.Enabled }}</td><td><span class="badge {{ statusClass .NetworkInfo.Status }}">{{ defaultText .NetworkInfo.Status "unknown" }}</span></td><td>{{ defaultText .NetworkInfo.Message "-" }}</td></tr>
+    <tr><td>{{ sectionLabel "route" }}</td><td>{{ boolText .Route.Enabled }}</td><td><span class="badge {{ statusClass .Route.Status }}">{{ defaultText .Route.Status "unknown" }}</span></td><td>{{ defaultText .Route.Message "-" }}</td></tr>
+    <tr><td>{{ sectionLabel "ping" }}</td><td>{{ boolText .Ping.Enabled }}</td><td><span class="badge {{ statusClass .Ping.Status }}">{{ defaultText .Ping.Status "unknown" }}</span></td><td>{{ defaultText .Ping.Message "-" }}</td></tr>
+    <tr><td>{{ sectionLabel "speed" }}</td><td>{{ boolText .Speed.Enabled }}</td><td><span class="badge {{ statusClass .Speed.Status }}">{{ defaultText .Speed.Status "unknown" }}</span></td><td>{{ defaultText .Speed.Message "-" }}</td></tr>
+    <tr><td>{{ sectionLabel "ip_quality" }}</td><td>{{ boolText .IPQuality.Enabled }}</td><td><span class="badge {{ statusClass .IPQuality.Status }}">{{ defaultText .IPQuality.Status "unknown" }}</span></td><td>{{ defaultText .IPQuality.Message "-" }}</td></tr>
+    <tr><td>{{ sectionLabel "reachability" }}</td><td>{{ boolText .Reachability.Enabled }}</td><td><span class="badge {{ statusClass .Reachability.Status }}">{{ defaultText .Reachability.Status "unknown" }}</span></td><td>{{ defaultText .Reachability.Message "-" }}</td></tr>
+    <tr><td>{{ sectionLabel "mail" }}</td><td>{{ boolText .Mail.Enabled }}</td><td><span class="badge {{ statusClass .Mail.Status }}">{{ defaultText .Mail.Status "unknown" }}</span></td><td>{{ defaultText .Mail.Message "-" }}</td></tr>
+    <tr><td>{{ sectionLabel "media" }}</td><td>{{ boolText .Media.Enabled }}</td><td><span class="badge {{ statusClass .Media.Status }}">{{ defaultText .Media.Status "unknown" }}</span></td><td>{{ defaultText .Media.Message "-" }}</td></tr>
+  </tbody></table></div>
+</section>
+
+{{ with .Hardware.Report }}
+<section class="section">
+  <h2>{{ t "checkup.section.hardware" }} · {{ t "report.sh.workloads" }}</h2>
+  <div class="table-wrap"><table><thead><tr><th>{{ t "report.sh.name" }}</th><th>{{ t "report.checkup.col.category" }}</th><th>{{ t "report.sh.iterations" }}</th><th>{{ t "report.sh.median" }}</th><th>{{ t "report.checkup.col.throughput" }}</th><th>{{ t "report.checkup.col.latency" }}</th><th>{{ t "report.sh.detail" }}</th><th>{{ t "report.checkup.col.error" }}</th></tr></thead><tbody>
+  {{ range .Results.Workloads }}<tr><td>{{ .Name }}</td><td>{{ .Category }}</td>{{ with .Result }}<td>{{ .Iterations }}</td><td>{{ formatFloat .MedianMS "ms" }}</td><td>{{ formatThroughput .ThroughputPerSec .ThroughputUnit }}</td><td>{{ formatFloat .AvgNSPerAccess "ns" }}</td><td>{{ defaultText .Detail "-" }}</td><td class="error">{{ defaultText .Error "-" }}</td>{{ else }}<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td class="error">{{ t "report.sh.missingResult" }}</td>{{ end }}</tr>{{ end }}
+  {{ range .Extensions.Workloads }}<tr><td>{{ .Name }}</td><td>{{ .Category }}</td>{{ with .Result }}<td>{{ .Iterations }}</td><td>{{ formatFloat .MedianMS "ms" }}</td><td>{{ formatThroughput .ThroughputPerSec .ThroughputUnit }}</td><td>{{ formatFloat .AvgNSPerAccess "ns" }}</td><td>{{ defaultText .Detail "-" }}</td><td class="error">{{ defaultText .Error "-" }}</td>{{ else }}<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td class="error">{{ t "report.sh.missingResult" }}</td>{{ end }}</tr>{{ end }}
+  </tbody></table></div>
+</section>
+{{ end }}
+
+{{ with .NetworkInfo.Result }}
+<section class="section">
+  <h2>{{ sectionLabel "network_info" }}</h2>
+  <h3>{{ t "report.sh.publicAddresses" }}</h3>
+  <div class="table-wrap"><table><thead><tr><th>{{ t "report.sh.family" }}</th><th>{{ t "report.checkup.col.address" }}</th><th>{{ t "report.checkup.col.asn" }}</th><th>{{ t "report.checkup.col.organization" }}</th><th>ISP</th><th>{{ t "report.checkup.col.country" }}</th></tr></thead><tbody>
+    {{ with .PublicIPv4 }}<tr><td>{{ .IPVersion }}</td><td><code>{{ .IP }}</code></td><td>{{ .ASN }}</td><td>{{ defaultText .Org "-" }}</td><td>{{ defaultText .ISP "-" }}</td><td>{{ defaultText .CountryCode .Country }}</td></tr>{{ end }}
+    {{ with .PublicIPv6 }}<tr><td>{{ .IPVersion }}</td><td><code>{{ .IP }}</code></td><td>{{ .ASN }}</td><td>{{ defaultText .Org "-" }}</td><td>{{ defaultText .ISP "-" }}</td><td>{{ defaultText .CountryCode .Country }}</td></tr>{{ end }}
+  </tbody></table></div>
+  {{ if .LocalGlobalAddresses }}<h3>{{ t "report.sh.localAddresses" }}</h3><div class="table-wrap"><table><thead><tr><th>{{ t "report.checkup.col.localInterface" }}</th><th>{{ t "report.sh.family" }}</th><th>{{ t "report.checkup.col.address" }}</th><th>{{ t "report.checkup.col.private" }}</th></tr></thead><tbody>{{ range .LocalGlobalAddresses }}<tr><td>{{ .Interface }}</td><td>{{ .IPVersion }}</td><td><code>{{ .Address }}</code></td><td>{{ boolText .Private }}</td></tr>{{ end }}</tbody></table></div>{{ end }}
+  {{ if .NAT }}<h3>{{ t "report.sh.natHeuristic" }}</h3><div class="table-wrap"><table><thead><tr><th>{{ t "report.sh.family" }}</th><th>{{ t "report.checkup.col.status" }}</th><th>{{ t "report.checkup.col.method" }}</th><th>{{ t "report.checkup.col.publicIP" }}</th><th>{{ t "report.checkup.col.localIP" }}</th><th>{{ t "report.checkup.col.reason" }}</th></tr></thead><tbody>{{ range .NAT }}<tr><td>{{ .IPVersion }}</td><td><span class="badge {{ statusClass .Status }}">{{ .Status }}</span></td><td>{{ .Method }}</td><td><code>{{ defaultText .PublicIP "-" }}</code></td><td><code>{{ defaultText .LocalIP "-" }}</code></td><td>{{ .Reason }}</td></tr>{{ end }}</tbody></table></div>{{ end }}
+  {{ with .STUNNAT }}<h3>{{ t "report.sh.stunNAT" }}</h3><p><strong>{{ defaultText .NATType (t "report.sh.inconclusive") }}</strong> <span class="badge {{ statusClass .Status }}">{{ .Status }}</span>{{ if .MappingBehavior }} · mapping {{ .MappingBehavior }}{{ end }}{{ if .FilteringBehavior }} · filtering {{ .FilteringBehavior }}{{ end }}{{ if .PortPreservation }} · port preservation {{ .PortPreservation }}{{ end }}{{ if .Hairpin }} · hairpin {{ .Hairpin }}{{ end }}{{ if .Partial }} · partial{{ end }} ({{ .Successful }} ok / {{ .Failed }} failed)</p>{{ if .Message }}<p class="small">{{ .Message }}</p>{{ end }}{{ if .Results }}<div class="table-wrap"><table><thead><tr><th>{{ t "report.sh.server" }}</th><th>{{ t "report.checkup.col.status" }}</th><th>{{ t "report.sh.natType" }}</th><th>{{ t "report.checkup.col.error" }}</th></tr></thead><tbody>{{ range .Results }}<tr><td><code>{{ .Server }}</code></td><td><span class="badge {{ statusClass .Status }}">{{ .Status }}</span></td><td>{{ defaultText .NATType "-" }}</td><td>{{ defaultText .Error "-" }}</td></tr>{{ end }}</tbody></table></div>{{ end }}{{ end }}
+  {{ with .IPBGP }}<h3>{{ t "report.sh.ipBgp" }}</h3><p><strong>{{ defaultText .ASN "-" }}</strong> {{ defaultText .NetworkName "" }} <span class="badge {{ statusClass .Status }}">{{ .Status }}</span>{{ if .Prefixes }} · prefix <code>{{ range .Prefixes }}{{ . }} {{ end }}</code>{{ end }}{{ if .Range }} · range <code>{{ .Range }}</code>{{ end }}{{ if .RIR }} · {{ .RIR }}{{ end }}{{ if .Country }} · {{ .Country }}{{ end }}{{ if .RegistrationDate }} · registered {{ .RegistrationDate }}{{ end }}{{ if .Tier1Upstreams }} · {{ .Tier1Upstreams }} Tier 1 upstreams{{ end }}</p>{{ if .Message }}<p class="small">{{ .Message }}</p>{{ end }}{{ if .Relationships }}<div class="table-wrap"><table><thead><tr><th>{{ t "report.checkup.col.relationship" }}</th><th>{{ t "report.checkup.col.asn" }}</th><th>{{ t "report.checkup.col.name" }}</th><th>{{ t "report.checkup.col.source" }}</th></tr></thead><tbody>{{ range .Relationships }}<tr><td>{{ defaultText .Kind "-" }}</td><td>{{ defaultText .ASN "-" }}</td><td>{{ defaultText .Name "-" }}{{ if .Tier1 }} <span class="badge ok">Tier 1</span>{{ end }}</td><td>{{ defaultText .Source "-" }}</td></tr>{{ end }}</tbody></table></div>{{ end }}{{ if .GeofeedURLs }}<p class="small">geofeed: {{ range .GeofeedURLs }}<code>{{ . }}</code> {{ end }}</p>{{ end }}{{ end }}
+  {{ with .CIDRNeighbors }}<h3>{{ t "report.sh.activeNeighbors" }}</h3><p><span class="badge {{ statusClass .Status }}">{{ .Status }}</span>{{ if .SubnetActive }} · {{ .SubnetActive }}/{{ .SubnetTotal }} in <code>{{ .SubnetPrefix }}</code> (subnet){{ end }}{{ if .PrefixActive }}{{ if .AnnouncedPrefix }} · {{ .PrefixActive }}/{{ .PrefixTotal }} in <code>{{ .AnnouncedPrefix }}</code> (announced){{ end }}{{ end }}</p>{{ if .Message }}<p class="small">{{ .Message }}</p>{{ end }}{{ end }}
+  {{ with .IPv6Subnet }}{{ if ne .Status "unsupported" }}<h3>{{ t "report.sh.ipv6Subnet" }}</h3><p><span class="badge {{ statusClass .Status }}">{{ .Status }}</span>{{ if .PrefixLength }} · on-link prefix <code>/{{ .PrefixLength }}</code>{{ end }}{{ if .Address }} · {{ .Address }}{{ end }}</p>{{ if .Message }}<p class="small">{{ .Message }}</p>{{ end }}{{ end }}{{ end }}
+  {{ if .Providers }}<h3>{{ t "report.sh.evidenceProviders" }}</h3><div class="table-wrap"><table><thead><tr><th>ID</th><th>{{ t "report.checkup.col.kind" }}</th><th>{{ t "report.sh.family" }}</th><th>{{ t "report.checkup.col.status" }}</th><th>{{ t "report.checkup.col.error" }}</th></tr></thead><tbody>{{ range .Providers }}<tr><td>{{ .ID }}</td><td>{{ .Kind }}</td><td>{{ defaultText .IPVersion "-" }}</td><td><span class="badge {{ statusClass .Status }}">{{ .Status }}</span></td><td class="error">{{ defaultText .Error "-" }}</td></tr>{{ end }}</tbody></table></div>{{ end }}
+</section>
+{{ end }}
+
+{{ if .Route.Results }}
+<section class="section"><h2>{{ sectionLabel "route" }} · {{ t "report.sh.evidence" }}</h2>
+{{ range .Route.Results }}
+	  <div class="subsection"><h3>{{ .Target.Name }} <span class="badge {{ statusClass (traceStatus .) }}">{{ traceStatus . }}</span>{{ if .Classification }} <span class="badge warn">{{ .Classification.Label }}</span>{{ end }}</h3><p class="small"><code>{{ defaultText .Target.ID "legacy" }}</code> / {{ .Target.City }} / {{ .Target.Carrier }} / AS{{ .Target.AS }} / {{ defaultText .Target.IPFamily "-" }} / catalog {{ defaultText .Target.Protocol "-" }} / probe {{ defaultText .ProbeProtocol "unknown" }} via {{ defaultText .ProbeTool "unknown" }} / {{ defaultText .Target.Source "-" }} / requested <code>{{ formatEndpoint .Target.Endpoint .Target.Port }}</code> / resolved <code>{{ defaultText .ResolvedTarget "unknown" }}</code> / destination reached {{ traceReached .DestinationReached }}{{ if .Classification }} / line <code>{{ .Classification.Code }}</code> ({{ .Classification.Confidence }}){{ if .ObservedASNs }} / ASNs {{ .ObservedASNs }}{{ end }}{{ end }}</p>
+  {{ if .Error }}<p class="error">{{ .Error }}</p>{{ end }}
+  {{ if .Hops }}<div class="table-wrap"><table><thead><tr><th>TTL</th><th>IP</th><th>{{ t "report.checkup.col.asn" }}</th><th>RTT</th><th>{{ t "report.sh.timeout" }}</th></tr></thead><tbody>{{ range .Hops }}<tr><td>{{ .TTL }}</td><td><code>{{ defaultText .IP "-" }}</code></td><td>{{ defaultText .ASN "-" }}</td><td>{{ formatFloat .RTTMs "ms" }}</td><td>{{ boolText .Timeout }}</td></tr>{{ end }}</tbody></table></div>{{ end }}</div>
+{{ end }}
+</section>
+{{ end }}
+
+{{ if .Ping.Results }}
+<section class="section"><h2>{{ sectionLabel "ping" }} · {{ t "report.sh.evidence" }}</h2><div class="table-wrap"><table><thead><tr><th>ID</th><th>{{ t "report.checkup.col.target" }}</th><th>{{ t "report.checkup.col.city" }}</th><th>{{ t "report.checkup.col.carrier" }}</th><th>{{ t "report.sh.family" }}</th><th>{{ t "report.checkup.col.connection" }}</th><th>{{ t "report.sh.average" }}</th><th>{{ t "report.checkup.col.jitter" }}</th><th>{{ t "report.checkup.col.loss" }}</th><th>{{ t "report.sh.sentReceived" }}</th><th>{{ t "report.checkup.col.status" }}</th><th>{{ t "report.checkup.col.message" }}</th></tr></thead><tbody>
+{{ range .Ping.Results }}<tr><td>{{ defaultText .ID "-" }}<br><span class="small">catalog {{ defaultText .Protocol "-" }} / probe {{ defaultText .ProbeProtocol "unknown" }} via {{ defaultText .ProbeTool "unknown" }} / {{ defaultText .Source "-" }}</span></td><td>{{ defaultText .Name .Target }}<br><code>{{ formatEndpoint .Target .Port }}</code></td><td>{{ defaultText .City "-" }}</td><td>{{ defaultText .Carrier "-" }} / AS{{ .ASN }}</td><td>{{ defaultText .IPFamily "-" }}</td><td><span class="badge {{ statusClass .ConnectionState }}">{{ defaultText .ConnectionState "unknown" }}</span></td><td>{{ formatFloat .AvgLatencyMs "ms" }}</td><td>{{ formatFloat .JitterMs "ms" }}</td><td>{{ printf "%.1f%%" .PacketLoss }}</td><td>{{ .Sent }}/{{ .Received }}</td><td><span class="badge {{ statusClass .Status }}">{{ defaultText .Status (t "common.unknown") }}</span></td><td>{{ defaultText .Message "-" }}</td></tr>{{ end }}
+</tbody></table></div></section>
+{{ end }}
+
+{{ with .Speed.Result }}
+<section class="section"><h2>{{ sectionLabel "speed" }} · {{ t "report.sh.evidence" }}</h2>
+  {{ with .Summary }}<div class="grid"><div class="metric"><span class="label">{{ t "report.sh.download" }}</span><strong>{{ formatFloat .DownloadMbps "Mbps" }}</strong></div><div class="metric"><span class="label">{{ t "report.sh.upload" }}</span><strong>{{ formatFloat .UploadMbps "Mbps" }}</strong></div><div class="metric"><span class="label">{{ t "report.checkup.col.latency" }}</span><strong>{{ formatFloat .LatencyMs "ms" }}</strong></div><div class="metric"><span class="label">{{ t "report.sh.aggregation" }}</span><strong>{{ defaultText .Aggregation (t "report.sh.singleProvider") }}</strong></div></div>{{ end }}
+  {{ if .Groups }}<h3>{{ t "report.sh.providerGroups" }}</h3><div class="table-wrap"><table><thead><tr><th>{{ t "report.checkup.col.provider" }}</th><th>{{ t "report.checkup.col.status" }}</th><th>{{ t "report.sh.available" }}</th><th>{{ t "report.checkup.col.fail" }}</th><th>{{ t "report.sh.download" }}</th><th>{{ t "report.sh.upload" }}</th><th>{{ t "report.checkup.col.latency" }}</th><th>{{ t "report.checkup.col.message" }}</th></tr></thead><tbody>{{ range .Groups }}<tr><td>{{ defaultText .ProviderLabel .Provider }}</td><td><span class="badge {{ statusClass .Status }}">{{ defaultText .Status (t "common.unknown") }}</span></td><td>{{ .Available }}</td><td>{{ .Failed }}</td>{{ with .Summary }}<td>{{ formatFloat .DownloadMbps "Mbps" }}</td><td>{{ formatFloat .UploadMbps "Mbps" }}</td><td>{{ formatFloat .LatencyMs "ms" }}</td>{{ else }}<td>-</td><td>-</td><td>-</td>{{ end }}<td>{{ defaultText .Message "-" }}</td></tr>{{ end }}</tbody></table></div>{{ end }}
+  {{ if .Providers }}<h3>{{ t "report.sh.providerResults" }}</h3><div class="table-wrap"><table><thead><tr><th>ID</th><th>{{ t "report.checkup.col.provider" }}</th><th>{{ t "report.checkup.col.kind" }}</th><th>{{ t "report.checkup.col.node" }}</th><th>{{ t "report.checkup.col.endpoint" }}</th><th>{{ t "report.checkup.col.region" }}</th><th>{{ t "report.sh.download" }}</th><th>{{ t "report.sh.upload" }}</th><th>{{ t "report.checkup.col.latency" }}</th><th>{{ t "report.sh.elapsed" }}</th><th>{{ t "report.checkup.col.status" }}</th><th>{{ t "report.checkup.col.message" }}</th></tr></thead><tbody>{{ range .Providers }}<tr><td>{{ .ID }}</td><td>{{ defaultText .ProviderLabel .Provider }}</td><td>{{ defaultText .Kind "-" }}</td><td>{{ defaultText .Node .NodeID }}{{ if .NodeID }}<br><code>{{ .NodeID }}</code>{{ end }}</td><td>{{ defaultText .Endpoint "-" }}</td><td>{{ defaultText .Region "-" }}</td><td>{{ formatFloat .DownloadMbps "Mbps" }}</td><td>{{ formatFloat .UploadMbps "Mbps" }}</td><td>{{ formatFloat .LatencyMs "ms" }}</td><td>{{ formatFloat .ElapsedMs "ms" }}</td><td><span class="badge {{ statusClass .Status }}">{{ defaultText .Status (t "common.unknown") }}</span></td><td>{{ defaultText .Message "-" }}</td></tr>{{ end }}</tbody></table></div>{{ end }}
+</section>
+{{ end }}
+
+{{ if .Reachability.Results }}
+<section class="section"><h2>{{ sectionLabel "reachability" }}</h2><div class="table-wrap"><table><thead><tr><th>ID</th><th>{{ t "report.checkup.col.category" }}</th><th>{{ t "report.checkup.col.protocol" }}</th><th>{{ t "report.checkup.col.endpoint" }}</th><th>{{ t "report.checkup.col.latency" }}</th><th>HTTP</th><th>{{ t "report.checkup.col.status" }}</th><th>{{ t "report.checkup.col.error" }}</th></tr></thead><tbody>{{ range .Reachability.Results }}<tr><td>{{ .ID }}</td><td>{{ .Category }}</td><td>{{ .Protocol }}</td><td><code>{{ .Endpoint }}</code></td><td>{{ formatFloat .LatencyMs "ms" }}</td><td>{{ if .HTTPStatus }}{{ .HTTPStatus }}{{ else }}-{{ end }}</td><td><span class="badge {{ statusClass .Status }}">{{ .Status }}</span></td><td class="error">{{ defaultText .Error "-" }}</td></tr>{{ end }}</tbody></table></div></section>
+{{ end }}
+
+{{ with .IPQuality.Result }}
+<section class="section"><h2>{{ sectionLabel "ip_quality" }}</h2>
+  {{ with .BasicInfo }}<div class="grid"><div class="metric"><span class="label">IP</span><strong><code>{{ defaultText .IP "-" }}</code></strong><span class="small">source {{ defaultText .Source "unknown" }}</span></div><div class="metric"><span class="label">{{ t "report.checkup.col.asn" }}</span><strong>{{ .ASN }}</strong><span class="small">{{ defaultText .Org .ISP }}</span></div><div class="metric"><span class="label">{{ t "report.sh.location" }}</span><strong>{{ defaultText .CountryCode .Country }}</strong></div><div class="metric"><span class="label">{{ t "report.sh.flags" }}</span><strong>hosting={{ boolText .Hosting }} / proxy={{ boolText .Proxy }}</strong><span class="error">{{ .Error }}</span></div></div>{{ end }}
+  {{ with .RiskSummary }}<h3>{{ t "report.sh.riskEvidence" }}</h3><p>{{ defaultText .Summary "-" }}</p><div class="table-wrap"><table><tbody><tr><th>{{ t "report.sh.riskLevel" }}</th><td>{{ defaultText .RiskLevel "unknown" }}</td><th>DNSBL</th><td>{{ boolText .DNSBLSupported }} via {{ defaultText .DNSBLTool "-" }}</td><th>{{ t "report.sh.listed" }}</th><td>{{ .DNSBLListedCount }} {{ range .DNSBLListed }}<code>{{ . }}</code> {{ end }}</td></tr><tr><th>{{ t "report.sh.dnsblDetail" }}</th><td colspan="5">{{ defaultText .DNSBLMessage "-" }}</td></tr></tbody></table></div>{{ end }}
+  {{ with .Score }}<p><strong>{{ t "report.sh.riskDiagnostic" }}: {{ .Total }}/{{ .MaxTotal }} ({{ .Level }})</strong></p>{{ end }}
+  {{ with .IPAPIIS }}{{ if .Supported }}<h3>{{ t "report.sh.ipapiCross" }}</h3><p class="small">{{ defaultText .Company "-" }} / {{ defaultText .ASN "-" }} / {{ defaultText .Location "-" }}</p>{{ end }}{{ end }}
+  {{ with .SecurityCheck }}<h3>{{ t "report.sh.securityCheck" }}</h3><p class="small"><span class="badge {{ statusClass .Status }}">{{ .Status }}</span> {{ defaultText .Message "" }} {{ if .Binary }}via <code>{{ .Binary }}</code>{{ end }}</p>{{ if .Fields }}<div class="table-wrap"><table><thead><tr><th>{{ t "report.checkup.col.field" }}</th><th>{{ t "report.checkup.col.value" }}</th></tr></thead><tbody>{{ range .Fields }}<tr><td>{{ .Name }}</td><td>{{ .Value }}</td></tr>{{ end }}</tbody></table></div>{{ end }}{{ if .Raw }}<details><summary>Raw output</summary><pre>{{ .Raw }}</pre></details>{{ end }}{{ end }}
+  {{ if .Sources }}<h3>{{ t "report.sh.evidenceSources" }}</h3><div class="table-wrap"><table><thead><tr><th>{{ t "report.checkup.col.source" }}</th><th>{{ t "report.checkup.col.status" }}</th><th>{{ t "report.checkup.col.message" }}</th></tr></thead><tbody>{{ range .Sources }}<tr><td>{{ .Source }}</td><td><span class="badge {{ statusClass .Status }}">{{ .Status }}</span></td><td>{{ defaultText .Message "-" }}</td></tr>{{ end }}</tbody></table></div>{{ end }}
+  {{ if .MailPorts }}<h3>{{ t "report.sh.ipqMailProbe" }}</h3><div class="table-wrap"><table><thead><tr><th>{{ t "report.checkup.col.port" }}</th><th>{{ t "report.checkup.col.target" }}</th><th>{{ t "report.checkup.col.method" }}</th><th>{{ t "report.checkup.col.latency" }}</th><th>{{ t "report.checkup.col.status" }}</th><th>{{ t "report.checkup.col.message" }}</th></tr></thead><tbody>{{ range .MailPorts }}<tr><td>{{ .Port }}</td><td>{{ defaultText .Target "-" }}</td><td>{{ defaultText .Method "-" }}</td><td>{{ formatFloat .LatencyMs "ms" }}</td><td><span class="badge {{ statusClass .Status }}">{{ defaultText .Status (t "common.unknown") }}</span></td><td>{{ defaultText .Message "-" }}</td></tr>{{ end }}</tbody></table></div>{{ end }}
+</section>
+{{ end }}
+
+{{ if .Mail.Results }}
+<section class="section"><h2>{{ sectionLabel "mail" }}</h2><div class="table-wrap"><table><thead><tr><th>{{ t "report.checkup.col.port" }}</th><th>{{ t "report.sh.colTitle" }}</th><th>{{ t "report.checkup.col.target" }}</th><th>{{ t "report.checkup.col.method" }}</th><th>{{ t "report.sh.supported" }}</th><th>{{ t "report.checkup.col.latency" }}</th><th>{{ t "report.checkup.col.status" }}</th><th>{{ t "report.checkup.col.message" }}</th></tr></thead><tbody>{{ range .Mail.Results }}<tr><td>{{ .Port }}</td><td>{{ defaultText .Title "-" }}</td><td>{{ defaultText .Target "-" }}</td><td>{{ defaultText .Method "-" }}</td><td>{{ boolText .Supported }}</td><td>{{ formatFloat .LatencyMs "ms" }}</td><td><span class="badge {{ statusClass .Status }}">{{ defaultText .Status (t "common.unknown") }}</span></td><td>{{ defaultText .Message "-" }}</td></tr>{{ end }}</tbody></table></div></section>
+{{ end }}
+
+{{ with .Media.Result }}{{ if .Items }}
+<section class="section"><h2>{{ sectionLabel "media" }}</h2><p class="small">Set {{ defaultText .Set "all" }} · available {{ .Summary.Available }} (restricted {{ .Summary.Restricted }}) / blocked {{ .Summary.Blocked }} / unknown {{ .Summary.Unknown }}</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>{{ t "report.sh.service" }}</th><th>{{ t "report.checkup.col.ip" }}</th><th>{{ t "report.checkup.col.region" }}</th><th>{{ t "report.checkup.col.status" }}</th><th>{{ t "report.checkup.col.message" }}</th></tr></thead><tbody>{{ range .Items }}<tr><td>{{ .ID }}</td><td>{{ .Title }}</td><td>{{ defaultText .IPVersion "-" }}</td><td>{{ defaultText .Region "-" }}</td><td><span class="badge {{ statusClass (mediaStatus .) }}">{{ mediaStatus . }}</span></td><td>{{ defaultText .Message "-" }}</td></tr>{{ end }}</tbody></table></div></section>
+{{ end }}{{ end }}
+
+{{ if .Warnings }}<section class="section"><h2>{{ t "report.checkup.warnings" }}</h2><ul>{{ range .Warnings }}<li>{{ . }}</li>{{ end }}</ul></section>{{ end }}
+</main></body></html>`))
+
+// WriteHTML renders a self-contained checkup report.
+func WriteHTML(w io.Writer, report CheckupReport) error {
+	return htmlTemplate.Execute(w, report)
+}
