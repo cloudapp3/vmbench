@@ -150,6 +150,10 @@ vmbench nodes health --node-catalog auto --kind route --ip-family v6 --json
 
 `vmbench update` 让已安装的二进制从 GitHub Releases 自升级：查询最新 release（`releases/latest`，天然排除 draft/prerelease），与当前构建版本比较后下载对应 OS/arch 的发布归档，按 release `checksums.txt` 做 SHA-256 校验，解出二进制并以临时文件 + rename 原地替换当前可执行文件（Windows 先将旧文件移到 `.old` 再替换）。校验模型与 `install.sh` 一致：checksums over TLS，release 资产本身不做签名；`--version TAG` 可固定/降级版本（等于当前版本也重装，可用于修复），`--check` 只报告不安装，`--json` 输出结构化状态。`GITHUB_TOKEN`/`GH_TOKEN` 会被作为 bearer token 转发给 GitHub API 以缓解速率限制。deb/rpm 安装的实例建议走包管理器升级，或用 `--dest` 指定可写路径；目标不可写时命令 fail-closed 并提示替代方案。
 
+## 卸载
+
+`vmbench uninstall` 一条命令移除二进制在机器上创建的一切：先打印删除计划（历史报告条数、已获取的静态工具、TUI 偏好、数据目录、二进制本体），终端交互确认后按「目录 → 二进制本体」顺序删除。二进制最后删除，且其余任何一项失败即保留，卸载可安全重跑。三条边界与安装脚本一致：自定义 `VMBENCH_HISTORY_DIR`（及 `VMBENCH_CONFIG` 重定向位置）下的报告保留；shell 启动文件里的 PATH 条目归 `install.sh --uninstall` 清理，本命令不碰 rc 文件；手动创建的 systemd/launchd unit 只检测提示、不停止不删除。`--dry-run` 只打印计划，`--json` 输出结构化计划/结果供脚本使用，`--yes` 跳过确认；非终端 stdin（含 `install.sh` 的委托调用）跳过确认直接执行。dpkg/rpm 管理的二进制会收到改用包管理器卸载的警告。
+
 ## MCP 给大模型调用
 
 `vmbench mcp serve --transport stdio` 提供本地 MCP Server，让 Claude、Codex、Cursor、Cline 等客户端通过 tools 调用 vmbench，而不是让模型执行任意 shell。

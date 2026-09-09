@@ -164,3 +164,38 @@ func TestRecordReportTimeFallsBackToAddTime(t *testing.T) {
 		t.Fatalf("fallback report time = %s", record.ReportTime)
 	}
 }
+
+func TestDefaultRootMirrorsDefaultDir(t *testing.T) {
+	xdg := t.TempDir()
+	t.Setenv("VMBENCH_HISTORY_DIR", "")
+	t.Setenv("XDG_DATA_HOME", xdg)
+	root, err := DefaultRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(xdg, "vmbench"); root != want {
+		t.Fatalf("DefaultRoot() = %q, want %q", root, want)
+	}
+	dir, err := DefaultDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parent := filepath.Dir(dir); parent != root {
+		t.Fatalf("DefaultDir parent = %q, want DefaultRoot %q", parent, root)
+	}
+}
+
+// TestDefaultRootIgnoresHistoryOverride pins the contract uninstall relies
+// on: a redirected VMBENCH_HISTORY_DIR never becomes the vmbench-owned root.
+func TestDefaultRootIgnoresHistoryOverride(t *testing.T) {
+	xdg := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", xdg)
+	t.Setenv("VMBENCH_HISTORY_DIR", filepath.Join(xdg, "elsewhere"))
+	root, err := DefaultRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(xdg, "vmbench"); root != want {
+		t.Fatalf("DefaultRoot() = %q, want %q", root, want)
+	}
+}

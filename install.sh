@@ -723,6 +723,10 @@ do_uninstall() {
 
   # Delegate to the binary's own uninstall when available (richest cleanup).
   if [ -n "$TARGET" ] && [ -x "$TARGET" ] && "$TARGET" uninstall --help >/dev/null 2>&1; then
+    # The binary removes files but never services; stop a manually created
+    # unit here (fail closed) so delegation cannot strand it running.
+    stop_service \
+      || die "native service cleanup failed; vmbench was left in place"
     log "Delegating to: $TARGET uninstall"
     uninstall_status=0
     run_delegated_uninstall "$TARGET" || uninstall_status=$?

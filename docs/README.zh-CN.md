@@ -63,6 +63,8 @@ curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh |
 
 会移除二进制、平台数据目录（Linux `~/.local/share/vmbench`，macOS `~/Library/Application Support/vmbench`，含全部本地历史报告）、TUI 偏好配置目录（Linux `~/.config/vmbench`；macOS 上位于数据目录之内）、手动创建的 `vmbench` systemd/launchd unit，以及安装脚本自己写入的 `# vmbench user install` PATH 条目。手写的 PATH 行与自定义 `VMBENCH_HISTORY_DIR` 下的报告会保留；root 系统级安装请用 `sudo bash -s -- --uninstall`。
 
+已安装的二进制也可以自卸载：`vmbench uninstall` 先打印删除计划（历史报告条数、已获取的静态工具、TUI 偏好、数据目录与二进制本体），终端确认后按「目录 → 二进制」顺序删除；任一项失败即保留二进制，卸载可安全重跑。shell 启动文件与 systemd/launchd 服务的清理仍归 `install.sh --uninstall`——它探测到该子命令时会委托二进制卸载，再接管服务停止与 PATH 条目清理。参数：`--dry-run` 只打印计划，`--yes` 跳过确认，`--json` 输出结构化计划/结果。
+
 其他安装方式（固定版本、自定义目录、Windows、`go install`、源码构建）：源码方式可用 `go install github.com/cloudapp3/vmbench/cmd/vmbench@latest`，或本地构建 `go build -o vmbench ./cmd/vmbench`（项目验证脚本 `./sh/build.sh` 使用 CGO_ENABLED=0，输出到临时目录，可用 `VMBENCH_OUTPUT_DIR` 覆盖）；完整说明见英文 README 的 Install 一节。
 
 `vmbench` 一个命令同时覆盖硬件基准与 VPS 综合测评：不带 `--preset` / `--only` / `--skip` 时只编排外部工具硬件基准（等价 v0.7.0 的 `vmbench run`），preset 或 `--only` 选择网络 section 后走综合测评（原 `vmbench suite`）；路由、测速、IP 质量等网络诊断都在同一命令面上。workload 始终串行隔离执行，线程数与队列深度由外部工具参数定义。

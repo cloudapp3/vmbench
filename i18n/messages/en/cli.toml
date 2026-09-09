@@ -39,6 +39,9 @@ other = "self-update to the latest GitHub release"
 [cli.usage.cmdVersion]
 other = "show version"
 
+[cli.usage.cmdUninstall]
+other = "remove vmbench, its history, and owned data"
+
 [cli.usage.detailHint]
 other = "Run 'vmbench --help' for benchmark flags, or 'vmbench mcp serve --help' for MCP server flags."
 
@@ -650,3 +653,67 @@ other = "error: name at least one tool, or pass --all"
 
 [cli.error.toolsLinuxOnly]
 other = "error: static tool binaries are provisioned for Linux only"
+
+[cli.uninstall.flag.dryRun]
+other = "print the removal plan without deleting anything"
+
+[cli.uninstall.flag.yes]
+other = "do not ask for confirmation"
+
+[cli.usage.uninstallDetail]
+other = "Removes everything vmbench created: fetched tool binaries, TUI preferences, benchmark history, and the running binary itself. A custom VMBENCH_HISTORY_DIR and shell PATH entries (owned by install.sh) are preserved."
+
+[cli.uninstall.plan.warnings]
+other = "Warnings:"
+
+[cli.uninstall.plan.nothing]
+other = "Nothing to remove: no vmbench files were found."
+
+[cli.uninstall.plan.following]
+other = "The following will be removed:"
+
+[cli.uninstall.plan.kept]
+other = "Kept:"
+
+[cli.uninstall.item.data]
+other = "benchmark history: {{.Count}} records"
+
+[cli.uninstall.item.dataEmpty]
+other = "benchmark history"
+
+[cli.uninstall.item.configDir]
+other = "TUI preferences"
+
+[cli.uninstall.item.configFile]
+other = "TUI preferences file"
+
+[cli.uninstall.item.cache]
+other = "fetched tools: {{.Tools}}"
+
+[cli.uninstall.item.cacheEmpty]
+other = "fetched tool binaries"
+
+[cli.uninstall.item.binary]
+other = "vmbench binary (this program)"
+
+[cli.uninstall.kept.customHistory]
+other = "custom VMBENCH_HISTORY_DIR is preserved"
+
+[cli.uninstall.confirm]
+other = "Proceed with uninstall? [y/N] "
+
+[cli.uninstall.aborted]
+other = "aborted"
+
+[cli.uninstall.output.removed]
+other = "removed {{.Path}}"
+
+[cli.uninstall.output.errors]
+other = "Errors:"
+
+[cli.uninstall.output.complete]
+other = "vmbench uninstalled. Reports under a custom VMBENCH_HISTORY_DIR are preserved."
+
+[cli.uninstall.error.requires]
+other = "error: uninstall takes no arguments"
+

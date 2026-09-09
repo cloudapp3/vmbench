@@ -76,6 +76,8 @@ func run(args []string) int {
 		return runHistory(args[1:])
 	case "update":
 		return runUpdate(args[1:])
+	case "uninstall":
+		return runUninstall(args[1:])
 	case "version", "--version", "-v":
 		fmt.Printf("vmbench %s\n", vmbench.Version)
 		return 0
@@ -111,6 +113,7 @@ func usageRows() []string {
 		"  vmbench compare   <a.json> <b.json>   " + i18n.T("cli.usage.cmdCompare"),
 		"  vmbench history   <command>           " + i18n.T("cli.usage.cmdHistory"),
 		"  vmbench update   [flags]              " + i18n.T("cli.usage.cmdUpdate"),
+		"  vmbench uninstall [flags]             " + i18n.T("cli.usage.cmdUninstall"),
 		"  vmbench version                       " + i18n.T("cli.usage.cmdVersion"),
 	}
 }

@@ -11,15 +11,24 @@ type PersistedConfig struct {
 	Lang  string `json:"lang,omitempty"`
 }
 
-func configPath() string {
+// ConfigPaths returns the TUI preferences file path and the vmbench-owned
+// directory containing it. Dir is empty when VMBENCH_CONFIG redirected the
+// file elsewhere (only the file is vmbench-owned then) or when the platform
+// has no config location.
+func ConfigPaths() (file, dir string) {
 	if v := os.Getenv("VMBENCH_CONFIG"); v != "" {
-		return v
+		return v, ""
 	}
-	dir, err := os.UserConfigDir()
+	base, err := os.UserConfigDir()
 	if err != nil {
-		return ""
+		return "", ""
 	}
-	return filepath.Join(dir, "vmbench", "config.json")
+	return filepath.Join(base, "vmbench", "config.json"), filepath.Join(base, "vmbench")
+}
+
+func configPath() string {
+	file, _ := ConfigPaths()
+	return file
 }
 
 func LoadConfig() PersistedConfig {

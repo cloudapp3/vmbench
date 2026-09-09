@@ -53,6 +53,8 @@ curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh |
 
 Removes the binary, the platform data directory (`~/.local/share/vmbench` on Linux, `~/Library/Application Support/vmbench` on macOS) including all locally stored benchmark history, the TUI preferences directory (`~/.config/vmbench` on Linux; on macOS it lives inside the data directory), any manually created `vmbench` systemd/launchd unit, and the installer-owned `# vmbench user install` PATH entries from `.zshrc`/`.bashrc`/`.profile`. Hand-written PATH lines and reports under a custom `VMBENCH_HISTORY_DIR` are preserved. Use `sudo bash -s -- --uninstall` for a root-owned system installation.
 
+The installed binary can also uninstall itself: `vmbench uninstall` prints the removal plan (history record count, fetched tools, TUI preferences, data directory, the binary itself), asks for confirmation on a terminal, and removes owned directories before the binary. It keeps the binary whenever a removal fails, so an interrupted uninstall can simply be rerun. Shell startup files and services are left to `install.sh --uninstall`, which delegates to this command when available and stops a manually created service and cleans its PATH entries afterwards. Flags: `--dry-run` previews the plan, `--yes` skips the prompt, `--json` emits a structured plan/result for scripts.
+
 Windows: download `vmbench-<version>-windows-<arch>.zip` from [Releases](https://github.com/cloudapp3/vmbench/releases) (WinSAT provides the default hardware probes).
 
 ### Self-update

@@ -177,6 +177,10 @@ Linux 默认集中的 `sysbench` 内存 workload 拆为顺序读带宽、顺序�
 - 替换：解出二进制写入目标同目录隐藏临时文件（保留现有 mode，缺省 `0755`）、`Sync` 后 rename 覆盖（复用 nodecatalog `atomicWrite` 的模式）；Windows 先把在用二进制移到 `.old` 再 rename，尽力清理。权限不足时包装为 `ErrTargetNotWritable`，CLI 层提示包管理器/`--dest` 替代。
 - 请求统一携带 `User-Agent: vmbench/<version>`；`GITHUB_TOKEN`/`GH_TOKEN` 作为 bearer token 附带 install.sh 同款 GitHub API 头。
 
+## Uninstall
+
+`uninstall/` 与 `install.sh --uninstall` 的委托协议配套：安装脚本探测 `vmbench uninstall --help` 退出码 0 即委托二进制卸载（并在委托前 fail-closed 地停掉手动创建的 native service），探测失败退回 shell 清理。包内是 `Plan → Execute` 两段：Plan 解析数据根（`history.DefaultRoot`，忽略 `VMBENCH_HISTORY_DIR`，重定向目录标记为保留）、TUI 配置（`tui.ConfigPaths`，`VMBENCH_CONFIG` 重定向时只删文件不删目录）、toolbin 缓存根（`~/.cache/vmbench`）与运行中二进制（排最后），同时产出 dpkg/rpm 归属警告与手动 service unit 提示；Execute 对每项删除前重验（拒绝 symlink、非目录、受保护路径；已消失路径幂等跳过），二进制仅在其余项全部成功后删除，失败即保留以便重跑。保护名单覆盖系统根目录（`/`、`/etc`、`/usr` 等）与 `$HOME`。Windows 经分离 `cmd /c ping` 延迟删除运行中的 exe。
+
 ## Suite Sections
 
 ```text

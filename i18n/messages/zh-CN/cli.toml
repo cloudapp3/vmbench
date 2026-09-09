@@ -39,6 +39,9 @@ other = "自升级到最新 GitHub 发布版本"
 [cli.usage.cmdVersion]
 other = "显示版本"
 
+[cli.usage.cmdUninstall]
+other = "卸载 vmbench 并清除其历史与数据"
+
 [cli.usage.detailHint]
 other = "运行 'vmbench --help' 查看基准测试参数,或 'vmbench mcp serve --help' 查看 MCP 服务参数。"
 
@@ -650,3 +653,67 @@ other = "错误: 请指定至少一个工具,或使用 --all"
 
 [cli.error.toolsLinuxOnly]
 other = "错误: 静态工具二进制仅支持 Linux"
+
+[cli.uninstall.flag.dryRun]
+other = "仅打印删除计划,不执行删除"
+
+[cli.uninstall.flag.yes]
+other = "跳过确认直接执行"
+
+[cli.usage.uninstallDetail]
+other = "删除 vmbench 创建的所有内容:已获取的静态工具二进制、TUI 偏好设置、测评历史,以及正在运行的二进制本体。自定义 VMBENCH_HISTORY_DIR 与 shell PATH 条目(归 install.sh 所有)会保留。"
+
+[cli.uninstall.plan.warnings]
+other = "警告:"
+
+[cli.uninstall.plan.nothing]
+other = "没有找到 vmbench 文件,无需删除。"
+
+[cli.uninstall.plan.following]
+other = "以下内容将被删除:"
+
+[cli.uninstall.plan.kept]
+other = "保留:"
+
+[cli.uninstall.item.data]
+other = "测评历史:{{.Count}} 条记录"
+
+[cli.uninstall.item.dataEmpty]
+other = "测评历史"
+
+[cli.uninstall.item.configDir]
+other = "TUI 偏好设置"
+
+[cli.uninstall.item.configFile]
+other = "TUI 偏好设置文件"
+
+[cli.uninstall.item.cache]
+other = "已获取的工具:{{.Tools}}"
+
+[cli.uninstall.item.cacheEmpty]
+other = "已获取的工具二进制"
+
+[cli.uninstall.item.binary]
+other = "vmbench 二进制(本程序)"
+
+[cli.uninstall.kept.customHistory]
+other = "自定义 VMBENCH_HISTORY_DIR,予以保留"
+
+[cli.uninstall.confirm]
+other = "确认卸载?[y/N] "
+
+[cli.uninstall.aborted]
+other = "已取消"
+
+[cli.uninstall.output.removed]
+other = "已删除 {{.Path}}"
+
+[cli.uninstall.output.errors]
+other = "错误:"
+
+[cli.uninstall.output.complete]
+other = "vmbench 已卸载。自定义 VMBENCH_HISTORY_DIR 下的报告已保留。"
+
+[cli.uninstall.error.requires]
+other = "错误:uninstall 不接受参数"
+

@@ -78,6 +78,29 @@ func DefaultDir() (string, error) {
 	return filepath.Join(home, ".local", "share", "vmbench", "history"), nil
 }
 
+// DefaultRoot returns the platform directory containing DefaultDir — the
+// root under which vmbench stores everything on this machine. Unlike
+// DefaultDir it ignores VMBENCH_HISTORY_DIR: a redirected history location
+// is not vmbench-owned storage, so callers decide separately what to do
+// with it (uninstall keeps it).
+func DefaultRoot() (string, error) {
+	if xdg := strings.TrimSpace(os.Getenv("XDG_DATA_HOME")); xdg != "" {
+		return filepath.Join(xdg, "vmbench"), nil
+	}
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		base, err := os.UserConfigDir()
+		if err != nil {
+			return "", fmt.Errorf("resolve user data directory: %w", err)
+		}
+		return filepath.Join(base, "vmbench"), nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve user home directory: %w", err)
+	}
+	return filepath.Join(home, ".local", "share", "vmbench"), nil
+}
+
 // Open returns a Store. An empty dir selects DefaultDir.
 func Open(dir string) (*Store, error) {
 	if strings.TrimSpace(dir) == "" {

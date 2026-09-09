@@ -1,5 +1,14 @@
 # VMBench Changelog
 
+## v0.10.0（2026-09-09）
+
+### `vmbench uninstall`：二进制自卸载
+
+- **新增 `vmbench uninstall` 子命令**：打印删除计划（历史报告条数、已获取的静态工具、TUI 偏好、数据目录、二进制本体）→ 终端确认 → 按「目录 → 二进制」顺序删除；任一项失败即保留二进制，卸载可安全重跑。`--dry-run` 预览、`--yes` 跳过确认、`--json` 输出结构化计划/结果，en/zh-CN 双语文案。
+- **职责边界与 `install.sh` 委托协议配套**：二进制负责文件清理（数据/配置/工具缓存/本体），shell 侧负责 `# vmbench user install` PATH 条目与 systemd/launchd 服务停止；`install.sh --uninstall` 探测到子命令即委托并在委托前停服务，无终端时（如 `curl | bash`）非交互直接执行。自定义 `VMBENCH_HISTORY_DIR` 与 `VMBENCH_CONFIG` 重定向位置一律保留。
+- **安全护栏**：系统根目录（`/`、`/etc`、`/usr` 等）与 `$HOME` 拒绝删除；symlink、非目录、非常规文件拒绝；删除前逐项重验（TOCTOU）；dpkg/rpm 管理的二进制警告改用包管理器卸载；手动 service unit 检测提示。`tools fetch` 的静态工具缓存（`~/.cache/vmbench`）纳入清理（shell fallback 此前不清理该目录）。
+- **新增顶层 `uninstall` 包**（Plan/Execute/guards，`history.DefaultRoot`、`tui.ConfigPaths` 为配套导出）。
+
 ## v0.9.0（2026-09-09）
 
 ### TUI 配置页改为 ECS 式勾选清单（BREAKING）
