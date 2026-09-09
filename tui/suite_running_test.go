@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"slices"
 	"strings"
 	"testing"
 
@@ -26,9 +25,6 @@ func TestStartSuiteLandsOnSuiteRunningPage(t *testing.T) {
 	um := updated.(Model)
 	if um.page != pageRunning || um.runKind != "suite" {
 		t.Fatalf("startSuite page=%d runKind=%q, want pageRunning/suite", um.page, um.runKind)
-	}
-	if !slices.Contains(m.config.presetIDs, configPresetHardware) {
-		t.Fatalf("preset IDs = %v, want hardware pseudo-preset", m.config.presetIDs)
 	}
 }
 

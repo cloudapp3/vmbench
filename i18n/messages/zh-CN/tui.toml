@@ -228,30 +228,6 @@ other = "剩余 ~{{.Eta}}"
 [tui.running.samples]
 other = "{{.Done}}/{{.Total}} 采样"
 
-[tui.suiteSummary.title]
-other = "运行摘要"
-[tui.suiteSummary.sections]
-other = "Section"
-[tui.suiteSummary.nodes]
-other = "节点"
-[tui.suiteSummary.routeNodes]
-other = "路由 {{.Route}} · Ping {{.Ping}}"
-[tui.suiteSummary.speedNodes]
-other = "测速 {{.Count}}"
-[tui.suiteSummary.nodesPending]
-other = "统计中…"
-[tui.suiteSummary.workloads]
-other = "硬件"
-[tui.suiteSummary.workloadCount]
-other = "{{.Count}} 个 workload"
-[tui.suiteSummary.estimatedLabel]
-other = "预计"
-[tui.suiteSummary.estimated]
-other = "~{{.Duration}}(近 {{.Samples}} 次历史均值)"
-[tui.suiteSummary.estimatedRough]
-other = "~{{.Duration}}(粗估)"
-[tui.suiteSummary.etaLine]
-other = "预计 ~{{.Duration}}"
 [tui.suiteSummary.minutes]
 other = "{{.Minutes}} 分"
 [tui.suiteSummary.minutesSeconds]
@@ -428,40 +404,19 @@ other = "综合测试完成"
 other = "◈ 评测配置"
 
 [tui.config.description]
-other = "以硬件跑分为主 — 可启用套件 section 采集 VPS 网络证据"
+other = "默认全开 — 不测的项目取消勾选，回车开始"
 
-[tui.config.helpFull]
-other = "  ↑↓ 字段   ←→ 选择   空格 勾选   回车 开始   esc 返回"
+[tui.config.start]
+other = "▶ 开始评测"
 
-[tui.config.helpCompact]
-other = "↑↓ 字段  ←→ 选择  空格 勾选  回车 下一步/开始  esc 返回"
+[tui.config.startDisabled]
+other = "▶ 开始 (未就绪)"
 
-[tui.config.summary]
-other = "{{.Preset}}  |  {{.Sections}} 个 section  |  IP {{.IP}}  |  {{.Iterations}} 次迭代"
-
-[tui.config.ready]
-other = "就绪"
-
-[tui.config.readyBody]
-other = "已选 {{.Count}} 个 section  ·  按回车运行"
-
-[tui.config.hardwarePreset]
-other = "仅硬件"
-
-[tui.config.customPreset]
-other = "自定义"
-
-[tui.config.preset]
-other = "预设"
-
-[tui.config.sections]
-other = "Section 选择"
+[tui.config.startSummary]
+other = "{{.Count}} 项 · 约 {{.Duration}}"
 
 [tui.config.needOneSection]
-other = "至少需要选择一个 section"
-
-[tui.config.runtime]
-other = "运行参数"
+other = "至少需要选择一个测试项"
 
 [tui.config.iterations]
 other = "迭代 {{.Count}}"
@@ -472,74 +427,53 @@ other = "IP {{.Version}}"
 [tui.config.timeout]
 other = "超时 {{.Timeout}}"
 
-[tui.config.hardwareTools]
-other = "硬件测试工具"
+[tui.config.advanced]
+other = "高级设置"
 
-[tui.config.filter]
-other = "Workload 过滤"
+[tui.config.advIterations]
+other = "迭代次数"
 
-[tui.config.filterAll]
-other = "全部"
+[tui.config.advIPVersion]
+other = "IP 版本"
 
-[tui.config.filterCPU]
-other = "CPU"
+[tui.config.advTimeout]
+other = "超时"
 
-[tui.config.filterDisk]
-other = "磁盘"
+[tui.config.advCatalog]
+other = "节点目录"
 
-[tui.config.filterMemory]
-other = "内存"
+[tui.config.catalogSource.embedded]
+other = "内置"
 
-[tui.config.filterCustom]
-other = "自定义"
+[tui.config.catalogSource.auto]
+other = "自动更新"
 
-[tui.config.filterCustomHint]
-other = "输入正则,如 sysbench|fio"
+[tui.config.sectionDesc.hardware]
+other = "sysbench · openssl · fio"
 
-[tui.config.preflight]
-other = "工具预检"
+[tui.config.sectionDesc.network_info]
+other = "CPU / 内存 / 内核"
 
-[tui.config.preflightPending]
-other = "检查中…"
+[tui.config.sectionDesc.route]
+other = "国内三网回程"
 
-[tui.config.missingTools]
-other = "缺失工具(对应 workload 将报结构化错误):"
+[tui.config.sectionDesc.ping]
+other = "国内节点延迟"
 
-[tui.config.missingNone]
-other = "所选工具均已就绪"
+[tui.config.sectionDesc.speed]
+other = "Cloudflare · Speedtest"
 
-[tui.config.speedProviders]
-other = "测速提供方"
+[tui.config.sectionDesc.ip_quality]
+other = "IP 风险与纯净度"
 
-[tui.config.routePresets]
-other = "国内回程预设"
+[tui.config.sectionDesc.reachability]
+other = "建站可用性"
 
-[tui.config.mediaSets]
-other = "流媒体集合"
+[tui.config.sectionDesc.mail]
+other = "25/587 端口"
 
-[tui.config.ipSources]
-other = "IP 质量来源"
-
-[tui.config.provenance]
-other = "网络目录来源"
-
-[tui.config.iperf]
-other = "iperf: {{.Value}}"
-
-[tui.config.catalog]
-other = "目录: {{.Value}}"
-
-[tui.config.revision]
-other = "版本: {{.Value}}"
-
-[tui.config.latestSelected]
-other = "使用最新版"
-
-[tui.config.start]
-other = "▶ 开始评测"
-
-[tui.config.startDisabled]
-other = "▶ 开始 (未就绪)"
+[tui.config.sectionDesc.media]
+other = "Netflix · Disney+ · YouTube"
 
 [tui.suiteResults.title]
 other = "◈ 综合测试报告"

@@ -70,11 +70,11 @@ func helpFor(p page) []helpEntry {
 		}
 	case pageConfig:
 		return []helpEntry{
-			{keys: "↑↓", descKey: "tui.hint.field", short: true},
-			{keys: "←→", descKey: "tui.hint.choose", short: true},
+			{keys: "↑↓/jk", descKey: "tui.hint.nav", short: true},
 			{keys: "spc/x", descKey: "tui.hint.toggle", short: true},
 			{keys: "1-9", descKey: "tui.hint.digits", short: false},
 			{keys: "↵", descKey: "tui.hint.start", short: true},
+			{keys: "←→", descKey: "tui.hint.choose", short: true},
 			{keys: "esc", descKey: "tui.hint.back", short: true},
 		}
 	case pageSuiteResults:
@@ -98,10 +98,7 @@ func helpFor(p page) []helpEntry {
 // textEntryActive reports whether a raw-text field currently has focus, so
 // global single-key bindings (?, q) and rune routing stay out of its way.
 func textEntryActive(m Model) bool {
-	switch m.page {
-	case pageConfig:
-		return m.config.textEntryActive()
-	case pageComparePicker:
+	if m.page == pageComparePicker {
 		return m.picker.mode == pickerManual && m.picker.inputFocus != 0
 	}
 	return false

@@ -228,30 +228,6 @@ other = "~{{.Eta}} left"
 [tui.running.samples]
 other = "{{.Done}}/{{.Total}} samples"
 
-[tui.suiteSummary.title]
-other = "Run Summary"
-[tui.suiteSummary.sections]
-other = "Sections"
-[tui.suiteSummary.nodes]
-other = "Nodes"
-[tui.suiteSummary.routeNodes]
-other = "route {{.Route}} · ping {{.Ping}}"
-[tui.suiteSummary.speedNodes]
-other = "speed {{.Count}}"
-[tui.suiteSummary.nodesPending]
-other = "counting…"
-[tui.suiteSummary.workloads]
-other = "Hardware"
-[tui.suiteSummary.workloadCount]
-other = "{{.Count}} workloads"
-[tui.suiteSummary.estimatedLabel]
-other = "Estimated"
-[tui.suiteSummary.estimated]
-other = "~{{.Duration}} (avg of {{.Samples}} history runs)"
-[tui.suiteSummary.estimatedRough]
-other = "~{{.Duration}} (rough)"
-[tui.suiteSummary.etaLine]
-other = "estimated ~{{.Duration}}"
 [tui.suiteSummary.minutes]
 other = "{{.Minutes}}m"
 [tui.suiteSummary.minutesSeconds]
@@ -428,40 +404,19 @@ other = "suite complete"
 other = "◈ Benchmark Configuration"
 
 [tui.config.description]
-other = "Hardware-first benchmark — enable suite sections for VPS network evidence"
+other = "All tests on by default — untick what you skip, enter to run"
 
-[tui.config.helpFull]
-other = "  ↑↓ field   ←→ choose   space toggle   enter start   esc back"
+[tui.config.start]
+other = "▶ Start Benchmark"
 
-[tui.config.helpCompact]
-other = "↑↓ field  ←→ choose  space toggle  enter next/start  esc back"
+[tui.config.startDisabled]
+other = "▶ Start (disabled)"
 
-[tui.config.summary]
-other = "{{.Preset}}  |  {{.Sections}} sections  |  IP {{.IP}}  |  {{.Iterations}} iterations"
-
-[tui.config.ready]
-other = "Ready"
-
-[tui.config.readyBody]
-other = "{{.Count}} sections selected  ·  press enter to run"
-
-[tui.config.hardwarePreset]
-other = "Hardware Only"
-
-[tui.config.customPreset]
-other = "Custom"
-
-[tui.config.preset]
-other = "Preset"
-
-[tui.config.sections]
-other = "Sections"
+[tui.config.startSummary]
+other = "{{.Count}} tests · ~{{.Duration}}"
 
 [tui.config.needOneSection]
-other = "at least one section required"
-
-[tui.config.runtime]
-other = "Runtime"
+other = "at least one test required"
 
 [tui.config.iterations]
 other = "Iterations {{.Count}}"
@@ -472,74 +427,53 @@ other = "IP {{.Version}}"
 [tui.config.timeout]
 other = "Timeout {{.Timeout}}"
 
-[tui.config.hardwareTools]
-other = "Hardware Tools"
+[tui.config.advanced]
+other = "Advanced"
 
-[tui.config.filter]
-other = "Workload Filter"
+[tui.config.advIterations]
+other = "Iterations"
 
-[tui.config.filterAll]
-other = "All"
+[tui.config.advIPVersion]
+other = "IP Version"
 
-[tui.config.filterCPU]
-other = "CPU"
+[tui.config.advTimeout]
+other = "Timeout"
 
-[tui.config.filterDisk]
-other = "Disk"
+[tui.config.advCatalog]
+other = "Node Catalog"
 
-[tui.config.filterMemory]
-other = "Memory"
+[tui.config.catalogSource.embedded]
+other = "embedded"
 
-[tui.config.filterCustom]
-other = "Custom"
+[tui.config.catalogSource.auto]
+other = "auto-update"
 
-[tui.config.filterCustomHint]
-other = "type a regex, e.g. sysbench|fio"
+[tui.config.sectionDesc.hardware]
+other = "sysbench · openssl · fio · mbw"
 
-[tui.config.preflight]
-other = "Tool Preflight"
+[tui.config.sectionDesc.network_info]
+other = "CPU / memory / kernel"
 
-[tui.config.preflightPending]
-other = "checking…"
+[tui.config.sectionDesc.route]
+other = "China return route trace"
 
-[tui.config.missingTools]
-other = "missing tools (their workloads will report structured errors):"
+[tui.config.sectionDesc.ping]
+other = "latency to China nodes"
 
-[tui.config.missingNone]
-other = "all selected tools found"
+[tui.config.sectionDesc.speed]
+other = "Cloudflare · Speedtest"
 
-[tui.config.speedProviders]
-other = "Speed Providers"
+[tui.config.sectionDesc.ip_quality]
+other = "IP risk & purity"
 
-[tui.config.routePresets]
-other = "China Route Presets"
+[tui.config.sectionDesc.reachability]
+other = "website availability"
 
-[tui.config.mediaSets]
-other = "Media Sets"
+[tui.config.sectionDesc.mail]
+other = "port 25/587 probes"
 
-[tui.config.ipSources]
-other = "IP Quality Sources"
-
-[tui.config.provenance]
-other = "Network Provenance"
-
-[tui.config.iperf]
-other = "iperf: {{.Value}}"
-
-[tui.config.catalog]
-other = "catalog: {{.Value}}"
-
-[tui.config.revision]
-other = "revision: {{.Value}}"
-
-[tui.config.latestSelected]
-other = "latest selected"
-
-[tui.config.start]
-other = "▶ Start Benchmark"
-
-[tui.config.startDisabled]
-other = "▶ Start (disabled)"
+[tui.config.sectionDesc.media]
+other = "Netflix · Disney+ · YouTube"
 
 [tui.suiteResults.title]
 other = "◈ Suite Report"

@@ -89,7 +89,7 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 
 - 8 套主题，支持本地持久化
 - Dashboard / Config / Running / Results / SuiteResults / Compare / ComparePicker / ResultDetail / Help
-- Go TUI 只有单一"运行评测"入口与统一配置页（不再分 RunConfig/SuiteConfig 两页，也没有独立 Multi-Core 入口）：preset 胶囊首位是"仅硬件"（与 CLI 默认一致），section 开关按需展开细节卡片，启动时按 section 集合分流 run/suite 报告，并使用与 CLI/MCP 相同的 catalog/config 模型；运行页按 runKind 分流 workload 网格与 section 网格
+- Go TUI 只有单一"运行评测"入口，配置页是 ECS 式垂直勾选清单（不再分 RunConfig/SuiteConfig 两页，也没有独立 Multi-Core 入口）：首行「开始评测」光标默认停留、9 个测试项默认全勾、高级参数（迭代/IP 版本/超时/节点目录）收进可展开的高级行，工具与 providers 等细节交给归一化默认值；启动时按 section 集合分流 run/suite 报告，并使用与 CLI/MCP 相同的 catalog/config 模型；运行页按 runKind 分流 workload 网格与 section 网格
 - Results 只展示原始时间、吞吐、延迟、detail/error
 - benchmark JSON 使用 schema v2；`run` 报告固定 `scope=hardware`、`extensions=false`，不再输出 iperf hosts 与 catalog provenance；旧版本网络报告的这些字段仍可被 compare/history 解析
 - 结果保留实际 iterations 与 `samples_ms`；processed 字段仅在明确为累计 bytes/ops 且 sample 语义一致时出现

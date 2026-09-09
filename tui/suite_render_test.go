@@ -155,9 +155,9 @@ func TestSuitePagesFit80x24Terminal(t *testing.T) {
 			name: "config",
 			page: pageConfig,
 			setup: func(m *Model) {
-				m.config.field = fieldAdvanced
+				m.config.advancedOpen = true
 			},
-			expected: []string{"Benchmark Configuration", "Network Provenance", "Start Benchmark"},
+			expected: []string{"Benchmark Configuration", "Hardware", "Media Unlock", "Advanced", "Start Benchmark"},
 		},
 		{
 			name: "running",
@@ -228,9 +228,9 @@ func TestSuitePagesFit80x24TerminalZhCN(t *testing.T) {
 			name: "config",
 			page: pageConfig,
 			setup: func(m *Model) {
-				m.config.field = fieldAdvanced
+				m.config.advancedOpen = true
 			},
-			expected: []string{"评测配置", "网络目录来源", "开始评测"},
+			expected: []string{"评测配置", "硬件", "高级设置", "开始评测"},
 		},
 		{
 			name: "running",
@@ -271,7 +271,7 @@ func TestSuitePagesFit80x24TerminalZhCN(t *testing.T) {
 	}
 }
 
-func TestCompactSuiteConfigKeepsFieldNavigation(t *testing.T) {
+func TestCompactSuiteConfigKeepsRowNavigation(t *testing.T) {
 	m := NewModel("", "")
 	m.page = pageConfig
 	m.width = 80
@@ -281,40 +281,29 @@ func TestCompactSuiteConfigKeepsFieldNavigation(t *testing.T) {
 	got := updated.(Model)
 	view := got.View()
 	assertRenderBounds(t, view, 80, 24)
-	if got.config.field != fieldSections || !strings.Contains(view, "Sections") {
-		t.Fatalf("down key did not move compact config to Sections: field=%d", got.config.field)
+	if row := got.config.currentRow(); row.kind != rowSection || row.index != 0 {
+		t.Fatalf("down key did not move config to first section: row=%+v", row)
+	}
+	if !strings.Contains(view, "Hardware") {
+		t.Fatalf("first section row should be visible:\n%s", view)
 	}
 }
 
-func TestCompactSuiteConfigFieldsFit80x24(t *testing.T) {
-	fields := []struct {
-		field    configField
-		expected string
-	}{
-		{field: fieldPreset, expected: "Preset"},
-		{field: fieldSections, expected: "Sections"},
-		{field: fieldRuntime, expected: "Runtime"},
-		{field: fieldHardwareTools, expected: "Hardware Tools"},
-		{field: fieldFilter, expected: "Workload Filter"},
-		{field: fieldSpeedProviders, expected: "Speed Providers"},
-		{field: fieldRoutePresets, expected: "China Route Presets"},
-		{field: fieldAdvanced, expected: "Network Provenance"},
-		{field: fieldStart, expected: "Ready"},
-	}
-	for _, tt := range fields {
-		t.Run(tt.expected, func(t *testing.T) {
-			m := NewModel("", "")
-			m.page = pageConfig
-			m.width = 80
-			m.height = 24
-			m.config.field = tt.field
+func TestCompactSuiteConfigRowsFit80x24(t *testing.T) {
+	m := NewModel("", "")
+	m.page = pageConfig
+	m.width = 80
+	m.height = 24
+	m.config.advancedOpen = true
 
-			view := m.View()
-			assertRenderBounds(t, view, 80, 24)
-			if !strings.Contains(view, tt.expected) {
-				t.Fatalf("compact config does not contain focused field %q", tt.expected)
-			}
-		})
+	rows := m.config.visibleRows()
+	for cursor := 0; cursor < len(rows); cursor++ {
+		m.config.cursor = cursor
+		view := m.View()
+		assertRenderBounds(t, view, 80, 24)
+		if !strings.Contains(view, "Start Benchmark") {
+			t.Fatalf("start row should stay visible with cursor %d:\n%s", cursor, view)
+		}
 	}
 }
 

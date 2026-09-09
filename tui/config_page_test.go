@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -10,421 +9,268 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/cloudapp3/vmbench"
-	"github.com/cloudapp3/vmbench/catalog"
 	"github.com/cloudapp3/vmbench/i18n"
-	"github.com/cloudapp3/vmbench/nodecatalog"
 	"github.com/cloudapp3/vmbench/suite"
 )
 
-func TestNewConfigStateDefaultsMatchCLI(t *testing.T) {
+func TestNewConfigStateDefaultsToFullChecklist(t *testing.T) {
 	s := newConfigState()
 
-	// The CLI default is hardware only, so the TUI must open the same way.
-	if got := s.presetIDs[s.preset]; got != configPresetHardware {
-		t.Fatalf("selected preset = %q, want %q", got, configPresetHardware)
+	// Opening the page and pressing enter runs the full checkup; the cursor
+	// starts on the start row so enter alone launches it.
+	if s.sections != suite.DefaultSections() {
+		t.Fatalf("default sections = %+v, want all on", s.sections)
 	}
-	if s.sections != (suite.SectionSelector{Hardware: true}) {
-		t.Fatalf("sections = %+v, want hardware only", s.sections)
+	if row := s.currentRow(); row.kind != rowStart {
+		t.Fatalf("cursor starts on row %+v, want start", row)
 	}
-	if s.iterations != 3 {
-		t.Fatalf("default iterations = %d, want 3", s.iterations)
-	}
-	if s.filterExpr() != "" {
-		t.Fatalf("default filter = %q, want none", s.filterExpr())
-	}
-	if strings.Join(s.selectedTools(), ",") != strings.Join(catalog.DefaultHardwareTools(), ",") {
-		t.Fatalf("default tools = %v, want %v", s.selectedTools(), catalog.DefaultHardwareTools())
+	if s.iterations != 3 || s.ipVersion != "v4" {
+		t.Fatalf("runtime defaults = %d/%s, want 3/v4", s.iterations, s.ipVersion)
 	}
 
-	if norm, err := vmbench.NormalizeOptions(s.buildRunOptions()); err != nil {
-		t.Fatalf("default run options must normalize: %v", err)
-	} else if norm.Iterations != 3 || norm.Engine != "external" {
-		t.Fatalf("normalized run options = %+v", norm)
+	// The UI no longer picks tools/providers/sets; normalization must fill
+	// the documented defaults for them.
+	norm, err := suite.NormalizeOptions(s.buildSuiteOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(norm.HardwareTools) == 0 {
+		t.Fatal("normalized suite should default hardware tools")
+	}
+	if norm.MediaSet != suite.DefaultMediaSet() {
+		t.Fatalf("normalized MediaSet = %q, want %q", norm.MediaSet, suite.DefaultMediaSet())
+	}
+	if strings.Join(norm.SpeedProviders, ",") == "" || strings.Join(norm.RoutePresets, ",") == "" {
+		t.Fatalf("normalized providers/routes = %v/%v, want defaults", norm.SpeedProviders, norm.RoutePresets)
+	}
+
+	runNorm, err := vmbench.NormalizeOptions(s.buildRunOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runNorm.Iterations != 3 || runNorm.Engine != "external" || runNorm.Filter != "" {
+		t.Fatalf("normalized run options = %+v", runNorm)
 	}
 }
 
-func TestConfigPresetApply(t *testing.T) {
-	s := newConfigState()
-
-	// Real presets apply their sections and IP version.
-	s.preset = 2 // quick
-	s.applyPreset()
-	quick, ok := suite.LookupPreset("quick")
-	if !ok {
-		t.Fatal("quick preset not found")
-	}
-	if s.sections != quick.Sections || s.ipVersion != quick.IPVersion {
-		t.Fatalf("sections = %+v ip = %s, want quick %+v/%s", s.sections, s.ipVersion, quick.Sections, quick.IPVersion)
-	}
-
-	// Custom keeps current picks.
-	custom := suite.SectionSelector{Hardware: true, Mail: true}
-	s.preset = 1
-	s.sections = custom
-	s.applyPreset()
-	if s.sections != custom {
-		t.Fatalf("custom preset changed sections: %+v", s.sections)
-	}
-
-	// Hardware resets to the bare hardware selection.
-	s.preset = 0
-	s.applyPreset()
-	if s.sections != (suite.SectionSelector{Hardware: true}) {
-		t.Fatalf("hardware preset sections = %+v", s.sections)
-	}
-	if s.suitePreset() != "" {
-		t.Fatalf("suitePreset = %q, want empty for hardware", s.suitePreset())
-	}
-	s.preset = 2
-	if s.suitePreset() != "quick" {
-		t.Fatalf("suitePreset = %q, want quick", s.suitePreset())
-	}
-}
-
-func TestConfigVisibleFields(t *testing.T) {
-	base := []configField{fieldPreset, fieldSections, fieldRuntime}
-	tail := []configField{fieldAdvanced, fieldStart}
-
-	s := newConfigState()
-	want := slices.Concat(base, []configField{fieldHardwareTools, fieldFilter}, tail)
-	if got := s.visibleFields(); !slices.Equal(got, want) {
-		t.Fatalf("hardware-only visible = %v, want %v", got, want)
-	}
-
-	s = newConfigState()
-	s.sections = suite.DefaultSections()
-	want = slices.Concat(base, []configField{fieldHardwareTools, fieldFilter, fieldSpeedProviders, fieldRoutePresets, fieldMediaSets, fieldIPSources}, tail)
-	if got := s.visibleFields(); !slices.Equal(got, want) {
-		t.Fatalf("all-sections visible = %v, want %v", got, want)
-	}
-
-	s = newConfigState()
-	s.sections = suite.SectionSelector{Hardware: true, Route: true, Media: true}
-	want = slices.Concat(base, []configField{fieldHardwareTools, fieldFilter, fieldRoutePresets, fieldMediaSets}, tail)
-	if got := s.visibleFields(); !slices.Equal(got, want) {
-		t.Fatalf("route+media visible = %v, want %v", got, want)
-	}
-}
-
-func TestConfigFocusSnapsAfterPresetSwitch(t *testing.T) {
-	s := newConfigState()
-	s.preset = 2 // quick: speed visible
-	s.applyPreset()
-	s.field = fieldSpeedProviders
-
-	s.preset = 0 // back to hardware only: speed card disappears
-	s.applyPreset()
-	if got := s.field; slices.Contains(s.visibleFields(), fieldSpeedProviders) || got == fieldSpeedProviders {
-		t.Fatalf("focus stayed on hidden field: %v", got)
-	}
-	if !slices.Contains(s.visibleFields(), s.field) {
-		t.Fatalf("snapped focus %v is not visible", s.field)
-	}
-}
-
-func TestConfigNavigationSkipsHiddenFields(t *testing.T) {
-	m := scrollTestModel(t, pageConfig, nil)
-	// Hardware-only defaults: preset → sections → runtime → tools → filter →
-	// advanced → start (speed/route/media/ip cards are hidden).
-	m.config.field = fieldRuntime
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
-	um := updated.(Model)
-	if um.config.field != fieldHardwareTools {
-		t.Fatalf("tab from runtime = %v, want hardwareTools", um.config.field)
-	}
-	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyTab})
-	um = updated.(Model)
-	if um.config.field != fieldFilter {
-		t.Fatalf("tab from tools = %v, want filter", um.config.field)
-	}
-	// Wrap from the last field back to the first.
-	um.config.field = fieldStart
-	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyDown})
-	um = updated.(Model)
-	if um.config.field != fieldPreset {
-		t.Fatalf("tab wrap from start = %v, want preset", um.config.field)
-	}
-}
-
-func TestConfigDigitTogglesSectionAndForcesCustom(t *testing.T) {
+func TestConfigCursorNavigation(t *testing.T) {
 	m := scrollTestModel(t, pageConfig, nil)
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'5'}})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	um := updated.(Model)
-	if !um.config.sections.Speed || !um.config.sections.Hardware {
-		t.Fatalf("sections after digit toggle = %+v, want hardware+speed", um.config.sections)
-	}
-	if got := um.config.presetIDs[um.config.preset]; got != configPresetCustom {
-		t.Fatalf("digit toggle must force custom preset, got %q", got)
+	if row := um.config.currentRow(); row.kind != rowSection || row.index != 0 {
+		t.Fatalf("down from start = %+v, want first section", row)
 	}
 
-	// Digit 1 toggles hardware off, leaving speed only.
+	// Up from start wraps around to the last visible row (advanced).
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	um = updated.(Model)
+	if row := um.config.currentRow(); row.kind != rowAdvanced {
+		t.Fatalf("up from start = %+v, want advanced", row)
+	}
+
+	// Digits and toggles never move the cursor.
 	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})
 	um = updated.(Model)
-	if um.config.sections.Hardware || !um.config.sections.Speed {
-		t.Fatalf("sections after second toggle = %+v, want speed only", um.config.sections)
+	if row := um.config.currentRow(); row.kind != rowAdvanced {
+		t.Fatalf("digit moved cursor: %+v", row)
+	}
+	if um.config.sections.Hardware {
+		t.Fatal("digit 1 should untick hardware")
+	}
+}
+
+func TestConfigSectionToggleBySpaceAndEnter(t *testing.T) {
+	m := scrollTestModel(t, pageConfig, nil)
+	m.config.cursorAt(rowSection, 0)
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	if updated.(Model).config.sections.Hardware {
+		t.Fatal("space should untick the focused section")
+	}
+	updated, _ = updated.(Model).Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !updated.(Model).config.sections.Hardware {
+		t.Fatal("enter on a section row should toggle it back on")
+	}
+}
+
+func TestConfigAdvancedToggleAndCycles(t *testing.T) {
+	m := scrollTestModel(t, pageConfig, nil)
+	m.config.cursorAt(rowAdvanced, -1)
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	um := updated.(Model)
+	if !um.config.advancedOpen {
+		t.Fatal("enter on advanced should open it")
+	}
+	if got := len(um.config.visibleRows()); got != 1+len(um.config.sectionIDs)+1+advCount {
+		t.Fatalf("open advanced rows = %d", got)
 	}
 
-	// Digits land in text fields instead of toggling sections.
-	um.config.field = fieldAdvanced
-	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyLeft})
 	um = updated.(Model)
-	if um.config.iperfHost != "3" {
-		t.Fatalf("digit should type into advanced field, got %q", um.config.iperfHost)
+	if um.config.advancedOpen {
+		t.Fatal("left on advanced should close it")
+	}
+	if row := um.config.currentRow(); row.kind != rowAdvanced {
+		t.Fatalf("closing advanced left cursor on %+v, want advanced", row)
+	}
+
+	// Reopen, then cycle every setting in both directions.
+	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyRight})
+	um = updated.(Model)
+	if !um.config.advancedOpen {
+		t.Fatal("right on advanced should open it")
+	}
+
+	um.config.cursorAt(rowAdvSetting, advIterations)
+	um.config.iterations = 9
+	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if got := updated.(Model).config.iterations; got != 1 {
+		t.Fatalf("iterations 9 → right = %d, want wrap to 1", got)
+	}
+	updated, _ = updated.(Model).Update(tea.KeyMsg{Type: tea.KeyLeft})
+	if got := updated.(Model).config.iterations; got != 9 {
+		t.Fatalf("iterations 1 → left = %d, want wrap to 9", got)
+	}
+
+	um = updated.(Model)
+	um.config.cursorAt(rowAdvSetting, advIPVersion)
+	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if got := updated.(Model).config.ipVersion; got != "v6" {
+		t.Fatalf("ipVersion v4 → enter = %q, want v6", got)
+	}
+
+	um = updated.(Model)
+	um.config.cursorAt(rowAdvSetting, advTimeout)
+	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if got := updated.(Model).config.timeoutValue(); got != 10*time.Minute {
+		t.Fatalf("timeout 5m → right = %v, want 10m", got)
+	}
+
+	um = updated.(Model)
+	um.config.cursorAt(rowAdvSetting, advCatalogSource)
+	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyRight})
+	if got := updated.(Model).config.catalogSource(); got != "auto" {
+		t.Fatalf("catalog embedded → right = %q, want auto", got)
 	}
 }
 
 func TestConfigStartEmitsKindBasedOnSections(t *testing.T) {
-	// Hardware-only default → hardwareStartMsg (run report).
+	// Default full checklist → suite report.
 	m := scrollTestModel(t, pageConfig, nil)
-	m.config.field = fieldStart
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {
-		t.Fatal("enter should return a cmd emitting hardwareStartMsg")
+		t.Fatal("enter should return a cmd")
 	}
-	start, ok := cmd().(hardwareStartMsg)
+	start, ok := cmd().(suiteStartMsg)
+	if !ok {
+		t.Fatalf("cmd() returned %T, want suiteStartMsg", cmd())
+	}
+	norm, err := suite.NormalizeOptions(start.opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !norm.Sections.Media || !norm.Sections.Hardware {
+		t.Fatalf("suite start sections = %+v, want full checklist", norm.Sections)
+	}
+
+	// Untick everything except hardware → bare benchmark run.
+	um := updated.(Model)
+	for digit := '2'; digit <= '9'; digit++ {
+		updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{digit}})
+		um = updated.(Model)
+	}
+	updated, cmd = um.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("enter should return a cmd")
+	}
+	hwStart, ok := cmd().(hardwareStartMsg)
 	if !ok {
 		t.Fatalf("cmd() returned %T, want hardwareStartMsg", cmd())
 	}
-	if start.opts.Iterations != 3 || start.opts.Engine != "external" {
-		t.Fatalf("start opts = %+v", start.opts)
+	if hwStart.opts.Iterations != 3 || hwStart.opts.Engine != "external" {
+		t.Fatalf("start opts = %+v", hwStart.opts)
 	}
 	if _, isModel := updated.(Model); !isModel {
 		t.Fatalf("update returned %T", updated)
-	}
-
-	// Adding a suite section → suiteStartMsg (suite report).
-	m.config.preset = 1 // custom
-	m.config.sections = suite.SectionSelector{Hardware: true, Speed: true}
-	updated, cmd = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if cmd == nil {
-		t.Fatal("enter should return a cmd emitting suiteStartMsg")
-	}
-	if _, ok := cmd().(suiteStartMsg); !ok {
-		t.Fatalf("cmd() returned %T, want suiteStartMsg", cmd())
 	}
 }
 
 func TestConfigStartDisabledWithoutSections(t *testing.T) {
 	m := scrollTestModel(t, pageConfig, nil)
-	m.config.sections = suite.SectionSelector{}
+	for digit := '1'; digit <= '9'; digit++ {
+		updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{digit}})
+		m = updated.(Model)
+	}
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd != nil {
 		t.Fatal("enter with no sections must not start anything")
 	}
-	if _, ok := updated.(Model); !ok {
+	um, ok := updated.(Model)
+	if !ok {
 		t.Fatalf("update returned %T", updated)
 	}
-	if view := updated.(Model).View(); !strings.Contains(view, i18n.T("tui.config.startDisabled")) {
-		t.Fatalf("start button should render disabled:\n%s", view)
+	if view := um.View(); !strings.Contains(view, i18n.T("tui.config.startDisabled")) {
+		t.Fatalf("start row should render disabled:\n%s", view)
 	}
 }
 
-func TestConfigInvalidRegexShowsToast(t *testing.T) {
+// TestConfigFocusedLineMatchesRender pins configFocusedLine's layout math to
+// viewConfig so focus-follow scrolling tracks the real rows.
+func TestConfigFocusedLineMatchesRender(t *testing.T) {
 	m := scrollTestModel(t, pageConfig, nil)
-	m.config.field = fieldStart
-	m.config.filterChip = configFilterChipCustom
-	m.config.filterText = "("
+	m.height = 40 // tall enough that no clipping hides the focused row
+	m.config.advancedOpen = true
 
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	um := updated.(Model)
-	if cmd == nil {
-		t.Fatal("invalid regex should surface a toast cmd")
+	cases := []configRow{
+		{kind: rowStart},
+		{kind: rowSection, index: 0},
+		{kind: rowSection, index: 4},
+		{kind: rowSection, index: 8},
+		{kind: rowAdvanced},
+		{kind: rowAdvSetting, index: 0},
+		{kind: rowAdvSetting, index: advCount - 1},
 	}
-	if !um.toast.Active() {
-		t.Fatal("invalid regex should show a toast")
-	}
-}
-
-func TestConfigCustomFilterTextEntry(t *testing.T) {
-	m := scrollTestModel(t, pageConfig, nil)
-	m.config.field = fieldFilter
-	m.config.filterChip = configFilterChipCustom
-
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("fio")})
-	um := updated.(Model)
-	if um.config.filterText != "fio" {
-		t.Fatalf("filterText = %q, want fio", um.config.filterText)
-	}
-
-	// "q" must be typed, not quit.
-	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
-	um = updated.(Model)
-	if um.config.filterText != "fioq" {
-		t.Fatalf("filterText = %q, want fioq", um.config.filterText)
-	}
-
-	// "?" must not open help while typing; it is typed into the field.
-	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
-	um = updated.(Model)
-	if um.page != pageConfig {
-		t.Fatalf("? leaked during text entry, page = %d", um.page)
-	}
-	if um.config.filterText != "fioq?" {
-		t.Fatalf("filterText = %q, want fioq?", um.config.filterText)
-	}
-
-	// Backspace removes one rune.
-	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyBackspace})
-	um = updated.(Model)
-	if um.config.filterText != "fioq" {
-		t.Fatalf("filterText = %q after backspace, want fioq", um.config.filterText)
-	}
-
-	// plannedWorkloads honors the regex.
-	um.config.filterText = "fio"
-	planned := um.config.plannedWorkloads()
-	if len(planned) == 0 {
-		t.Fatal("fio filter should plan fio workloads")
-	}
-	for _, d := range planned {
-		if !strings.Contains(d.Name, "fio") {
-			t.Fatalf("fio filter planned non-fio workload %q", d.Name)
+	for _, row := range cases {
+		if !m.config.cursorAt(row.kind, row.index) {
+			t.Fatalf("row %+v not found", row)
+		}
+		line, ok := configFocusedLine(m)
+		if !ok {
+			t.Fatalf("focused line unknown for %+v", row)
+		}
+		viewLine := line + lipgloss.Height(renderHeader(m)) + 1 // body top padding
+		lines := strings.Split(m.View(), "\n")
+		if viewLine >= len(lines) {
+			t.Fatalf("focused line %d beyond view for %+v", viewLine, row)
+		}
+		if !strings.Contains(lines[viewLine], "▎") {
+			t.Fatalf("focused band not on line %d for %+v:\n%s", viewLine, row, m.View())
 		}
 	}
 }
 
-func TestConfigChipFilterPlansCategory(t *testing.T) {
-	m := scrollTestModel(t, pageConfig, nil)
-	m.config.field = fieldFilter
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRight})
-	um := updated.(Model)
-	if um.config.filterChip != 1 || um.config.buildRunOptions().Filter != "CPU" {
-		t.Fatalf("filter chip = %d expr = %q, want 1/CPU", um.config.filterChip, um.config.buildRunOptions().Filter)
-	}
-	for _, d := range um.config.plannedWorkloads() {
-		if d.Category != "CPU" {
-			t.Fatalf("CPU filter planned non-CPU workload %q (%s)", d.Name, d.Category)
-		}
-	}
-}
-
-func TestConfigBuildsCanonicalSuiteOptions(t *testing.T) {
-	state := newConfigState()
-	state.preset = 1
-	state.sections = suite.SectionSelector{Hardware: true, Ping: true, Reachability: true}
-	state.iterations = 5
-	state.ipVersion = "dual"
-	state.timeoutIndex = 2
-	state.iperfHost = "iperf.example:5201"
-	state.catalogSource = nodecatalog.SourceEmbedded
-	state.catalogRevision = ""
-	for id := range state.hardwareTools {
-		state.hardwareTools[id] = false
-	}
-	state.hardwareTools[catalog.HardwareToolOpenSSL] = true
-
-	raw := state.buildSuiteOptions()
-	if raw.Iterations != 5 || raw.IPVersion != "dual" || raw.Timeout != 10*time.Minute {
-		t.Fatalf("runtime options = %+v", raw)
-	}
-	if !slices.Equal(raw.HardwareTools, []string{catalog.HardwareToolOpenSSL}) || !slices.Equal(raw.IperfHosts, []string{"iperf.example:5201"}) {
-		t.Fatalf("tool options = %+v", raw)
-	}
-	norm, err := suite.NormalizeOptions(raw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if norm.CatalogRevision == "" || norm.ResolvedCatalog == nil || len(norm.NodeIDs) == 0 {
-		t.Fatalf("normalized TUI provenance = %+v", norm)
-	}
-}
-
-func TestConfigDefaultsForOptionalSections(t *testing.T) {
-	state := newConfigState()
-	if !state.mediaSets[suite.DefaultMediaSet()] {
-		t.Errorf("default media set %s should be selected", suite.DefaultMediaSet())
-	}
-	if !state.ipSources[suite.IPSourceBuiltin] {
-		t.Error("builtin IP source should be selected by default")
-	}
-	if state.ipSources[suite.IPSourceSecurityCheck] {
-		t.Error("securitycheck should be opt-in only")
-	}
-	for _, id := range []string{suite.SpeedProviderChinaISP, suite.SpeedProviderSpeedtestISP} {
-		if !slices.Contains(state.speedIDs, id) {
-			t.Errorf("speed provider %s missing from TUI list", id)
-		}
-	}
-	if !state.speedProviders[suite.SpeedProviderCloudflare] {
-		t.Error("Cloudflare should be selected by default")
-	}
-	if state.speedProviders[suite.SpeedProviderIperf3] {
-		t.Error("iperf3 should not be selected without a host")
-	}
-}
-
-func TestToggleMediaSetMutualExclusion(t *testing.T) {
-	state := newConfigState()
-	state.toggleMediaSet("jp")
-	if state.mediaSets[suite.DefaultMediaSet()] {
-		t.Error("selecting a region must clear the all-platform set")
-	}
-	if !state.mediaSets["jp"] {
-		t.Fatal("jp should stay selected")
-	}
-	state.toggleMediaSet("kr")
-	if !state.mediaSets["jp"] || !state.mediaSets["kr"] {
-		t.Error("region sets must combine")
-	}
-	state.toggleMediaSet(suite.DefaultMediaSet())
-	for _, id := range state.mediaIDs {
-		if id != suite.DefaultMediaSet() && state.mediaSets[id] {
-			t.Errorf("selecting all must clear %s", id)
-		}
-	}
-}
-
-func TestBuildSuiteOptionsCarriesMediaSetAndIPSources(t *testing.T) {
-	state := newConfigState()
-	state.sections = suite.SectionSelector{Media: true, IPQuality: true}
-	state.toggleMediaSet("jp")
-	state.toggleMediaSet("kr")
-	state.ipSources[suite.IPSourceSecurityCheck] = true
-
-	norm, err := suite.NormalizeOptions(state.buildSuiteOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if norm.MediaSet != "jp,kr" {
-		t.Fatalf("normalized MediaSet = %q, want jp,kr", norm.MediaSet)
-	}
-	if strings.Join(norm.IPSources, ",") != "builtin,securitycheck" {
-		t.Fatalf("normalized IPSources = %v", norm.IPSources)
-	}
-}
-
-func TestConfigPreflightAndRender(t *testing.T) {
-	m := scrollTestModel(t, pageConfig, nil)
-
-	updated, _ := m.Update(missingToolsMsg{missing: []string{"mbw"}})
-	um := updated.(Model)
-	if !um.config.missingOK || len(um.config.missing) != 1 {
-		t.Fatalf("preflight state = %+v", um.config)
-	}
-	// The preflight card lives in the full grid; render tall enough for it.
-	um.width, um.height = 100, 50
-	view := um.View()
-	if !strings.Contains(view, "mbw") {
-		t.Fatalf("preflight card should list missing tool:\n%s", view)
-	}
-
-	// Every visible field focus must fit 80x24 in both locales.
+func TestConfigRowsFit80x24BothLocales(t *testing.T) {
 	for _, lang := range []string{"en", "zh-CN"} {
-		if !i18n.SetLang(lang) {
-			t.Fatalf("SetLang(%q) failed", lang)
-		}
-		t.Cleanup(func() { i18n.SetLang("en") })
-		for _, f := range newConfigState().visibleFields() {
-			mm := scrollTestModel(t, pageConfig, nil)
-			mm.config.field = f
-			mm.config.missingOK = true
-			assertRenderBounds(t, mm.View(), 80, 24)
-		}
+		t.Run(lang, func(t *testing.T) {
+			if !i18n.SetLang(lang) {
+				t.Fatalf("SetLang(%q) failed", lang)
+			}
+			t.Cleanup(func() { i18n.SetLang("en") })
+
+			m := scrollTestModel(t, pageConfig, nil)
+			m.config.advancedOpen = true
+			for cursor := 0; cursor < len(m.config.visibleRows()); cursor++ {
+				mm := m
+				mm.config.cursor = cursor
+				assertRenderBounds(t, mm.View(), 80, 24)
+			}
+		})
 	}
 }
 
-func TestSummaryCardEstimates(t *testing.T) {
+func TestSuiteDurationEstimates(t *testing.T) {
 	s := newConfigState()
 
 	rough := estimateSuiteDuration(s, historyStats{})
@@ -439,18 +285,7 @@ func TestSummaryCardEstimates(t *testing.T) {
 		},
 		samples: 3,
 	}
-	s.preset = 2 // quick: hardware + network evidence + speed
-	s.applyPreset()
-	withHistory := estimateSuiteDuration(s, stats)
-	if withHistory <= 0 || withHistory >= rough {
-		t.Fatalf("history estimate %v should beat rough %v on quick defaults", withHistory, rough)
-	}
-
-	// Card renders within 80 cells in both locales.
-	card := suiteSummaryCard(s, stats, catalogStats{loaded: true, download: 15, route: 25, ping: 25, isp: 12}, 76)
-	for i, line := range strings.Split(card, "\n") {
-		if w := lipgloss.Width(line); w > 80 {
-			t.Fatalf("summary card line %d width %d > 80: %q", i, w, line)
-		}
+	if withHistory := estimateSuiteDuration(s, stats); withHistory <= 0 || withHistory >= rough {
+		t.Fatalf("history estimate %v should beat rough %v on full checklist", withHistory, rough)
 	}
 }

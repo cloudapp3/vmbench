@@ -67,18 +67,24 @@ func TestHelpShowsEveryPageSection(t *testing.T) {
 }
 
 func TestHelpSuppressedDuringTextEntry(t *testing.T) {
-	m := scrollTestModel(t, pageConfig, nil)
-	m.config.field = fieldAdvanced
+	m := scrollTestModel(t, pageComparePicker, nil)
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	// "m" switches the picker to manual entry with the path input focused.
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
+	um := updated.(Model)
+	if um.picker.mode != pickerManual || um.picker.inputFocus != 'a' {
+		t.Fatalf("manual entry not focused: mode=%d focus=%d", um.picker.mode, um.picker.inputFocus)
+	}
+
+	updated, _ = um.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
 	um, ok := updated.(Model)
 	if !ok {
 		t.Fatalf("Update returned %T, want Model", updated)
 	}
-	if um.page != pageConfig {
+	if um.page != pageComparePicker {
 		t.Fatalf("? must not toggle help while text entry is focused, page = %d", um.page)
 	}
-	if got := um.config.iperfHost; got != "?" {
+	if got := um.picker.pathA.Value(); got != "?" {
 		t.Fatalf("rune should reach the text field, got %q", got)
 	}
 }

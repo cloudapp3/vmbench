@@ -28,11 +28,10 @@ func updateDashboard(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch item.mode {
 		case "bench":
 			m.page = pageConfig
-			cmds := []tea.Cmd{configMissingToolsCmd(m.config)}
 			if m.historyStats.samples == 0 && len(m.historyStats.avg) == 0 {
-				cmds = append(cmds, loadHistoryStatsCmd())
+				return m, loadHistoryStatsCmd()
 			}
-			return m, tea.Batch(cmds...)
+			return m, nil
 		case "compare":
 			m.page = pageComparePicker
 			if m.picker.records == nil && !m.picker.loading && m.picker.err == nil {

@@ -40,10 +40,9 @@ func WithPageForRender(m Model, name string) Model {
 		m.page = pageCompare
 	case "config":
 		m.page = pageConfig
-	case "config-quick":
+	case "config-advanced":
 		m.page = pageConfig
-		m.config.preset = 2 // first real preset (quick)
-		m.config.applyPreset()
+		m.config.advancedOpen = true
 	case "suite-running":
 		m.page = pageRunning
 		m.runKind = "suite"

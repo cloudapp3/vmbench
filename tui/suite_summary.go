@@ -2,18 +2,13 @@ package tui
 
 import (
 	"encoding/json"
-	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/cloudapp3/vmbench/catalog"
 	"github.com/cloudapp3/vmbench/history"
 	"github.com/cloudapp3/vmbench/i18n"
-	"github.com/cloudapp3/vmbench/nodecatalog"
 	"github.com/cloudapp3/vmbench/suite"
-	"github.com/cloudapp3/vmbench/tui/comp"
-	"github.com/cloudapp3/vmbench/tui/theme"
 )
 
 // sectionEnabled mirrors SectionSelector's bools by ID; the selector has no
@@ -54,34 +49,6 @@ func sectionStates(rep suite.SuiteReport) map[suite.SectionID]suite.SectionState
 		suite.SectionReachability: rep.Reachability.SectionState,
 		suite.SectionMail:         rep.Mail.SectionState,
 		suite.SectionMedia:        rep.Media.SectionState,
-	}
-}
-
-// catalogStats holds planned node counts from the embedded node catalog so
-// the config page summary can show probe volume before the run starts.
-type catalogStats struct {
-	loaded   bool // false until catalogStatsMsg arrives; node counts stay hidden
-	route    int
-	ping     int
-	isp      int
-	download int
-}
-
-type catalogStatsMsg struct{ stats catalogStats }
-
-func loadCatalogStatsCmd() tea.Cmd {
-	return func() tea.Msg {
-		manifest, err := nodecatalog.Embedded()
-		if err != nil {
-			return catalogStatsMsg{}
-		}
-		return catalogStatsMsg{stats: catalogStats{
-			loaded:   true,
-			download: len(manifest.NodeIDs(nodecatalog.Filter{Kind: nodecatalog.KindDownload})),
-			route:    len(manifest.NodeIDs(nodecatalog.Filter{Kind: nodecatalog.KindRoute})),
-			ping:     len(manifest.NodeIDs(nodecatalog.Filter{Kind: nodecatalog.KindPing})),
-			isp:      len(manifest.NodeIDs(nodecatalog.Filter{Kind: nodecatalog.KindISPDownload})),
-		}}
 	}
 }
 
@@ -189,75 +156,4 @@ func formatDuration(d time.Duration) string {
 	default:
 		return i18n.Tf("tui.suiteSummary.seconds", map[string]any{"Seconds": int(d.Seconds())})
 	}
-}
-
-// suiteSummaryCard renders the live "what will run" panel: enabled sections,
-// planned probe nodes, hardware workload count, and an estimated duration.
-func suiteSummaryCard(s configState, stats historyStats, cat catalogStats, width int) string {
-	t := theme.Active
-
-	enabled := 0
-	var names []string
-	for _, id := range s.sectionIDs {
-		if !sectionEnabled(s.sections, id) {
-			continue
-		}
-		enabled++
-		names = append(names, i18n.SectionLabel(string(id)))
-	}
-	namesLine := strings.Join(names, " · ")
-	if namesLine == "" {
-		namesLine = "—"
-	}
-
-	var tools []string
-	for _, id := range s.hardwareIDs {
-		if s.hardwareTools[id] {
-			tools = append(tools, id)
-		}
-	}
-	workloads := len(catalog.ExternalHardwareDefinitionsForTools("", tools))
-
-	rows := []comp.KV{
-		{Key: i18n.T("tui.suiteSummary.sections"), Value: namesLine},
-	}
-
-	nodeParts := []string{}
-	if !cat.loaded {
-		// Counts are still loading; showing zeros would read as "no nodes".
-		nodeParts = append(nodeParts, i18n.T("tui.suiteSummary.nodesPending"))
-	} else {
-		if s.sections.Route || s.sections.Ping {
-			nodeParts = append(nodeParts, i18n.Tf("tui.suiteSummary.routeNodes", map[string]any{"Route": cat.route, "Ping": cat.ping}))
-		}
-		if s.sections.Speed {
-			nodeParts = append(nodeParts, i18n.Tf("tui.suiteSummary.speedNodes", map[string]any{"Count": cat.download + cat.isp}))
-		}
-	}
-	if len(nodeParts) > 0 || !cat.loaded {
-		rows = append(rows, comp.KV{Key: i18n.T("tui.suiteSummary.nodes"), Value: strings.Join(nodeParts, "  ")})
-	}
-	rows = append(rows, comp.KV{
-		Key:   i18n.T("tui.suiteSummary.workloads"),
-		Value: i18n.Tf("tui.suiteSummary.workloadCount", map[string]any{"Count": workloads}),
-	})
-
-	eta := estimateSuiteDuration(s, stats)
-	etaValue := formatDuration(eta)
-	if stats.samples > 0 {
-		etaValue = i18n.Tf("tui.suiteSummary.estimated", map[string]any{
-			"Duration": formatDuration(eta),
-			"Samples":  stats.samples,
-		})
-	} else {
-		etaValue = i18n.Tf("tui.suiteSummary.estimatedRough", map[string]any{"Duration": formatDuration(eta)})
-	}
-	rows = append(rows, comp.KV{Key: i18n.T("tui.suiteSummary.estimatedLabel"), Value: etaValue})
-
-	return comp.Card{
-		Title:  i18n.T("tui.suiteSummary.title"),
-		Body:   comp.KVGrid(width-4, rows),
-		Accent: t.CategorySystem,
-		Width:  width,
-	}.Render()
 }

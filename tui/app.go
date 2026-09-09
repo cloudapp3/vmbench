@@ -104,7 +104,6 @@ type Model struct {
 	suiteEventCh  chan suite.Event
 	suiteReport   *suite.SuiteReport
 
-	catalogStats catalogStats
 	historyStats historyStats
 
 	compareA string
@@ -153,7 +152,7 @@ func NewModel(compareA, compareB string) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{loadSysinfo(), tickEvery(), m.spinner.Tick, loadCatalogStatsCmd()}
+	cmds := []tea.Cmd{loadSysinfo(), tickEvery(), m.spinner.Tick}
 	if m.page == pageCompare && m.compareA != "" && m.compareB != "" {
 		cmds = append(cmds, loadCompareCmd(m.compareA, m.compareB))
 	}
@@ -241,15 +240,6 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case hardwareStartMsg:
 		return startBenchmark(m, msg.opts)
-
-	case missingToolsMsg:
-		m.config.missing = msg.missing
-		m.config.missingOK = true
-		return m, nil
-
-	case catalogStatsMsg:
-		m.catalogStats = msg.stats
-		return m, nil
 
 	case historyStatsMsg:
 		m.historyStats = msg.stats

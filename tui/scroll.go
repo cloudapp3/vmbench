@@ -229,13 +229,15 @@ func followFocus(m Model) Model {
 
 // focusedContentLine reports the 0-based content line of the page's cursor,
 // mirroring the layout math of the corresponding view. Tests pin the two
-// together (TestResultsFocusedLine).
+// together (TestResultsFocusedLine, TestConfigFocusedLineMatchesRender).
 func focusedContentLine(m Model) (int, bool) {
 	switch m.page {
 	case pageResults:
 		return resultsFocusedLine(m)
 	case pageComparePicker:
 		return pickerFocusedLine(m)
+	case pageConfig:
+		return configFocusedLine(m)
 	}
 	return 0, false
 }
