@@ -1,5 +1,22 @@
 # VMBench Changelog
 
+## v0.9.0（2026-09-09）
+
+### TUI 配置页改为 ECS 式勾选清单（BREAKING）
+
+- 统一"运行评测"配置页重构为垂直勾选清单：首行「开始评测」光标默认停留，进入页面直接回车即跑；9 个测试项一行一项、默认全勾，`空格`/`回车` 勾选、`1-9` 数字键快切，开始行实时显示启用项数与按历史均值估算的总时长。
+- **默认行为变化（BREAKING）**：默认全勾意味着 TUI 直接回车产出 suite 全量报告（此前默认"仅硬件" run 报告）；缩小范围取消勾选即可。
+- 高级参数（迭代次数 / IP 版本 / 超时 / 节点目录）收进底部可展开的「高级设置」行，`←→` 循环改值；硬件工具、workload 过滤、speed/route/media/IP 来源等细节卡片移除，自动采用与 CLI/MCP 相同的文档化默认值。
+- 移除随之失效的 suite 汇总/渲染死代码与旧测试（净约 1000 行）。
+
+### `vmbench tools`：opt-in 静态工具二进制分发
+
+- **新增 `vmbench tools` 子命令**（`status` / `fetch`）：解决"系统没装 fio/sysbench → 磁盘/CPU/内存 workload 全部结构化报错"的开箱体验。`fetch` 从本仓库稳定 `tools` release tag 的独立资产下载 pin 版静态构建（fio 3.39、sysbench 1.0.20，Linux amd64/arm64），流式下载按 `toolbin` 包编译期 SHA-256 pin 校验（信任根 = TLS + 源码 pin，独立于每次 release 的 checksums.txt），不匹配 fail-closed 不落盘；原子安装到用户缓存目录 `~/.cache/vmbench/binaries/`（`--dest` 可覆盖，`--url` 支持镜像），不改动系统软件包。`status` 列出全部硬件工具的解析路径。
+- **工具解析顺序扩展**：PATH → 可执行文件相邻 `binaries/`（管理员放置，优先）→ 用户缓存目录（fetch 产物）。政策不变：主 release 包仍不内置第三方二进制、不搜索当前工作目录、缺工具仍进结构化 `error` 不回退进程内算法。
+- **预检提示**：CLI 预检在 apt 提示后新增 `vmbench tools fetch ...` 一行提示（en/zh-CN）。
+- **构建管道**：`scripts/build-tools.sh`（Alpine musl 静态构建 + 静态断言 + sha256 输出）与 `.github/workflows/tools-release.yml`（手动触发，原生 amd64/arm64 runner 构建，资产覆盖上传到 `tools` tag）。重 pin 需重建资产并同步更新 `toolbin` 哈希。GPLv2 源码提供义务与许可证表见新增 `docs/THIRD-PARTY.md`。
+- 顺带修正历史遗留：仓库 `binaries/sysbench_x64` 为 musl 动态链接，在 glibc 系统不可执行；官方静态资产即为替代。
+
 ## v0.8.0（2026-09-08）
 
 ### run/suite 合并进根命令（BREAKING）

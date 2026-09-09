@@ -122,8 +122,8 @@ vmbench
 
 Dashboard 支持：
 
-- 单一"运行评测"入口：先进入统一配置页——preset 胶囊首位是"仅硬件"（与 CLI 默认一致）+ Custom + quick/website/proxy/mail，9 个 section 开关与硬件工具 / workload 过滤 / speed / route / media / IP 来源等细节卡片按开关状态按需展开，实时显示计划 workload 数与缺失工具预检，`1-9` 数字键快切 section
-- 配置与 CLI/MCP 相同的 iterations/timeout/IP version/tools/providers/iperf/sections/route/catalog source/revision；配置页含摘要卡（计划 workload 数、按历史均值估算的总时长）；启动时若生效 section 恰好只有 hardware 则产出 run 报告，否则产出 suite 报告（与 CLI 同一规则）
+- 单一"运行评测"入口：先进入 ECS 式垂直勾选清单——首行「开始评测」光标默认停留（打开页面直接回车即跑），9 个测试项默认全勾、一行一项（`空格`/`回车` 勾选，`1-9` 数字键快切），开始行实时显示启用项数与按历史均值估算的总时长
+- 高级参数（迭代次数 / IP 版本 / 超时 / 节点目录）收进底部可展开的「高级设置」行，`←→` 循环改值；硬件工具、workload 过滤、providers/route/media/IP 来源等细节不再暴露，自动采用与 CLI/MCP 相同的文档化默认值；启动时若生效 section 恰好只有 hardware 则产出 run 报告，否则产出 suite 报告（与 CLI 同一规则）
 - 打开系统信息
 - 比较报告：从历史记录选两条（或手输路径），run 报告出 delta 表，suite 报告用与 CLI 相同的 textgrid 对比，也可查看单条历史记录
 - Running 页按 runKind 分流：硬件基准显示迭代迷你条、采样进度与完成后按墙钟外推的 ETA，suite 显示 section 网格与已耗时；Results 三视图（卡片/分组/平铺）+ `d` 进单 workload 详情（指标/采样/错误/原始输出）
@@ -142,7 +142,7 @@ Dashboard 支持：
 - `geekbench`：可选 CPU upstream score，不默认跑，不作为 vmbench 总分
 - `winsat`：Windows CPU / 内存 / 磁盘（Windows 默认，也可显式选择）
 
-硬件测评（默认硬件选择或 suite 组合里启用 hardware）会在执行前提示当前 filter 会命中的缺失工具，Linux 还会输出已知 Debian/Ubuntu 安装命令。未被 filter 选中的 adapter 不产生误导提示；实际缺失的工具不会触发进程内 fallback 或被静默跳过，而是进入结构化 `error` 字段。官方源码和 release 包默认不内置第三方二进制工具；Linux 本地 fallback 只从解析后的 vmbench 可执行文件相邻 `binaries/` 或同目录加载，例如 `<exe-dir>/binaries/sysbench_x64`，不会搜索当前工作目录。
+硬件测评（默认硬件选择或 suite 组合里启用 hardware）会在执行前提示当前 filter 会命中的缺失工具，Linux 还会输出已知 Debian/Ubuntu 安装命令与 `vmbench tools fetch` 静态二进制获取提示。未被 filter 选中的 adapter 不产生误导提示；实际缺失的工具不会触发进程内 fallback 或被静默跳过，而是进入结构化 `error` 字段。官方源码和 release 主包默认不内置第三方二进制工具；`vmbench tools fetch`（fio、sysbench，Linux amd64/arm64）可从本仓库 `tools` release 的独立资产按编译期 SHA-256 pin 下载静态构建并安装到用户缓存目录（`~/.cache/vmbench/binaries/`），不改动系统软件包，`--url` 可指定镜像。Linux 本地 fallback 另可从解析后的 vmbench 可执行文件相邻 `binaries/` 或同目录加载，例如 `<exe-dir>/binaries/sysbench_x64`，不会搜索当前工作目录。
 
 ## 报告与网络失败语义
 

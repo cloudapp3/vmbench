@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/cloudapp3/vmbench/bench"
+	"github.com/cloudapp3/vmbench/toolbin"
 )
 
 // Definition describes a workload without instantiating its heavy data payloads.
@@ -405,6 +406,14 @@ func resolveTool(name string) (string, error) {
 	return "", fmt.Errorf("%s not found in PATH or executable-adjacent binaries directory", name)
 }
 
+// ResolveTool reports the executable path a hardware tool resolves to, or an
+// error describing why it is missing. Resolution order: PATH, the
+// executable-adjacent binaries directory, then the user cache directory
+// populated by `vmbench tools fetch`.
+func ResolveTool(name string) (string, error) {
+	return resolveTool(name)
+}
+
 func resolveAnyTool(names ...string) (string, string, error) {
 	var errs []string
 	for _, name := range names {
@@ -441,6 +450,13 @@ func localToolCandidates(name string) []string {
 			filepath.Join(dir, "binaries", bin),
 			filepath.Join(dir, bin),
 		)
+	}
+	// Fetched binaries land in the user cache directory last: an admin-provided
+	// adjacent binary takes precedence over a user's own `vmbench tools fetch`.
+	// (bench/netio keeps a parallel lookup for its securityCheck tool; the two
+	// lists are intentionally not shared.)
+	if cache, err := toolbin.CacheDir(); err == nil {
+		candidates = append(candidates, filepath.Join(cache, bin))
 	}
 	return candidates
 }

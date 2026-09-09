@@ -23,6 +23,7 @@ import (
 	"github.com/cloudapp3/vmbench/suite"
 	"github.com/cloudapp3/vmbench/suitecompare"
 	"github.com/cloudapp3/vmbench/sysinfo"
+	"github.com/cloudapp3/vmbench/toolbin"
 	"github.com/cloudapp3/vmbench/tui"
 )
 
@@ -65,6 +66,8 @@ func run(args []string) int {
 		return runList(args[1:])
 	case "nodes":
 		return runNodes(args[1:])
+	case "tools":
+		return runTools(args[1:])
 	case "sysinfo":
 		return runSysinfo(args[1:])
 	case "compare":
@@ -103,6 +106,7 @@ func usageRows() []string {
 		"  vmbench mcp serve [flags]            " + i18n.T("cli.usage.cmdMcp"),
 		"  vmbench list                          " + i18n.T("cli.usage.cmdList"),
 		"  vmbench nodes     <command> [flags]   " + i18n.T("cli.usage.cmdNodes"),
+		"  vmbench tools    <command> [flags]   " + i18n.T("cli.usage.cmdTools"),
 		"  vmbench sysinfo   [--json]            " + i18n.T("cli.usage.cmdSysinfo"),
 		"  vmbench compare   <a.json> <b.json>   " + i18n.T("cli.usage.cmdCompare"),
 		"  vmbench history   <command>           " + i18n.T("cli.usage.cmdHistory"),
@@ -270,7 +274,22 @@ func printHardwareToolPreflight(w io.Writer, tools []string, filter *regexp.Rege
 		if len(packages) > 0 {
 			fmt.Fprintf(w, "%s\n", i18n.Tf("cli.notice.installHint", map[string]any{"Packages": strings.Join(packages, " ")}))
 		}
+		if fetchable := fetchableToolNames(missing); len(fetchable) > 0 {
+			fmt.Fprintf(w, "%s\n", i18n.Tf("cli.notice.fetchHint", map[string]any{"Command": "vmbench tools fetch " + strings.Join(fetchable, " ")}))
+		}
 	}
+}
+
+// fetchableToolNames filters missing tools down to those with a pinned static
+// build in toolbin's registry.
+func fetchableToolNames(missing []string) []string {
+	var names []string
+	for _, name := range missing {
+		if _, ok := toolbin.Find(name); ok {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 func linuxHardwarePackages(tools []string) []string {

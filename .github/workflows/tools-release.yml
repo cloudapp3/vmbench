@@ -1,0 +1,69 @@
+name: tools-release
+
+# Rebuilds the pinned static benchmark tool binaries (fio, sysbench) and
+# replaces the assets of the stable `tools` release tag. Manual dispatch
+# only: after uploading, the SHA-256 pins in toolbin/toolbin.go must be
+# updated in the same change set.
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: "Release note for the tools tag"
+        required: false
+        default: "pinned static tool binaries"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build static tools (${{ matrix.arch }})
+        run: |
+          sudo apt-get update && sudo apt-get install -y docker.io || true
+          scripts/build-tools.sh "dist-tools-${{ matrix.arch }}"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tools-linux-${{ matrix.arch }}
+          path: |
+            dist-tools-${{ matrix.arch }}/vmbench-tools-*-linux-${{ matrix.arch }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-tools
+          merge-multiple: true
+
+      - name: Compute checksums
+        run: |
+          cd dist-tools
+          sha256sum vmbench-tools-*-linux-* | tee sha256sums.txt
+
+      - name: Upload to the tools release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTE: ${{ inputs.note }}
+        run: |
+          gh release view tools --repo "$GITHUB_REPOSITORY" \
+            || gh release create tools --repo "$GITHUB_REPOSITORY" \
+                 --title "vmbench tool binaries" --notes "$NOTE" --latest=false
+          gh release upload tools --repo "$GITHUB_REPOSITORY" --clobber \
+            dist-tools/vmbench-tools-* dist-tools/sha256sums.txt

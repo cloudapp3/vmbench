@@ -362,10 +362,14 @@ Linux 的 dd read 使用 `iflag=direct`，避免页缓存产生远高于真实�
 1. 检查系统 PATH → 找到则使用
 2. Linux 下检查解析后的 vmbench 可执行文件相邻位置：
    `<exe-dir>/binaries/<tool>_<arch>`，其次 `<exe-dir>/<tool>_<arch>`
-3. 未找到 → 写入结构化 error，不回退到进程内算法
+3. Linux 下检查用户缓存目录：`os.UserCacheDir()/vmbench/binaries/<tool>_<arch>`
+   （`vmbench tools fetch` 的安装位置；SHA-256 pin 校验，fail-closed）
+4. 未找到 → 写入结构化 error，不回退到进程内算法
 ```
 
-当前工作目录中的 `binaries/` 不会被搜索。
+当前工作目录中的 `binaries/` 不会被搜索。`vmbench tools fetch [fio sysbench]`
+可从本仓库 `tools` release 的独立资产下载静态构建（Linux amd64/arm64），
+安装到用户缓存目录，不改动系统软件包；主 release 包仍不内置第三方二进制。
 
 ---
 
@@ -670,12 +674,11 @@ Dashboard（主菜单）
 - 按 `t` 切换主题，选择自动保存到本地配置
 - 显示当前主题名称
 
-#### Run Benchmark → Config（统一配置页）
+#### Run Benchmark → Config（ECS 式勾选清单）
 
-- preset 胶囊首位是"仅硬件"（与 CLI 默认一致），随后 Custom 与 quick/website/proxy/mail；`1-9` 数字键快切 section 并自动切到 Custom preset
-- 9 个 section 开关与细节卡片（hardware tools / filter / speed / route / media / IP sources / advanced）按开关状态按需展开，焦点自动吸附可见字段
-- 与 CLI/MCP 共用 iterations/timeout/IP version/tools/providers/iperf/sections/route/catalog source/revision 归一化模型
-- 摘要卡实时显示启用 section 数、计划 workload 数与预计总时长（优先历史均值）；工具缺失预检 warning 卡非阻塞
+- 垂直平铺的极简清单：首行「开始评测」光标默认停留（打开页面直接回车即跑），其下 9 个测试项一行一项（`空格`/`回车` 勾选，`1-9` 数字键快切），底部一个可展开的「高级设置」行（`←→` 循环改值：迭代次数 1-9 / IP v4·v6·dual / 超时 1·5·10·15m / 节点目录 内置·自动更新）
+- 默认全部测试项勾选；开始行实时显示启用项数与预计总时长（优先历史均值）
+- 硬件工具、workload 过滤、providers/route/media/IP 来源等细节不再暴露给用户，归一化时自动采用与 CLI/MCP 相同的文档化默认值；生效 section 恰好只有 hardware 时产出 run 报告，否则产出 suite 报告（与 CLI 同一规则）
 
 #### Running（单一运行页，按 runKind 分流）
 

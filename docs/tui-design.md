@@ -42,7 +42,7 @@ v0.8.0 起 run/suite 合并为单一配置页与单一运行页：启动时按�
   - System Info
   - Quit
 
-说明：Go TUI 已移除误导性的独立 Multi-Core 入口。硬件 workload 串行执行，CPU 线程数和磁盘队列深度由外部工具参数定义；默认工具按平台选择，Linux 为 sysbench/OpenSSL/fio，macOS 为 OpenSSL，Windows 为 WinSAT。sysbench 拆出 memory read/write/latency，fio 拆出 4K random read/write Q1/Q32 与 1M sequential read/write Q1/Q8。CLI/TUI 可通过 `--hardware-tool` 显式选择其他 adapter；CLI 会在开始前提示当前 filter 涉及的缺失工具，TUI/报告继续展示结构化错误，不提供进程内 benchmark fallback。可选 dd read 只有 Linux 能以 direct I/O 运行，其他平台 fail-closed 并提示改用 fio。
+说明：Go TUI 已移除误导性的独立 Multi-Core 入口。硬件 workload 串行执行，CPU 线程数和磁盘队列深度由外部工具参数定义；默认工具按平台选择，Linux 为 sysbench/OpenSSL/fio，macOS 为 OpenSSL，Windows 为 WinSAT。sysbench 拆出 memory read/write/latency，fio 拆出 4K random read/write Q1/Q32 与 1M sequential read/write Q1/Q8。CLI/TUI 可通过 `--hardware-tool` 显式选择其他 adapter；CLI 会在开始前提示当前 filter 涉及的缺失工具（apt 安装命令与 `vmbench tools fetch` 静态二进制提示），TUI/报告继续展示结构化错误，不提供进程内 benchmark fallback。可选 dd read 只有 Linux 能以 direct I/O 运行，其他平台 fail-closed 并提示改用 fio。
 
 按键：
 

@@ -139,9 +139,10 @@ Linux 默认集中的 `sysbench` 内存 workload 拆为顺序读带宽、顺序�
 
 1. `PATH`
 2. Linux 下检查**解析后的 vmbench 可执行文件相邻位置**：`<exe-dir>/binaries/<tool>_<arch>`，其次 `<exe-dir>/<tool>_<arch>`
-3. 工具缺失时写入结构化 `error`
+3. Linux 下检查用户缓存目录 `os.UserCacheDir()/vmbench/binaries/<tool>_<arch>`（`vmbench tools fetch` 的安装位置）
+4. 工具缺失时写入结构化 `error`
 
-当前工作目录中的 `binaries/` 不参与工具发现。官方源码与 release 包默认不内置第三方 benchmark 二进制，避免许可证和可追溯性风险。
+当前工作目录中的 `binaries/` 不参与工具发现。官方源码与 release 主包默认不内置第三方 benchmark 二进制，避免许可证和可追溯性风险；取而代之的是 opt-in 的 `vmbench tools fetch`：从本仓库稳定 `tools` release tag 的独立资产下载静态构建（当前为 fio 与 sysbench，Linux amd64/arm64），下载流按 `toolbin` 包内编译期 SHA-256 pin 校验，失败 fail-closed，安装到用户缓存目录且不改动系统软件包。资产由 `scripts/build-tools.sh` 从 pin 版上游源码构建，升级需重建资产并同步更新 pin；许可证与源码提供义务见 `docs/THIRD-PARTY.md`。
 
 ## Network Probe 可靠性
 

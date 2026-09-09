@@ -32,6 +32,53 @@ func TestLocalToolCandidatesAreExecutableAdjacent(t *testing.T) {
 	}
 }
 
+func TestLocalToolCandidatesPreferAdjacentOverUserCache(t *testing.T) {
+	cache := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cache)
+	candidates := localToolCandidates("fio")
+	if len(candidates) == 0 {
+		t.Fatal("expected candidates on linux")
+	}
+	wantCache := filepath.Join(cache, "vmbench", "binaries", "fio_x64")
+	if got := candidates[len(candidates)-1]; got != wantCache {
+		t.Fatalf("last candidate = %q, want user cache %q", got, wantCache)
+	}
+	for _, candidate := range candidates[:len(candidates)-1] {
+		if candidate == wantCache {
+			t.Fatalf("user cache candidate %q must appear exactly once, candidates = %v", wantCache, candidates)
+		}
+		if strings.Contains(candidate, filepath.Join("vmbench", "binaries")) && !strings.HasPrefix(candidate, wantCache) {
+			// adjacent "<exe-dir>/binaries/..." is allowed; only the user
+			// cache path may reference the cache layout
+			t.Fatalf("unexpected cache-layout candidate %q", candidate)
+		}
+	}
+}
+
+func TestResolveToolFindsUserCacheBinary(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("adjacent/cache lookup is linux-only")
+	}
+	cache := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cache)
+	dir := filepath.Join(cache, "vmbench", "binaries")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "mbw_x64")
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", t.TempDir())
+	got, err := ResolveTool("mbw")
+	if err != nil {
+		t.Fatalf("ResolveTool(mbw) error = %v", err)
+	}
+	if got != path {
+		t.Fatalf("ResolveTool(mbw) = %q, want %q", got, path)
+	}
+}
+
 func TestDefaultExternalHardwareDefinitionsUseDetailedMemoryAndFioWorkloads(t *testing.T) {
 	defs := ExternalHardwareDefinitionsForTools("", []string{HardwareToolSysbench, HardwareToolOpenSSL, HardwareToolFio})
 	names := map[string]bool{}

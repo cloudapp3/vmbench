@@ -33,7 +33,7 @@ vmbench 是一款跨平台 VPS 测评工具，用 Go 编写，强调：
 - Memory：sysbench 顺序读/写带宽、随机读延迟；STREAM / mbw 可选启用
 - Disk：fio 4K 随机读/写 Q1/Q32、1M 顺序读/写 Q1/Q8；dd sequential write/read 可选启用，Linux read 使用 direct I/O
 - Windows：默认使用 WinSAT CPU / memory / disk
-- 说明：硬件跑分只依赖外部工具；CLI 只为当前 filter 会命中的 workload 预检缺失工具，并提示可用的 Debian/Ubuntu 安装命令，受影响 workload 仍进入结构化 error，不回退到进程内算法
+- 说明：硬件跑分只依赖外部工具；CLI 只为当前 filter 会命中的 workload 预检缺失工具，并提示可用的 Debian/Ubuntu 安装命令与 `vmbench tools fetch`（pin 版静态二进制，装到用户缓存目录，不改动系统），受影响 workload 仍进入结构化 error，不回退到进程内算法
 
 ### Network
 - Network Info：本机虚拟化 + 公网 IPv4/IPv6、ASN、provider、location 与 `direct/translated/unknown` NAT 证据

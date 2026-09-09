@@ -21,6 +21,9 @@ other = "列出可用工作负载"
 [cli.usage.cmdNodes]
 other = "管理版本化网络节点"
 
+[cli.usage.cmdTools]
+other = "安装静态 benchmark 工具二进制"
+
 [cli.usage.cmdSysinfo]
 other = "显示系统信息"
 
@@ -575,3 +578,75 @@ other = "已更新到 v{{.Latest}}: {{.Old}} -> {{.New}},路径 {{.Path}}"
 
 [cli.update.notice.pkgManagerHint]
 other = "vmbench 可能由 apt/yum 管理;建议使用包管理器升级,或使用 sudo/--dest 重新执行"
+
+[cli.usage.toolsCommands]
+other = "子命令:"
+
+[cli.usage.toolsStatus]
+other = "显示硬件工具解析状态"
+
+[cli.usage.toolsFetch]
+other = "下载 pin 版静态工具二进制到用户缓存目录"
+
+[cli.usage.toolsDetail]
+other = "静态构建发布于 tools release 资产,下载时按编译进 vmbench 的 SHA-256 pin 校验,安装到用户缓存目录;PATH 与可执行文件相邻目录优先。"
+
+[cli.usage.toolsFetchDetail]
+other = "为每个指定工具 (fio, sysbench) 下载 pin 版静态构建,以可执行权限安装到目标目录(默认用户缓存目录)。--url 可指向提供同名资产的镜像。"
+
+[cli.notice.fetchHint]
+other = "提示: {{.Command}}(下载 pin 版静态二进制,不改动系统软件包)"
+
+[cli.flag.toolsAll]
+other = "获取全部可安装工具"
+
+[cli.flag.toolsDest]
+other = "目标目录(默认用户缓存目录)"
+
+[cli.flag.toolsURL]
+other = "资产基础 URL 覆盖(镜像)"
+
+[cli.flag.toolsTimeout]
+other = "整体下载超时"
+
+[cli.tools.colTool]
+other = "工具"
+
+[cli.tools.colStatus]
+other = "状态"
+
+[cli.tools.colPath]
+other = "解析路径"
+
+[cli.tools.ok]
+other = "就绪"
+
+[cli.tools.missing]
+other = "缺失"
+
+[cli.tools.cacheDir]
+other = "安装目录: {{.Path}}"
+
+[cli.tools.fetching]
+other = "正在获取 {{.Tool}} {{.Version}}..."
+
+[cli.tools.fetchDone]
+other = "已安装 {{.Tool}} {{.Version}} -> {{.Path}}"
+
+[cli.tools.fetchFail]
+other = "错误: 获取 {{.Tool}} 失败: {{.Err}}"
+
+[cli.error.toolsUnknownCommand]
+other = "错误: 未知 tools 子命令: {{.Command}}"
+
+[cli.error.toolsUnknownTool]
+other = "错误: 未知工具 {{.Tool}};可安装的工具: {{.Known}}"
+
+[cli.error.toolsTimeout]
+other = "错误: timeout 必须为正数"
+
+[cli.error.toolsNeedsName]
+other = "错误: 请指定至少一个工具,或使用 --all"
+
+[cli.error.toolsLinuxOnly]
+other = "错误: 静态工具二进制仅支持 Linux"

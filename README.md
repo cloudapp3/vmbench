@@ -160,6 +160,14 @@ CLI, TUI, and console/HTML report labels are localized in English and Simplified
 | Suite network diagnostics | ✅ | ✅ | ⚠️ partial / environment-dependent |
 | MCP stdio server | ✅ | ✅ | ✅ |
 
+Missing `fio` or `sysbench` on a Linux host can be fixed without touching system packages:
+
+```sh
+vmbench tools fetch fio sysbench   # pinned static builds, SHA-256 verified, ~/.cache/vmbench/binaries
+```
+
+Downloads come from the `tools` release assets of this repository and are verified against hashes compiled into vmbench; `--url` accepts a mirror.
+
 Network sections depend on local routing, DNS, firewall, IPv6, and sandbox permissions; failures are recorded as structured errors instead of being hidden.
 
 ## Documentation

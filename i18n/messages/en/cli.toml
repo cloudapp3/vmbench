@@ -21,6 +21,9 @@ other = "list available workloads"
 [cli.usage.cmdNodes]
 other = "manage versioned network nodes"
 
+[cli.usage.cmdTools]
+other = "provision static benchmark tool binaries"
+
 [cli.usage.cmdSysinfo]
 other = "show system information"
 
@@ -575,3 +578,75 @@ other = "updated to v{{.Latest}}: {{.Old}} -> {{.New}} at {{.Path}}"
 
 [cli.update.notice.pkgManagerHint]
 other = "vmbench may be managed by apt/yum; prefer your package manager, or rerun with sudo / --dest"
+
+[cli.usage.toolsCommands]
+other = "Commands:"
+
+[cli.usage.toolsStatus]
+other = "show hardware tool resolution status"
+
+[cli.usage.toolsFetch]
+other = "download pinned static tool binaries into the user cache"
+
+[cli.usage.toolsDetail]
+other = "Static builds are published as assets of the 'tools' release and verified against SHA-256 pins compiled into vmbench. They are installed under the user cache directory; PATH and executable-adjacent binaries keep precedence."
+
+[cli.usage.toolsFetchDetail]
+other = "Fetches the pinned static build for each named tool (fio, sysbench) and installs it as an executable under the destination directory (default: the user cache directory). Use --url to point at a mirror serving the same asset names."
+
+[cli.notice.fetchHint]
+other = "hint: {{.Command}} (downloads pinned static binaries; no system packages are modified)"
+
+[cli.flag.toolsAll]
+other = "fetch every provisionable tool"
+
+[cli.flag.toolsDest]
+other = "destination directory (default: user cache)"
+
+[cli.flag.toolsURL]
+other = "asset base URL override (mirror)"
+
+[cli.flag.toolsTimeout]
+other = "overall fetch timeout"
+
+[cli.tools.colTool]
+other = "tool"
+
+[cli.tools.colStatus]
+other = "status"
+
+[cli.tools.colPath]
+other = "resolved path"
+
+[cli.tools.ok]
+other = "ok"
+
+[cli.tools.missing]
+other = "missing"
+
+[cli.tools.cacheDir]
+other = "fetch destination: {{.Path}}"
+
+[cli.tools.fetching]
+other = "fetching {{.Tool}} {{.Version}}..."
+
+[cli.tools.fetchDone]
+other = "installed {{.Tool}} {{.Version}} -> {{.Path}}"
+
+[cli.tools.fetchFail]
+other = "error: fetch {{.Tool}}: {{.Err}}"
+
+[cli.error.toolsUnknownCommand]
+other = "error: unknown tools command: {{.Command}}"
+
+[cli.error.toolsUnknownTool]
+other = "error: unknown tool {{.Tool}}; provisionable tools: {{.Known}}"
+
+[cli.error.toolsTimeout]
+other = "error: timeout must be positive"
+
+[cli.error.toolsNeedsName]
+other = "error: name at least one tool, or pass --all"
+
+[cli.error.toolsLinuxOnly]
+other = "error: static tool binaries are provisioned for Linux only"

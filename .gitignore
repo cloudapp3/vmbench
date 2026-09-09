@@ -11,8 +11,13 @@
 *.out
 
 # Optional local external-tool binaries.
-# Official source/release archives do not vendor third-party tools by default.
+# Official source/release archives do not vendor third-party tools by default;
+# pinned static builds are provisioned opt-in via `vmbench tools fetch`
+# (assets built by scripts/build-tools.sh, hashes pinned in toolbin).
 /binaries/
+
+# Local output of scripts/build-tools.sh (CI rebuilds these).
+/dist-tools/
 
 # Go build / coverage artifacts
 coverage.out
