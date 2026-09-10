@@ -63,27 +63,18 @@ func WriteConsole(w io.Writer, report CheckupReport) error {
 		}
 		if len(report.Route.Results) > 0 {
 			headers := []string{
-				i18n.T("report.checkup.col.target"), i18n.T("report.checkup.col.city"), i18n.T("report.checkup.col.carrier"),
-				i18n.T("report.checkup.col.resolved"), i18n.T("report.checkup.col.probe"), i18n.T("report.checkup.col.hops"),
-				i18n.T("report.checkup.col.reached"), i18n.T("report.checkup.col.line"), i18n.T("report.checkup.col.status"),
+				i18n.T("report.checkup.col.target"), i18n.T("report.checkup.col.resolved"),
+				i18n.T("report.checkup.col.line"), i18n.T("report.checkup.col.confidence"),
+				i18n.T("report.checkup.col.status"),
 			}
 			rows := make([][]string, 0, len(report.Route.Results))
 			for _, item := range report.Route.Results {
-				status := item.EffectiveStatus()
-				if message := strings.TrimSpace(item.Error); message != "" {
-					status += ": " + message
-				}
-				probe := defaultText(item.ProbeProtocol, "unknown") + "/" + defaultText(item.ProbeTool, "unknown")
 				rows = append(rows, []string{
-					item.Target.Name,
-					item.Target.City,
-					item.Target.Carrier,
+					defaultText(item.Target.Name, strings.TrimSpace(item.Target.City+" "+item.Target.Carrier)),
 					defaultText(item.ResolvedTarget, "unknown"),
-					probe,
-					fmt.Sprintf("%d", len(item.Hops)),
-					traceDestinationReachedText(item.DestinationReached),
-					traceClassificationText(item.Classification),
-					status,
+					RouteLineText(item),
+					routeConfidenceText(item.Classification),
+					routeStatusText(item),
 				})
 			}
 			if err := writeGrid(w, headers, rows); err != nil {

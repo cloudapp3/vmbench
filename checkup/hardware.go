@@ -6,6 +6,7 @@ import (
 	"time"
 
 	vmbench "github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/redact"
 )
 
 func runHardwareSection(ctx context.Context, opts Options, report *CheckupReport) {
@@ -19,6 +20,9 @@ func runHardwareSection(ctx context.Context, opts Options, report *CheckupReport
 		Filter:        opts.Filter,
 		Engine:        "external",
 		HardwareTools: append([]string(nil), opts.HardwareTools...),
+		// The outer checkup.Run redacts the whole CheckupReport, including
+		// this embedded run document, in one pass; skip the inner pass.
+		Redact: redact.ModeNone,
 	})
 	section.Report = &result
 	section.FinishTime = time.Now().Unix()

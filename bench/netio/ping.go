@@ -304,6 +304,10 @@ func pingTarget(ctx context.Context, target PingTarget) PingProbeResult {
 }
 
 func pingTargetWithDial(ctx context.Context, target PingTarget, dial pingDialFunc) PingProbeResult {
+	return pingTargetWithProbes(ctx, target, dial, systemICMPEchoProbe)
+}
+
+func pingTargetWithProbes(ctx context.Context, target PingTarget, dial pingDialFunc, icmpProbe icmpEchoProbeFunc) PingProbeResult {
 	port := target.Port
 	if port <= 0 {
 		port = pingPort
@@ -342,6 +346,21 @@ func pingTargetWithDial(ctx context.Context, target PingTarget, dial pingDialFun
 	result.Received = len(evidence.rtts)
 	result.PacketLoss = float64(pingProbes-len(evidence.rtts)) / float64(pingProbes) * 100
 	if len(evidence.rtts) == 0 {
+		// A target that stayed silent to every TCP probe may still answer
+		// ICMP echo (traceroute endpoints, router interfaces): retry with
+		// system ping before declaring the target dead.
+		if echo := icmpEchoFallback(ctx, target, icmpProbe); len(echo.rtts) > 0 {
+			result.ConnectionState = ""
+			result.Received = len(echo.rtts)
+			result.PacketLoss = float64(pingProbes-len(echo.rtts)) / float64(pingProbes) * 100
+			result.Status = "ok"
+			result.ProbeProtocol = "icmp-echo"
+			result.ProbeTool = firstNonEmpty(strings.TrimSpace(echo.tool), "system-ping")
+			result.AvgLatencyMs = avgDuration(echo.rtts).Seconds() * 1000
+			result.JitterMs = jitterDuration(echo.rtts).Seconds() * 1000
+			result.Message = "tcp probes silent; latency from icmp echo fallback"
+			return result
+		}
 		result.Status = "error"
 		if evidence.lastErr != nil {
 			result.Message = evidence.lastErr.Error()

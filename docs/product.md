@@ -124,7 +124,7 @@ vmbench --only hardware --hardware-tool geekbench
 
 默认 timeout 仍为 5 分钟：hardware 按 workload 应用，其余网络 section 各自派生 section timeout；调用方 cancel/deadline 会写成结构化 section error。体检 CLI 默认把 section 的 running/完成状态实时写到 stderr，`--quiet` 可关闭进度而不改变报告。
 
-Ping 会保留逐目标结果，全部目标失败时额外返回聚合错误。TCP connect 成功和 TCP RST/refused 都证明目标已响应，均计入 `received` 和延迟而不计为丢包；`connection_state` 区分 `open/refused/mixed/no_response`。Route 会先解析实际目标并记录 `resolved_target`；只有到达该地址才是 `status=ok`，已有有效 hop 但未到达为 `partial`，无有效证据或探测失败为 `error`。Mail 对内置端口逐个顺序连接，避免共享目标对并发突发限流，逐项状态为 `open/refused/timeout/error`；DNS 失败保持为探测 `error`，不会伪装成端口 timeout。
+Ping 会保留逐目标结果，全部目标失败时额外返回聚合错误。TCP connect 成功和 TCP RST/refused 都证明目标已响应，均计入 `received` 和延迟而不计为丢包；`connection_state` 区分 `open/refused/mixed/no_response`。TCP 全部静默（0 open、0 RST）的目标会追加一次系统 `ping` ICMP echo fallback：有回包则改记 `probe_protocol=icmp-echo`，延迟/loss 来自 ICMP 证据，`connection_state` 留空；ICMP 也无响应时维持 error。Route 会先解析实际目标并记录 `resolved_target`；只有到达该地址才是 `status=ok`，已有有效 hop 但未到达为 `partial`，无有效证据或探测失败为 `error`。Mail 对内置端口逐个顺序连接，避免共享目标对并发突发限流，逐项状态为 `open/refused/timeout/error`；DNS 失败保持为探测 `error`，不会伪装成端口 timeout。
 
 输出层级：
 
@@ -134,7 +134,7 @@ Ping 会保留逐目标结果，全部目标失败时额外返回聚合错误。
 
 ## 可复现节点与历史
 
-网络节点从硬编码常量迁移为版本化 catalog。内置快照保证离线可运行；`--node-catalog embedded|auto|PATH` 选择数据源，`--node-revision` 固定 revision。`auto` 只读取已验证缓存并在缓存不可用时回退 embedded，不在测评过程中隐式更新。节点 ID、地区、城市、运营商、ASN、IP family、protocol、endpoint、source 和流量预算进入 catalog，并由报告记录最终 source/revision/node IDs；download 的 `traffic_bytes` 会限制单次响应体读取量。
+网络节点从硬编码常量迁移为版本化 catalog。内置快照保证离线可运行；`--node-catalog embedded|auto|PATH` 选择数据源，`--node-revision` 固定 revision。`auto` 每次尝试拉取最新 manifest（HTTPS + 严格 schema 校验、镜像链、共享 5s 超时），成功后把原文写入缓存作离线兜底；任何失败（网络/镜像不可达/schema 无效/pin 不匹配）静默回退缓存→embedded，不影响测评执行，不产生 warning。节点 ID、地区、城市、运营商、ASN、IP family、protocol、endpoint、source 和流量预算进入 catalog，并由报告记录最终 source（`remote`/`auto`/`embedded`/`path`）/revision/node IDs；download 的 `traffic_bytes` 会限制单次响应体读取量。
 
 ```bash
 vmbench nodes list --node-catalog embedded --json

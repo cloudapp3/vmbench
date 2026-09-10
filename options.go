@@ -8,6 +8,7 @@ import (
 
 	gbbench "github.com/cloudapp3/vmbench/bench"
 	"github.com/cloudapp3/vmbench/catalog"
+	"github.com/cloudapp3/vmbench/redact"
 )
 
 const defaultTimeout = 5 * time.Minute
@@ -26,11 +27,18 @@ type Options struct {
 	OnEvent       EventHandler
 	Engine        string   // "external"; legacy "native"/"full" values are treated as external
 	HardwareTools []string // external hardware tool IDs
+	// Redact masks the machine's public IP addresses in the run report. The
+	// zero value means redact.Default: reports are redacted unless the caller
+	// explicitly opts out with redact.ModeNone.
+	Redact redact.Mode
 }
 
 func prepareOptions(opts Options) (Options, string, []string) {
 	norm := opts
 	warnings := make([]string, 0, 2)
+	if norm.Redact == "" {
+		norm.Redact = redact.Default
+	}
 	if strings.TrimSpace(norm.DiskPath) == "" {
 		norm.DiskPath = os.TempDir()
 	}

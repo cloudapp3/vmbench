@@ -174,6 +174,9 @@ func TestExternalHardwareDefinitionsForTools(t *testing.T) {
 
 func TestMissingHardwareToolsUsesSelectedAdapterCommands(t *testing.T) {
 	dir := t.TempDir()
+	// Isolate the toolbin cache so a dev machine that already fetched pinned
+	// static binaries cannot satisfy tool resolution behind the test's back.
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	suffix := ""
 	if runtime.GOOS == "windows" {
 		suffix = ".exe"
@@ -198,6 +201,10 @@ func TestMissingHardwareToolsUsesSelectedAdapterCommands(t *testing.T) {
 
 func TestMissingHardwareToolsForFilterOnlyChecksMatchingAdapters(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
+	// Isolate the toolbin cache: resolveTool falls back to the user cache
+	// directory, so a fetched pinned fio binary would otherwise mask the
+	// missing-tool evidence this test asserts.
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	tools := []string{HardwareToolFio, HardwareToolMBW}
 	tests := []struct {
 		name   string

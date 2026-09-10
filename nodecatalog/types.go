@@ -14,6 +14,7 @@ const (
 
 	SourceEmbedded = "embedded"
 	SourceAuto     = "auto"
+	SourceRemote   = "remote"
 	SourcePath     = "path"
 
 	KindDownload    = "download"

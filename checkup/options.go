@@ -7,6 +7,7 @@ import (
 	"github.com/cloudapp3/vmbench/bench/netio"
 	"github.com/cloudapp3/vmbench/catalog"
 	"github.com/cloudapp3/vmbench/nodecatalog"
+	"github.com/cloudapp3/vmbench/redact"
 )
 
 type SectionSelector struct {
@@ -52,6 +53,10 @@ type Options struct {
 	CatalogWarning   string                `json:"-"`
 	NodeIDs          []string              `json:"-"`
 	OnEvent          EventHandler          `json:"-"`
+	// Redact masks the machine's public IP addresses in the report. The zero
+	// value means redact.Default: reports are redacted unless the caller
+	// explicitly opts out with redact.ModeNone.
+	Redact redact.Mode `json:"-"`
 }
 
 type EventKind string
@@ -284,6 +289,9 @@ func PrepareOptions(opts Options) Options {
 	norm := opts
 	norm.Filter = strings.TrimSpace(norm.Filter)
 	norm.DiskPath = strings.TrimSpace(norm.DiskPath)
+	if norm.Redact == "" {
+		norm.Redact = redact.Default
+	}
 	norm.IperfHosts = normalizeStringList(norm.IperfHosts)
 	norm.Preset = normalizePresetID(norm.Preset)
 	if norm.Preset != "" {

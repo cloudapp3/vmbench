@@ -797,7 +797,7 @@ func protocolForSection(section string) string {
 	case "route":
 		return "traceroute"
 	case "ping":
-		return "tcp-connect"
+		return "tcp-connect+icmp-echo"
 	case "speed":
 		return "speed-probe"
 	case "mail":

@@ -1,5 +1,46 @@
 # VMBench Changelog
 
+## v0.13.0（2026-09-10）
+
+### 报告脱敏：本机公网 IP 默认替换为文档保留段地址
+
+- **背景**：体检报告在多处原样记录本机公网 IP（结构化身份字段、IP quality 自由文本证据、BGP/CIDR 网段、反向 DNSBL 标签、内嵌 hardware Document），而报告会以 JSON/HTML 落盘、写入 history、经 TUI 展示并整体返回给 MCP 客户端——分享即泄露。
+- **新包 `redact/`**：泛型 JSON 字节级替换——`Marshal → 三次有序替换 → Unmarshal 回原类型`。Pass A 网段/范围（仅当网段数学上包含某本机 IP 才替换，v4 长度保持 /24 下限、v6 /64 下限）、Pass B 反向 DNSBL 标签（`d.c.b.a.` 带尾点）、Pass C 带边界保护的裸 IP（URL、`::ffff:` 映射、相邻部分前缀均可正确处理）。泄漏面是长尾，字节级对未来新增字段自动覆盖。
+- **掩码形态**：IPv4 → `203.0.113.1,2,…`（RFC 5737 TEST-NET-3），IPv6 → `2001:db8::1,2,…`（RFC 3849），同一 IP 在一份报告内映射一致；文档保留段自身不脱敏 ⇒ 幂等。内网 IP、hostname、路由 hop、远端节点 IP 保留（不在本机地址集合内）。
+- **双入口收口**：`checkup.Run` 与 `vmbench.RunCore` 各自在产出报告前脱敏一次，天然覆盖 CLI JSON/HTML/console、`--save-history`、TUI 卡片与导出、MCP structuredContent、内嵌 run Document；嵌套 RunCore 传 `none` 由外层统一处理。checkup 侧 fail-closed：脱敏失败时丢弃网络身份与 IP quality 证据并告警，绝不返回明文。
+- **开关**：默认脱敏；CLI `--redact none` 逃生舱（stderr 打分享警告）；TUI 与 MCP 恒为脱敏。非法值退出码 2；en/zh-CN 双语 i18n。Go API `Options.Redact` 零值即默认脱敏（fail-safe）。
+- **测试**：`redact/redact_test.go` 覆盖映射一致性、三类 pass 形态、边界保护、幂等、往返完整性；`checkup/redact_test.go` 用含全部泄漏面的 fixture 断言脱敏后无明文、指标无损；CLI 校验测试（`--redact bogus` → 2）。
+
+### 体检 route 展示：ECS 式具体线路
+
+- **线路成为第一公民**：route 部分三个输出面（TUI 结果卡 / console / HTML）统一展示回程具体线路（如 `电信CN2GIA [精品线路]`）。取值优先保守分类 `classification.label`（清理对齐空格），分类缺失或 inconclusive 时回退翻译 `observed_asns`（含 AS4809+AS4134→CN2GT、单 AS4809→CN2GIA 消歧，沿用上游 ECS 标签表），两者皆无显示本地化的「未知线路」。
+- **色调分级共享**：新增 `checkup.RouteLineText` / `RouteLineTone` 供三个输出面共用——精品/优质线路为成功色、163/4837/CMI 等普通干线为中性色、证据不足为警示色；HTML route 摘要表 badge 按分级着色，逐跳表中命中中国骨干网 ASN 的行加高亮 badge。
+- **console 主表收敛**：route 表从 9 列收敛为 `目标/解析IP/线路/置信度/状态` 5 列；未到达以 `partial (unreached)` 并入状态列，probe/hops 等探测出处仍在 HTML 与 JSON 证据中保留。
+- **测试修复**：catalog 两个工具预检测试补 `XDG_CACHE_HOME` 隔离（同 v0.11.0 对 `cmd/vmbench` 的修复）——开发机已 fetch 过 pinned fio 时 `resolveTool` 缓存回退会掩盖 missing 证据，导致 `TestMissingHardwareToolsForFilterOnlyChecksMatchingAdapters` 误报。
+
+### Ping：TCP 全静默目标自动 ICMP echo fallback
+
+- **背景**：catalog 中 `*.endpoint.nxtrace.org` 等 traceroute 端点对 TCP SYN 静默丢包（ACL drop 而非 reject），ping 部分长期出现成片 `error no_response`——目标是活的，只是不回 TCP。独立出口复现 + ICMP 反证确认这是目标策略而非路径问题。
+- **fallback 语义**：10 次 TCP 探测全部静默（0 open、0 RST）且未取消时，追加一次系统 `ping`（`bench/netio/ping_icmp.go`；Linux `-c/-w`、macOS `-c/-t`/`ping6`、Windows `-n/-w`，沿用 traceroute 的 shell-out 模式，无需 root）。ICMP 有回包则该行改记 `status=ok`、`probe_protocol=icmp-echo`、`probe_tool=system-ping`，延迟/抖动/loss 来自 ICMP 证据，`connection_state` 留空；ping 缺失或 ICMP 也无响应时维持原 TCP error 不受影响。
+- **跨 locale 解析**：逐次 RTT 只取带 `ttl=` 标记的回包行中的 `time=10.7 ms` / `时间=338ms` / `time<1ms`，天然跳过 rtt min/avg/max/mdev 与 Windows 往返均值等汇总行（含中文 Windows）。
+- **展示**：TUI ping 卡对 icmp-echo 行追加 `icmp` 标记并按警示色（同 refused/mixed）着色——TCP 死、ICMP 活属于降级路径；HTML 报告经既有 `probe … via …` 列自然呈现；compare 逐行沿用 `probe_protocol`，section 级标签更新为 `tcp-connect+icmp-echo`。
+- **范围**：RST/refused、mixed、DNS 失败等路径不触发 fallback；`vmbench-rs` 尚未同步（见 `docs/rust-port.md`）。
+
+### Node catalog `auto`：每次自动拉取 + 静默回退（借鉴 ECS 分发模式）
+
+- **背景**：`auto` 此前从不联网，只读本地缓存，而缓存只有手动 `vmbench nodes update` 才会写入——对多数用户 auto 等价于 embedded，节点数据随版本定死。上游（speedtest.cn-CN-ID 等）每日更新，快照却停在发布日。
+- **新语义**：`auto` 每次 load 都 best-effort 拉取 manifest（`nodecatalog/remote.go`）：镜像链顺序尝试（raw.githubusercontent → jsDelivr → gh-proxy → spiritlhl CDN），共享 5s 超时、非最后镜像 2s 软帽；每个候选必须通过 HTTPS fetch → strict schema → revision pin 三关。成功即用（source 记为 `remote`）并把原文原子写入缓存作离线兜底。
+- **静默回退**：一切拉取失败（DNS/超时/5xx/镜像不可达/schema 无效/pin 不匹配）回退 cache→embedded，不产生任何 warning——离线不该唠叨；仅成功后缓存写失败与 manifest 过期会告警。pin 不匹配的远程 revision 不覆盖已钉住的缓存。
+- **信任模型**：与 ECS 融合怪同模式——信任根是 HTTPS（TLS）+ 严格 schema decoder，不涉及签名密钥；镜像链只是分发端点，前缀代理即使被替换内容，影响面也仅限测试目标指向（无代码执行、无凭据泄露）。镜像链为单个 string var（`DefaultManifestURLs`），可用 `-ldflags -X` 整体替换，增删镜像无需发版。需要端到端强保证时仍可用 `nodes update`：显式提供 Ed25519 trust root 与 detached signature，验签通过才原子写入缓存。
+- **数据保鲜**：仓库 `nodecatalog/nodes.json` 即 live manifest（raw URL 直接服务仓库文件），维护者用 `scripts/gen_isp_nodes.go` 再生成、审查、bump revision 后直接提交；embedded 快照随 `go:embed` 同一提交更新。无需密钥仪式。
+- **测试**：`nodecatalog/remote_test.go` 九个用例覆盖拉取写缓存、断网静默回退（cache/embedded）、schema 无效静默跳过、镜像链降级、pin 保留、过期、写失败、并发安全；`TestMain` 保证测试二进制永不触网。
+
+### sysinfo 硬件证据数据层（additive，展示面后续接线）
+
+- **内存运行态**：`MemoryInfo` 增补 `used_bytes` / `available_bytes` / `used_percent`（Linux/macOS/Windows 采集，`omitempty`）——是 best-effort 运行时状态而非容量，渲染层须把零值当 unknown 而非空。
+- **CPU/网卡证据**：`CPUInfo` 增补 `stepping`；`NetworkInfo` 增补 `primary_driver` / `primary_pci`（首个物理网卡的驱动与 PCI ID，如 `virtio_net` / `1af4:1000`，无设备 backed 接口时留空）。
+- **展示辅助（`sysinfo/present.go`）**：`PlatformDiagnostics.OversellSignals()` 把已有的 balloon/KSM 证据映射为买家视角超售信号（On=能力开启、Risk=对买家意味着超售暴露，证据未知则省略）；`FormatCacheLine` 以固定 L1d/L1i/L2/L3 顺序渲染缓存行。均为纯函数，本版本仅入库未接显示。
+
 ## v0.12.0（2026-09-10）
 
 ### 派生评估层：`vmbench score`（政策反转）

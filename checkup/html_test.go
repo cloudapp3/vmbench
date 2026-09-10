@@ -147,3 +147,36 @@ func TestWriteHTMLIncludesDetailedCheckupEvidence(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteHTMLIncludesRouteLineSummary(t *testing.T) {
+	reached := true
+	report := CheckupReport{Route: RouteSection{
+		SectionState: SectionState{Enabled: true, Status: "ok"},
+		Results: []RouteRun{{
+			Target:             netio.TraceTarget{Name: "Guangzhou CT", City: "Guangzhou", Carrier: "CT", AS: 4134},
+			ResolvedTarget:     "202.96.209.133",
+			DestinationReached: &reached,
+			Status:             netio.TraceStatusOK,
+			Classification: &netio.RouteClassification{
+				Code: "ct_cn2_gia", Label: "电信CN2GIA [精品线路]", Confidence: "confirmed", Rank: 5,
+			},
+			Hops: []netio.Hop{{TTL: 2, IP: "59.43.0.1", ASN: "AS4809"}},
+		}},
+	}}
+	var output bytes.Buffer
+	if err := WriteHTML(&output, report); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"Guangzhou CT",
+		"202.96.209.133",
+		"电信CN2GIA [精品线路]",
+		"confirmed",
+		"badge ok",
+		"AS4809",
+	} {
+		if !strings.Contains(output.String(), want) {
+			t.Fatalf("HTML route line summary missing %q", want)
+		}
+	}
+}

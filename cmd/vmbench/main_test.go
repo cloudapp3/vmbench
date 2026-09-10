@@ -67,6 +67,30 @@ func TestRunRejectsInvalidSectionArguments(t *testing.T) {
 	}
 }
 
+func TestRedactFlagValidation(t *testing.T) {
+	withLangEnv(t, "en")
+	if code := run([]string{"--redact", "bogus"}); code != 2 {
+		t.Fatalf("run(--redact bogus) = %d, want 2", code)
+	}
+	// --redact none passes its own check and prints the share warning before
+	// the later --only failure aborts the run.
+	output, code := captureStderr(t, func() int { return run([]string{"--redact", "none", "--only", "unknown"}) })
+	if code != 2 {
+		t.Fatalf("run(--redact none --only unknown) = %d, want 2", code)
+	}
+	if !strings.Contains(output, "--redact none keeps real public IPs") {
+		t.Errorf("stderr missing the none notice:\n%s", output)
+	}
+	// Mode values are case-insensitive.
+	output, code = captureStderr(t, func() int { return run([]string{"--redact", "IPS", "--only", "unknown"}) })
+	if code != 2 {
+		t.Fatalf("run(--redact IPS --only unknown) = %d, want 2", code)
+	}
+	if strings.Contains(output, "unknown redact mode") {
+		t.Errorf("--redact IPS should validate:\n%s", output)
+	}
+}
+
 func TestInvalidSectionNameResolvesAliases(t *testing.T) {
 	for _, value := range []string{"network_info", "network-identity", "netinfo", "reachability", "website", "telegram"} {
 		if got := invalidSectionName(value); got != "" {

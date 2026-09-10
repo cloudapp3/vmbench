@@ -94,8 +94,9 @@ Downloads are SHA-256 verified against the release `checksums.txt`, then atomica
 | `--ip-version` | v4 | `v4`, `v6`, or `dual` |
 | `--speed-provider` | cloudflare | cloudflare, speedtest_net, speedtest_cn, china_isp, speedtest_isp, iperf3 |
 | `--ip-quality-source` | builtin | builtin; opt-in `securitycheck` (external 18-database binary) |
+| `--redact` | ips | Mask this machine's public IPv4/IPv6 in reports (`none` to keep real addresses) |
 | `--media-set` | all | `globe`, `tw`, `hk`, `jp`, `kr`, `na`, `sa`, `eu`, `afr`, `sea`, `oce`, `ai`, or combinations |
-| `--node-catalog` | embedded | `embedded`, `auto`, or a JSON path |
+| `--node-catalog` | embedded | `embedded`, `auto` (fetch each run, silent cache/embedded fallback), or a JSON path |
 | `--node-revision` | — | Pin an exact catalog revision; fails before probes start on mismatch |
 | `--iperf-host` | — | iperf3 server for the iperf3 speed provider |
 | `--json` / `--html` | — | Write JSON / HTML report to file |
@@ -104,6 +105,8 @@ Downloads are SHA-256 verified against the release `checksums.txt`, then atomica
 | `--lang` | auto | `en` or `zh-CN` (also `VMBENCH_LANG`) |
 
 Without `--preset` / `--only` / `--skip` the run is hardware-only; network sections are opt-in via a preset or explicit selection. When the effective selection is exactly the `hardware` section the output is a benchmark (run-kind) report — identical to pre-v0.8.0 `vmbench run` — otherwise a composite checkup report. Full flag tables: `vmbench --help` or the [capability reference](docs/capabilities.md).
+
+Reports are redacted by default: this machine's public IPv4/IPv6 addresses are consistently replaced with documentation-range placeholders (`203.0.113.x`, `2001:db8::x`) across every surface — console, JSON, HTML, history, TUI, and MCP — including BGP/CIDR prefixes and reverse DNSBL labels that embed the address. Internal IPs, hostnames, route hops, and remote node IPs are kept. `--redact none` opts out (the CLI prints a sharing warning); TUI and MCP always redact.
 
 ## VPS Checkup
 

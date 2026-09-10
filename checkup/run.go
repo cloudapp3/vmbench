@@ -49,6 +49,7 @@ func Run(ctx context.Context, opts Options) CheckupReport {
 		report.UpdatedTime = finished.Unix()
 		report.FinishedTime = report.UpdatedTime
 		report.Status, report.Message = finalize(report)
+		redactReport(&report, norm.Redact)
 		emit(EventCheckupDone, "", report.Status, report.Message)
 		return report
 	}
@@ -105,6 +106,7 @@ func Run(ctx context.Context, opts Options) CheckupReport {
 	report.UpdatedTime = finished.Unix()
 	report.FinishedTime = report.UpdatedTime
 	report.Status, report.Message = finalize(report)
+	redactReport(&report, norm.Redact)
 	emit(EventCheckupDone, "", report.Status, report.Message)
 	return report
 }

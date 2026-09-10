@@ -114,9 +114,12 @@ vmbench --preset quick|website|proxy|mail
 vmbench --only ping,mail
 vmbench --skip media
 vmbench --ip-version v4|v6|dual
+vmbench --redact ips|none
 ```
 
-网络节点来自版本化 catalog。`--node-catalog` 支持 `embedded`、`auto` 或 JSON 路径；`--node-revision` 固定精确 revision，不匹配时在 probe 前失败。`auto` 只使用已验证缓存并可回退 embedded，不在测评时隐式下载。`vmbench nodes verify/update` 使用调用方显式提供的 Ed25519 公钥和 detached signature；`nodes health` 进行有界可用性检查。
+网络节点来自版本化 catalog。`--node-catalog` 支持 `embedded`、`auto` 或 JSON 路径；`--node-revision` 固定精确 revision，不匹配时在 probe 前失败。`auto` 每次尝试自动拉取（HTTPS + 严格 schema 校验 + 镜像链，最多约 5 秒），任何失败静默回退已验证缓存→embedded，不产生 warning。`vmbench nodes verify/update` 使用调用方显式提供的 Ed25519 公钥和 detached signature；`nodes health` 进行有界可用性检查。
+
+报告默认脱敏：本机公网 IPv4/IPv6 会在全部出口（Console/JSON/HTML/历史/TUI/MCP）被一致替换为文档保留段占位地址（`203.0.113.x` / `2001:db8::x`），内嵌该地址的 BGP/CIDR 网段与反向 DNSBL 标签一并替换；内网 IP、hostname、路由 hop、远端节点 IP 保留。`--redact none` 可保留真实地址（CLI 会输出分享警告）；TUI 与 MCP 恒为脱敏。
 
 ## TUI
 

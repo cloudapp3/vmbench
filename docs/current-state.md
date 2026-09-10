@@ -48,7 +48,7 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 - Mail 端口顺序探测并区分 `open/refused/timeout/error`；DNS 失败保持为 probe error
 - IP Quality fail-closed：元数据、公网 IPv4、DNSBL 或 Port 25 结论不完整时不生成风险 score；DNSBL zone 并发查询
 - Cloudflare upload 使用流式请求体，避免分配 50 MiB payload；所有 HTTP 传输保留状态码/body copy 错误
-- `nodecatalog/` 用 embedded/auto/path 三种 source 提供版本化节点；revision pin 在 probe 前检查，Ed25519 signed update 通过严格 schema 验证后才原子写入缓存
+- `nodecatalog/` 用 embedded/auto/remote/path 提供 版本化节点；`auto` 每次 best-effort HTTPS 拉取（镜像链 + 共享 5s 超时 + 严格 schema 校验），成功原子写 cache 作离线兜底，一切失败静默回退 cache→embedded；revision pin 在 probe 前检查，`nodes update` 的 Ed25519 验签（显式 trust root）是不依赖镜像的加固路径
 - embedded snapshot 已覆盖成都、CERNET、CSTNET 与 IPv6 route/ping；节点 ID、protocol、ASN、流量预算和 revision 进入可追溯证据
 
 ### 3. 体检产品

@@ -73,6 +73,9 @@ func RunCore(ctx context.Context, opts Options) Report {
 		HardwareTools: append([]string(nil), norm.HardwareTools...),
 	}, results, warnings)
 
+	document, redactWarnings := redactDocument(document, norm.Redact)
+	document.Warnings = append(document.Warnings, redactWarnings...)
+
 	emitEvent(norm, Event{
 		Kind:     EventBenchDone,
 		Progress: 1,

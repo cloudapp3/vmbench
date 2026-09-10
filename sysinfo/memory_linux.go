@@ -13,5 +13,10 @@ func collectMemoryInfo(ctx context.Context) (MemoryInfo, []string) {
 	if err != nil {
 		return MemoryInfo{}, []string{"memory: " + err.Error()}
 	}
-	return MemoryInfo{TotalBytes: vm.Total}, nil
+	return MemoryInfo{
+		TotalBytes:     vm.Total,
+		UsedBytes:      vm.Used,
+		AvailableBytes: vm.Available,
+		UsedPercent:    vm.UsedPercent,
+	}, nil
 }

@@ -135,8 +135,14 @@ other = "Reached"
 [report.checkup.col.line]
 other = "Line"
 
+[report.checkup.col.confidence]
+other = "Confidence"
+
 [report.checkup.col.status]
 other = "Status"
+
+[report.checkup.route.unknownLine]
+other = "Unknown line"
 
 [report.checkup.col.ip]
 other = "IP"

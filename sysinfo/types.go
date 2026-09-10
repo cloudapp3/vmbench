@@ -12,6 +12,7 @@ import (
 // CPUInfo describes the detected CPU and topology.
 type CPUInfo struct {
 	Model         string           `json:"model"`
+	Stepping      int32            `json:"stepping,omitempty"`
 	Arch          string           `json:"arch"`
 	PhysicalCores int              `json:"physical_cores"`
 	LogicalCores  int              `json:"logical_cores"`
@@ -23,12 +24,17 @@ type CPUInfo struct {
 	NumaNodes     int              `json:"numa_nodes"`
 }
 
-// MemoryInfo describes the detected system memory.
+// MemoryInfo describes the detected system memory. Used/available evidence is
+// best-effort runtime state, not capacity, so renderers must treat zero as
+// "unknown" rather than "empty".
 type MemoryInfo struct {
-	TotalBytes uint64 `json:"total_bytes"`
-	Type       string `json:"type"`
-	FreqMHz    int    `json:"freq_mhz"`
-	Channels   int    `json:"channels"`
+	TotalBytes     uint64  `json:"total_bytes"`
+	UsedBytes      uint64  `json:"used_bytes,omitempty"`
+	AvailableBytes uint64  `json:"available_bytes,omitempty"`
+	UsedPercent    float64 `json:"used_percent,omitempty"`
+	Type           string  `json:"type"`
+	FreqMHz        int     `json:"freq_mhz"`
+	Channels       int     `json:"channels"`
 }
 
 // OSInfo describes the detected operating system.
@@ -55,9 +61,13 @@ type DiskInfo struct {
 }
 
 // NetworkInfo describes network reachability context for extension benches.
+// PrimaryDriver/PrimaryPCI identify the first physical NIC (e.g. virtio_net
+// with PCI id 1af4:1000); both stay empty when no device-backed interface exists.
 type NetworkInfo struct {
 	InterfaceCount int      `json:"interface_count"`
 	ActiveNames    []string `json:"active_names"`
+	PrimaryDriver  string   `json:"primary_driver,omitempty"`
+	PrimaryPCI     string   `json:"primary_pci,omitempty"`
 }
 
 // VirtualizationInfo describes locally detected virtualization context.
@@ -201,7 +211,8 @@ func collectNetworkInfo(ctx context.Context) (NetworkInfo, []string) {
 		}
 		active = append(active, item.Name)
 	}
-	return NetworkInfo{InterfaceCount: len(interfaces), ActiveNames: active}, nil
+	driver, pci := nicHardware(active)
+	return NetworkInfo{InterfaceCount: len(interfaces), ActiveNames: active, PrimaryDriver: driver, PrimaryPCI: pci}, nil
 }
 
 func compactWarnings(in []string) []string {

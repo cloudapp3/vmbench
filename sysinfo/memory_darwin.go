@@ -15,7 +15,12 @@ func collectMemoryInfo(ctx context.Context) (MemoryInfo, []string) {
 	if err != nil {
 		return MemoryInfo{}, []string{"memory: " + err.Error()}
 	}
-	out := MemoryInfo{TotalBytes: vm.Total}
+	out := MemoryInfo{
+		TotalBytes:     vm.Total,
+		UsedBytes:      vm.Used,
+		AvailableBytes: vm.Available,
+		UsedPercent:    vm.UsedPercent,
+	}
 	text, sysctlErr := runCommand(ctx, "sysctl", "-n", "hw.memsize")
 	if sysctlErr == nil {
 		if value, parseErr := strconv.ParseUint(strings.TrimSpace(text), 10, 64); parseErr == nil && value > 0 {

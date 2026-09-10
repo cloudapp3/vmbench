@@ -105,7 +105,10 @@ var htmlTemplate = template.Must(template.New("checkup-report").Funcs(template.F
 	"traceStatus": func(value RouteRun) string {
 		return value.EffectiveStatus()
 	},
-	"traceReached": traceDestinationReachedText,
+	"traceReached":    traceDestinationReachedText,
+	"routeLineText":   RouteLineText,
+	"routeLineTone":   RouteLineTone,
+	"routeConfidence": routeConfidenceText,
 	"sectionNames": func(value SectionSelector) string {
 		return strings.Join(value.Names(), ", ")
 	},
@@ -232,10 +235,13 @@ ul { margin:8px 0 0; padding-left:20px; }
 
 {{ if .Route.Results }}
 <section class="section"><h2>{{ sectionLabel "route" }} · {{ t "report.sh.evidence" }}</h2>
+  <div class="table-wrap"><table><thead><tr><th>{{ t "report.checkup.col.target" }}</th><th>{{ t "report.checkup.col.resolved" }}</th><th>{{ t "report.checkup.col.line" }}</th><th>{{ t "report.checkup.col.confidence" }}</th><th>{{ t "report.checkup.col.status" }}</th></tr></thead><tbody>
+  {{ range .Route.Results }}<tr><td>{{ defaultText .Target.Name "-" }}<br><span class="small">{{ .Target.City }} / {{ .Target.Carrier }} / AS{{ .Target.AS }}</span></td><td><code>{{ defaultText .ResolvedTarget "unknown" }}</code></td><td><span class="badge {{ routeLineTone . }}">{{ routeLineText . }}</span></td><td>{{ routeConfidence .Classification }}</td><td><span class="badge {{ statusClass (traceStatus .) }}">{{ traceStatus . }}</span></td></tr>{{ end }}
+  </tbody></table></div>
 {{ range .Route.Results }}
-	  <div class="subsection"><h3>{{ .Target.Name }} <span class="badge {{ statusClass (traceStatus .) }}">{{ traceStatus . }}</span>{{ if .Classification }} <span class="badge warn">{{ .Classification.Label }}</span>{{ end }}</h3><p class="small"><code>{{ defaultText .Target.ID "legacy" }}</code> / {{ .Target.City }} / {{ .Target.Carrier }} / AS{{ .Target.AS }} / {{ defaultText .Target.IPFamily "-" }} / catalog {{ defaultText .Target.Protocol "-" }} / probe {{ defaultText .ProbeProtocol "unknown" }} via {{ defaultText .ProbeTool "unknown" }} / {{ defaultText .Target.Source "-" }} / requested <code>{{ formatEndpoint .Target.Endpoint .Target.Port }}</code> / resolved <code>{{ defaultText .ResolvedTarget "unknown" }}</code> / destination reached {{ traceReached .DestinationReached }}{{ if .Classification }} / line <code>{{ .Classification.Code }}</code> ({{ .Classification.Confidence }}){{ if .ObservedASNs }} / ASNs {{ .ObservedASNs }}{{ end }}{{ end }}</p>
+	  <div class="subsection"><h3>{{ .Target.Name }} <span class="badge {{ statusClass (traceStatus .) }}">{{ traceStatus . }}</span>{{ if .Classification }} <span class="badge {{ routeLineTone . }}">{{ routeLineText . }}</span>{{ end }}</h3><p class="small"><code>{{ defaultText .Target.ID "legacy" }}</code> / {{ .Target.City }} / {{ .Target.Carrier }} / AS{{ .Target.AS }} / {{ defaultText .Target.IPFamily "-" }} / catalog {{ defaultText .Target.Protocol "-" }} / probe {{ defaultText .ProbeProtocol "unknown" }} via {{ defaultText .ProbeTool "unknown" }} / {{ defaultText .Target.Source "-" }} / requested <code>{{ formatEndpoint .Target.Endpoint .Target.Port }}</code> / resolved <code>{{ defaultText .ResolvedTarget "unknown" }}</code> / destination reached {{ traceReached .DestinationReached }}{{ if .Classification }} / line <code>{{ .Classification.Code }}</code> ({{ .Classification.Confidence }}){{ if .ObservedASNs }} / ASNs {{ .ObservedASNs }}{{ end }}{{ end }}</p>
   {{ if .Error }}<p class="error">{{ .Error }}</p>{{ end }}
-  {{ if .Hops }}<div class="table-wrap"><table><thead><tr><th>TTL</th><th>IP</th><th>{{ t "report.checkup.col.asn" }}</th><th>RTT</th><th>{{ t "report.sh.timeout" }}</th></tr></thead><tbody>{{ range .Hops }}<tr><td>{{ .TTL }}</td><td><code>{{ defaultText .IP "-" }}</code></td><td>{{ defaultText .ASN "-" }}</td><td>{{ formatFloat .RTTMs "ms" }}</td><td>{{ boolText .Timeout }}</td></tr>{{ end }}</tbody></table></div>{{ end }}</div>
+  {{ if .Hops }}<div class="table-wrap"><table><thead><tr><th>TTL</th><th>IP</th><th>{{ t "report.checkup.col.asn" }}</th><th>RTT</th><th>{{ t "report.sh.timeout" }}</th></tr></thead><tbody>{{ range .Hops }}<tr><td>{{ .TTL }}</td><td><code>{{ defaultText .IP "-" }}</code></td><td>{{ if .ASN }}<span class="badge ok">{{ .ASN }}</span>{{ else }}-{{ end }}</td><td>{{ formatFloat .RTTMs "ms" }}</td><td>{{ boolText .Timeout }}</td></tr>{{ end }}</tbody></table></div>{{ end }}</div>
 {{ end }}
 </section>
 {{ end }}

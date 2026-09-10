@@ -92,6 +92,28 @@ func TestRouteResultCardShowsPartialDestinationStatus(t *testing.T) {
 	}
 }
 
+func TestRouteResultCardShowsLineLabel(t *testing.T) {
+	reached := true
+	report := checkup.CheckupReport{Route: checkup.RouteSection{
+		SectionState: checkup.SectionState{Enabled: true, Status: "ok"},
+		Results: []checkup.RouteRun{{
+			Target:             netio.TraceTarget{Name: "广州电信", City: "Guangzhou", Carrier: "CT"},
+			ResolvedTarget:     "202.96.209.133",
+			DestinationReached: &reached,
+			Status:             netio.TraceStatusOK,
+			Classification: &netio.RouteClassification{
+				Code: "ct_cn2_gia", Label: "电信CN2GIA [精品线路]", Confidence: "confirmed", Rank: 5,
+			},
+		}},
+	}}
+	view := routeResultCard(report, 80)
+	for _, want := range []string{"广州电信", "202.96.209.133", "电信CN2GIA [精品线路]"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("route result card missing %q:\n%s", want, view)
+		}
+	}
+}
+
 func TestPingResultCardShowsRefusedConnectionState(t *testing.T) {
 	report := checkup.CheckupReport{Ping: checkup.PingSection{
 		SectionState: checkup.SectionState{Enabled: true, Status: "ok"},
@@ -106,6 +128,25 @@ func TestPingResultCardShowsRefusedConnectionState(t *testing.T) {
 	view := pingResultCard(report, 80)
 	if !strings.Contains(view, "refused") {
 		t.Fatalf("ping result card did not show refused state:\n%s", view)
+	}
+}
+
+func TestPingResultCardShowsICMPFallbackMarker(t *testing.T) {
+	report := checkup.CheckupReport{Ping: checkup.PingSection{
+		SectionState: checkup.SectionState{Enabled: true, Status: "ok"},
+		Results: []checkup.PingResult{{
+			Name:          "GZ CT CN2",
+			Status:        "ok",
+			ProbeProtocol: "icmp-echo",
+			ProbeTool:     "ping",
+			AvgLatencyMs:  10.9,
+			Sent:          10,
+			Received:      10,
+		}},
+	}}
+	view := pingResultCard(report, 80)
+	if !strings.Contains(view, "icmp") {
+		t.Fatalf("ping result card did not show icmp fallback marker:\n%s", view)
 	}
 }
 

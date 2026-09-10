@@ -7,6 +7,7 @@ import (
 
 	"github.com/cloudapp3/vmbench/catalog"
 	"github.com/cloudapp3/vmbench/nodecatalog"
+	"github.com/cloudapp3/vmbench/redact"
 )
 
 // OptionsError reports invalid checkup configuration before any section starts.
@@ -126,6 +127,9 @@ func ValidateOptions(opts Options) error {
 	case "", "v4", "ipv4", "4", "v6", "ipv6", "6", "dual", "both", "all":
 	default:
 		problems = append(problems, "ip_version must be one of: v4, v6, dual")
+	}
+	if _, err := redact.Parse(string(opts.Redact)); err != nil {
+		problems = append(problems, "redact must be one of: ips, none")
 	}
 	if invalid := firstInvalidValue(opts.RoutePresets, StandardizeRoutePresets); invalid != "" {
 		problems = append(problems, fmt.Sprintf("unknown route preset %q", invalid))

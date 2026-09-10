@@ -150,7 +150,7 @@ Linux 默认集中的 `sysbench` 内存 workload 拆为顺序读带宽、顺序�
 - `network_info` 通过显式网络 section 获取公网 IPv4/IPv6、ASN/provider/location，并只输出可验证的 `direct` / `translated` / `unknown` NAT 结论；hardware-only `run` 不会因此发起公网请求。
 - `reachability` 以受限并发探测内置 website HTTPS 与 Telegram DC TCP 目标，逐项保留 protocol、endpoint、latency、HTTP status 和 error。
 - Go 主线 traceroute 使用系统 `traceroute` / `tcptraceroute` / `tracepath`，Windows 使用 `tracert`；目标最多 4 路并发，并按 catalog IP family 解析地址。每个结果记录实际 `resolved_target`、`destination_reached`、`probe_protocol`、`probe_tool` 与 `status=ok|partial|error`。只有 hop 到达解析后的目标才是 `ok`；有有效 hop 但没有到达目标是 `partial`；命令缺失、没有有效 hop 或探测失败是 `error`。
-- Net Ping 使用 `tcp-connect/go-net-dialer` 实际探测证据；connect 成功与 TCP RST（包括 connection refused/reset）都证明目标已响应，计入 RTT/received 而不算丢包。逐目标 `connection_state` 为 `open|refused|mixed|no_response`；真正的 timeout/无响应才计入 loss。全部目标失败时返回非 nil 聚合错误，同时保留结构化 results，成功结果的 0 latency/jitter/loss 仍显式序列化。
+- Net Ping 使用 `tcp-connect/go-net-dialer` 实际探测证据；connect 成功与 TCP RST（包括 connection refused/reset）都证明目标已响应，计入 RTT/received 而不算丢包。逐目标 `connection_state` 为 `open|refused|mixed|no_response`；真正的 timeout/无响应才计入 loss。全部目标失败时返回非 nil 聚合错误，同时保留结构化 results，成功结果的 0 latency/jitter/loss 仍显式序列化。TCP 全静默（0 open、0 RST）的目标走系统 `ping`（iputils/BusyBox/macOS/Windows 各自参数，Windows 含本地化输出）ICMP echo fallback：解析带 `ttl=` 的回包行取逐次 RTT，成功后改记 `icmp-echo/system-ping` 证据；ping 缺失或 ICMP 无响应时维持 TCP error。
 - Mail 与 IP Quality 的端口证据复用同一顺序 TCP 探测器，避免同时连接 `portquiz.net` 的多个端口触发突发限制；每项状态严格分类为 `open|refused|timeout|error`。DNS 解析超时属于探测 `error`，不会伪装成端口 `timeout`。
 - IP Quality 采用 fail-closed：元数据、公网 IPv4、DNSBL 或 Port 25 探测未得到确定结论时保留 detail/error，但不生成 0-100 `score`。只有输入完整且各项得到确定结果时才计算业务风险分。
 - DNSBL zone 并发查询；Cloudflare upload 使用流式请求体，避免为 50 MiB 上传数据分配同等大小内存。
@@ -163,9 +163,9 @@ Linux 默认集中的 `sysbench` 内存 workload 拆为顺序读带宽、顺序�
 - Node：稳定 `id`、`name`、`kind`、`region/city`、`carrier/asn`、`ip_family`、`protocol`、`endpoint/port/url`、`traffic_bytes`、`source`；download 的 `traffic_bytes` 是响应体读取上限
 - kind：`download`、`upload`、`route`、`ping`、`route_ping`
 
-加载模式为 `embedded`、`auto`、显式 JSON path。默认 `embedded` 保证离线确定性；`auto` 优先读取 user cache，缓存不存在/损坏/不匹配时回退 embedded。`--node-revision` 是精确 pin，任何候选 revision 不匹配都会在 probe 前失败。过期 snapshot 产生 warning，但不会静默替换数据。报告中的 source 规范化为 `embedded|auto|path`，真实本地路径只出现在管理 CLI 的 `path` 字段，避免泄露 home path。
+加载模式为 `embedded`、`auto`、显式 JSON path。默认 `embedded` 保证离线确定性；`auto` 每次 best-effort HTTPS 拉取（镜像链顺序尝试、共享 5s 超时、非最后镜像 2s 软帽、严格 schema 校验），成功即用并原子写 cache 作离线兜底，一切失败静默回退 cache→embedded。`--node-revision` 是精确 pin，任何候选 revision 不匹配都会在 probe 前失败。过期 snapshot 产生 warning，但不会静默替换数据。报告中的 source 规范化为 `embedded|auto|remote|path`（`remote` 表示本次拉取成功），真实本地路径只出现在管理 CLI 的 `path` 字段，避免泄露 home path。
 
-`vmbench nodes update` 要求调用方提供 Ed25519 trust root 和 detached signature，签名覆盖 manifest 精确字节；通过签名和严格 schema 校验后，原子写入 user cache（Unix mode `0600`）。`nodes verify` 可只验证 schema/revision，也可验证 detached signature；`nodes health` 对 HTTP/DNS/TCP endpoint 做有界并发可用性检查并保留逐节点错误。当前 embedded snapshot 覆盖全球 download，以及广州/北京/上海/成都、三网、CERNET、CSTNET 和 IPv6 route/ping 证据。
+`auto` 的信任根是 HTTPS（TLS）+ 严格 schema decoder，与 ECS 融合怪的分发模式相同：镜像链（`DefaultManifestURLs`：raw.githubusercontent → jsDelivr → gh-proxy → spiritlhl CDN）只是分发端点，前缀代理被恶意替换内容的影响面限于测试目标指向（无代码执行、无凭据泄露，且 schema 校验兜底结构）。需要端到端强保证时用 `vmbench nodes update`：它要求调用方显式提供 Ed25519 trust root 和 detached signature，签名覆盖 manifest 精确字节，通过后原子写入 user cache（Unix mode `0600`）。`nodes verify` 可只验证 schema/revision，也可验证 detached signature；`nodes health` 对 HTTP/DNS/TCP endpoint 做有界并发可用性检查并保留逐节点错误。当前 embedded snapshot 覆盖全球 download，以及广州/北京/上海/成都、三网、CERNET、CSTNET 和 IPv6 route/ping 证据。
 
 ## Self-Update
 

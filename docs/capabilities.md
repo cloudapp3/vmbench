@@ -94,6 +94,7 @@ vmbench 是一款**跨平台 VPS 基准测试工具**，使用 Go 编写，面�
 | JSON 报告 | 机器可解析的完整结构化数据；同目录临时文件原子导出，Unix mode `0600` |
 | HTML 报告 | 带系统信息卡片的可视化报告；同目录临时文件原子导出，Unix mode `0600` |
 | 报告对比 | 自动识别 benchmark/体检；仅对兼容证据计算 delta |
+| 报告脱敏 | 默认将本机公网 IPv4/IPv6 替换为文档保留段地址（`203.0.113.x` / `2001:db8::x`），覆盖结构化字段、自由文本证据、BGP 网段与反向 DNS 标签；CLI `--redact none` 可关闭 |
 | 本地历史 | add/list/show/delete、`compare --last N`、`--save-history` |
 | 系统信息 | CPU/GPU/内存/磁盘/网络/OS/虚拟化全量采集 |
 
@@ -144,8 +145,9 @@ v0.8.0 起 `run` / `suite` 子命令合并进根命令。报告种类规则：�
 | `--ip-version` | `v4` | IP 版本：`v4` / `v6` / `dual` |
 | `--media-set` | `all` | 流媒体解锁检测范围（地区代码组合，`all` 与地区互斥） |
 | `--ip-quality-source` | `builtin` | IP 质量数据源；`securitycheck` 为 opt-in 外部二进制 |
+| `--redact` | `ips` | 报告脱敏模式：`ips`（遮蔽本机公网 IP，默认）/ `none`（保留真实地址） |
 | `--route-presets` | `gz,bj,sh,cd,cernet,cstnet` | 广州、北京、上海、成都、教育网、科技网 |
-| `--node-catalog` | `embedded` | `embedded` / `auto` / 显式 JSON path |
+| `--node-catalog` | `embedded` | `embedded` / `auto`（每次自动拉取，失败静默回退 cache→embedded）/ 显式 JSON path |
 | `--node-revision` | （空） | pin 精确 catalog revision，不匹配时不启动 probe |
 | `--node-cache` | 用户 cache | `auto` source 的 cache path override |
 | `--iperf-host` | （空） | iperf3 服务器地址（逗号分隔多个；`--speed-provider iperf3` 时必填） |
@@ -170,7 +172,7 @@ v0.8.0 起 `run` / `suite` 子命令合并进根命令。报告种类规则：�
 | `history delete ID` | 删除指定记录 |
 | `history compare --last N` | 比较最近 N 份同 report kind 的记录 |
 
-节点选择公共参数是 `--node-catalog embedded|auto|PATH` 与 `--node-revision REV`；管理命令可用 `--node-cache PATH` 覆盖默认 cache。`embedded` 不访问网络；`auto` 只加载已经验证的 cache，失败时回退 embedded。更新必须显式提供 trust root，不内置可被远程替换的公钥。
+节点选择公共参数是 `--node-catalog embedded|auto|PATH` 与 `--node-revision REV`；管理命令可用 `--node-cache PATH` 覆盖默认 cache。`embedded` 不访问网络；`auto` 每次尝试 HTTPS 拉取（共享 5s 超时、镜像链逐个尝试、严格 schema 校验），失败时静默回退 cache→embedded。`auto` 的信任根是 TLS + 严格 schema（与 ECS 融合怪同模式，不涉及签名密钥）；`nodes update` 仍要求显式提供 trust root，不内置可被远程替换的公钥。
 
 ### `--hardware-tool` 可选值
 
@@ -401,20 +403,22 @@ Linux 的 dd read 使用 `iflag=direct`，避免页缓存产生远高于真实�
 
 ### TCP Ping
 
-每个目标发送 10 次 TCP connect。连接成功与 TCP RST/refused/reset 都证明对端返回了响应，都会计入 RTT 与 `received`，不会计为 packet loss；timeout 或其他无响应才算丢包。逐目标 `connection_state` 为 `open`、`refused`、`mixed` 或 `no_response`，全部目标失败时仍保留 results 并返回聚合 error。
+每个目标发送 10 次 TCP connect。连接成功与 TCP RST/refused/reset 都证明对端返回了响应，都会计入 RTT 与 `received`，不会计为 packet loss；timeout 或其他无响应才算丢包。逐目标 `connection_state` 为 `open`、`refused`、`mixed` 或 `no_response`，全部目标失败时仍保留 results 并返回聚合 error。10 次 TCP 全部静默的目标会自动追加系统 `ping` 的 ICMP echo fallback（traceroute 端点等对 TCP 装死但仍回 ICMP）；成功行改记 `probe_protocol=icmp-echo` 并清空 `connection_state`，ICMP 也无响应才维持 error。
 
 ### 版本化 Node Catalog
 
 Manifest 字段为 `schema_version/revision/generated_at/expires_at/nodes[]`。节点字段为 `id/name/kind/region/city/carrier/asn/ip_family/protocol/endpoint/port/url/traffic_bytes/source`，kind 支持 `download/upload/route/ping/route_ping`；download 的 `traffic_bytes` 会限制单次响应体读取量。
 
 - 默认 `embedded`：离线且确定，不依赖远端可用性
-- `auto`：优先已验证 user cache，失败回退 embedded，不在 benchmark 中隐式更新
+- `auto`：每次 best-effort HTTPS 拉取（镜像链、共享 5s 超时、严格 schema 校验），成功即用（source 记为 `remote`）并把原文原子写入 cache 作离线兜底；一切失败（网络/镜像不可达/schema 无效/pin 不匹配）静默回退 cache→embedded。信任根为 TLS + 严格 schema，与 ECS 融合怪同模式；镜像（raw → jsDelivr → gh-proxy → spiritlhl CDN）只是分发端点
 - path：显式加载本地 JSON；strict decoder 拒绝未知字段、重复 ID 和不合法 endpoint
-- revision pin：选中 snapshot 与 pin 不一致时 probe 前失败
-- signed update：Ed25519 detached signature + strict schema 均通过后才原子替换 cache（Unix mode `0600`）
+- revision pin：选中 snapshot 与 pin 不一致时 probe 前失败；远程 revision 不匹配时不覆盖已钉住的 cache
+- signed update：Ed25519 detached signature + strict schema 均通过后才原子替换 cache（Unix mode `0600`）；显式 trust root 的加固路径，`auto` 不依赖它
 - health：逐节点结构化 status/method/latency/error；它是可用性检查，不参与 benchmark metric
 
-报告把 source 归一化为 `embedded|auto|path`，不写入用户 home/cache 的真实路径；管理 CLI JSON 才在显式 `path` 字段中显示文件位置。
+报告把 source 归一化为 `embedded|auto|remote|path`，不写入用户 home/cache 的真实路径；管理 CLI JSON 才在显式 `path` 字段中显示文件位置。
+
+数据保鲜：仓库 `nodecatalog/nodes.json` 即 live manifest（raw URL 直接服务仓库文件）；维护者用 `scripts/gen_isp_nodes.go` 再生成、审查、bump revision 后直接提交即可，embedded 快照随 `go:embed` 同一提交更新。镜像链是单个 string var（`nodecatalog/remote.go`），可用 `-ldflags -X` 整体替换，增删镜像无需发版。
 
 ### 网络身份与可达性
 

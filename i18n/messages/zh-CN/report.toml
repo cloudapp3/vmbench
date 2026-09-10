@@ -135,8 +135,14 @@ other = "到达"
 [report.checkup.col.line]
 other = "线路"
 
+[report.checkup.col.confidence]
+other = "置信度"
+
 [report.checkup.col.status]
 other = "状态"
+
+[report.checkup.route.unknownLine]
+other = "未知线路"
 
 [report.checkup.col.ip]
 other = "IP"

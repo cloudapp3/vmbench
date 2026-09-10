@@ -35,6 +35,8 @@
 
 ## 3. 脱敏设计（redaction）
 
+> **状态注记（2026-09-10）**：`ips` / `none` 两档已在**报告层**落地（`redact/` 包 + `checkup.Run` / `RunCore` 双入口收口，CLI `--redact`，TUI/MCP 恒为脱敏）。报告层脱敏与上文的差异：掩码形态为文档保留段占位地址（`203.0.113.x` / `2001:db8::x`，RFC 5737 / RFC 3849），不保留前缀；BGP/CIDR 网段按"数学包含本机 IP"判定后一并替换；实现在 JSON 字节级统一替换而非路径级+值级两层（对未来新增字段自动覆盖）。本节其余内容（`strict` 档、hostname 掩码、inventory、text/HTML 分享物）仍归属 `share`；share 落地时应复用报告层已脱敏的报告与同一 flag 词汇。
+
 ### 3.1 三个档案
 
 ```

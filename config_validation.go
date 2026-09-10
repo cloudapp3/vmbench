@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/cloudapp3/vmbench/catalog"
+	"github.com/cloudapp3/vmbench/redact"
 )
 
 // OptionsError reports invalid run configuration before any workload starts.
@@ -41,6 +42,9 @@ func ValidateOptions(opts Options) error {
 	case "", "external", "native", "full":
 	default:
 		problems = append(problems, "engine must be one of: external, native, full")
+	}
+	if _, err := redact.Parse(string(opts.Redact)); err != nil {
+		problems = append(problems, "redact must be one of: ips, none")
 	}
 	if invalid := firstInvalidHardwareTool(opts.HardwareTools); invalid != "" {
 		problems = append(problems, fmt.Sprintf("unknown hardware tool %q; available: %s", invalid, strings.Join(catalog.HardwareToolIDs(), ", ")))

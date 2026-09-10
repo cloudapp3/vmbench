@@ -136,7 +136,7 @@ other = "save the report to local history"
 other = "optional tag used with --save-history"
 
 [cli.flag.nodeCatalog]
-other = "node catalog source: embedded, auto, or a JSON path"
+other = "node catalog source: embedded, auto (fetch with cache fallback), or a JSON path"
 
 [cli.flag.nodeRevision]
 other = "require an exact node catalog revision"
@@ -171,11 +171,14 @@ other = "media unlock set: all, globe, tw, hk, jp, kr, na, sa, eu, afr, sea, oce
 [cli.flag.ipQualitySource]
 other = "IP quality evidence sources (comma-separated: builtin,securitycheck)"
 
+[cli.flag.redact]
+other = "mask this machine's public IPs in reports: ips (default) or none"
+
 [cli.flag.jsonSysinfo]
 other = "output as JSON"
 
 [cli.flag.nodeCatalogNodes]
-other = "catalog source: embedded, auto, or JSON path"
+other = "catalog source: embedded, auto (fetch), or JSON path"
 
 [cli.flag.nodeCacheNodes]
 other = "override auto catalog cache path"
@@ -294,6 +297,9 @@ other = 'error: unknown media set "{{.Value}}" (available: {{.Available}})'
 [cli.error.unknownIPSource]
 other = 'error: unknown IP quality source "{{.Value}}" (available: {{.Available}})'
 
+[cli.error.badRedact]
+other = 'error: unknown redact mode "{{.Value}}" (available: ips, none)'
+
 [cli.error.noValidSpeedProviders]
 other = 'error: no valid speed providers in "{{.Value}}" (available: {{.Available}})'
 
@@ -359,6 +365,9 @@ other = "error: invalid stored report: {{.Err}}"
 
 [cli.notice.historySaved]
 other = "history: saved {{.ID}}"
+
+[cli.notice.redactDisabled]
+other = "notice: --redact none keeps real public IPs in reports; do not share the output unreviewed"
 
 [cli.notice.missingHardwareTools]
 other = "notice: missing hardware tools: {{.Tools}}; affected workloads will be recorded as structured errors"

@@ -35,6 +35,7 @@ func collectCPUInfo(ctx context.Context) (CPUInfo, []string) {
 	}
 	if len(infoList) > 0 {
 		info.Model = strings.TrimSpace(infoList[0].ModelName)
+		info.Stepping = infoList[0].Stepping
 		info.BaseFreqMHz = infoList[0].Mhz
 		info.MaxFreqMHz = infoList[0].Mhz
 	}

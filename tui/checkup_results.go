@@ -275,15 +275,19 @@ func pingResultCard(r checkup.CheckupReport, width int) string {
 		name := firstStr(p.Name, "?")
 		nameStyled := lipgloss.NewStyle().Foreground(t.Fg).Width(28).Render(truncStr(name, 28))
 		connectionState := strings.ToLower(strings.TrimSpace(p.ConnectionState))
+		icmpFallback := strings.Contains(strings.ToLower(p.ProbeProtocol), "icmp")
 		var metric string
 		if strings.EqualFold(p.Status, "ok") {
 			color := t.Success
-			if connectionState == netio.PingConnectionStateRefused || connectionState == netio.PingConnectionStateMixed {
+			if connectionState == netio.PingConnectionStateRefused || connectionState == netio.PingConnectionStateMixed || icmpFallback {
 				color = t.Warning
 			}
 			text := fmt.Sprintf("%s avg  %.0f%% loss", fmtMs(p.AvgLatencyMs), p.PacketLoss)
 			if connectionState != "" {
 				text += "  " + connectionState
+			}
+			if icmpFallback {
+				text += "  icmp"
 			}
 			metric = lipgloss.NewStyle().Foreground(color).Render(text)
 		} else {
@@ -309,13 +313,38 @@ func routeResultCard(r checkup.CheckupReport, width int) string {
 	if len(r.Route.Results) == 0 {
 		return sectionStateCard(checkup.SectionRoute, r.Route.SectionState, width)
 	}
+	cardW := cardWidth(width)
+	nameW := cardW / 4
+	if nameW > 18 {
+		nameW = 18
+	}
+	if nameW < 10 {
+		nameW = 10
+	}
 	var lines []string
 	for _, item := range r.Route.Results {
-		name := fmt.Sprintf("%s %s", item.Target.City, item.Target.Carrier)
-		nameStyled := lipgloss.NewStyle().Foreground(t.Fg).Width(28).Render(truncStr(name, 28))
-		hops := lipgloss.NewStyle().Foreground(t.Accent).Render(fmt.Sprintf("%d hops", len(item.Hops)))
+		name := firstStr(item.Target.Name, strings.TrimSpace(item.Target.City+" "+item.Target.Carrier))
+		nameStyled := lipgloss.NewStyle().Foreground(t.Fg).Width(nameW).Render(truncStr(name, nameW))
+		ip := firstStr(item.ResolvedTarget, "-")
+		ipW := 15
+		if strings.Contains(ip, ":") {
+			ipW = 22
+		}
+		ipStyled := lipgloss.NewStyle().Foreground(t.Muted).Width(ipW).Render(truncStr(ip, ipW))
+		lineW := cardW - nameW - ipW - 14
+		if lineW < 10 {
+			lineW = 10
+		}
+		color := t.Fg
+		switch checkup.RouteLineTone(item) {
+		case "ok":
+			color = t.Success
+		case "warn":
+			color = t.Warning
+		}
+		lineStyled := lipgloss.NewStyle().Foreground(color).Width(lineW).Render(truncStr(checkup.RouteLineText(item), lineW))
 		status := tuiTraceStatus(item.EffectiveStatus())
-		lines = append(lines, nameStyled+" "+hops+"  "+status)
+		lines = append(lines, nameStyled+" "+ipStyled+"  "+lineStyled+"  "+status)
 	}
 	return comp.Card{
 		Title:    checkupSectionLabel(checkup.SectionRoute),

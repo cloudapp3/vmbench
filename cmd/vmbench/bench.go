@@ -17,6 +17,7 @@ import (
 	"github.com/cloudapp3/vmbench/checkup"
 	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/nodecatalog"
+	"github.com/cloudapp3/vmbench/redact"
 	gbreport "github.com/cloudapp3/vmbench/report"
 )
 
@@ -41,6 +42,7 @@ type benchmarkFlags struct {
 	ipVersion       string
 	mediaSet        string
 	ipSource        string
+	redact          string
 	saveHistory     bool
 	historyTag      string
 	catalogSource   string
@@ -54,6 +56,7 @@ func newBenchmarkFlags() *benchmarkFlags {
 		ipVersion:     "v4",
 		mediaSet:      "all",
 		ipSource:      "builtin",
+		redact:        string(redact.Default),
 		catalogSource: nodecatalog.SourceEmbedded,
 	}
 }
@@ -80,6 +83,7 @@ func newBenchmarkFlagSet(bf *benchmarkFlags) *flag.FlagSet {
 	fs.StringVar(&bf.ipVersion, "ip-version", bf.ipVersion, i18n.T("cli.flag.ipVersion"))
 	fs.StringVar(&bf.mediaSet, "media-set", bf.mediaSet, i18n.T("cli.flag.mediaSet"))
 	fs.StringVar(&bf.ipSource, "ip-quality-source", bf.ipSource, i18n.T("cli.flag.ipQualitySource"))
+	fs.StringVar(&bf.redact, "redact", bf.redact, i18n.T("cli.flag.redact"))
 	fs.BoolVar(&bf.saveHistory, "save-history", false, i18n.T("cli.flag.saveHistory"))
 	fs.StringVar(&bf.historyTag, "history-tag", "", i18n.T("cli.flag.historyTag"))
 	fs.BoolVar(&bf.quiet, "quiet", false, i18n.T("cli.flag.quiet"))
@@ -163,6 +167,15 @@ func (bf *benchmarkFlags) validate(fs *flag.FlagSet) (*regexp.Regexp, int) {
 	default:
 		fmt.Fprintln(os.Stderr, i18n.T("cli.error.badIPVersion"))
 		return nil, 2
+	}
+	redactMode, err := redact.Parse(bf.redact)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.badRedact", map[string]any{"Value": bf.redact}))
+		return nil, 2
+	}
+	bf.redact = string(redactMode)
+	if redactMode == redact.ModeNone {
+		fmt.Fprintln(os.Stderr, i18n.T("cli.notice.redactDisabled"))
 	}
 	if bad := invalidSectionName(bf.only); bad != "" {
 		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.unknownSectionOnly", map[string]any{"Value": bad}))
@@ -260,6 +273,7 @@ func (bf *benchmarkFlags) runHardwareOnly(filterRE *regexp.Regexp) int {
 		Filter:        bf.filter,
 		Engine:        "external",
 		HardwareTools: parseHosts(bf.hardwareTool),
+		Redact:        redact.Mode(bf.redact),
 		OnEvent:       progressPrinter(!bf.quiet),
 	})
 	if err != nil {
@@ -290,6 +304,7 @@ func (bf *benchmarkFlags) runCheckupSections(sections checkup.SectionSelector, r
 		IPVersion:        ipVersion,
 		MediaSet:         bf.mediaSet,
 		IPSources:        parseHosts(bf.ipSource),
+		Redact:           redact.Mode(bf.redact),
 		CatalogSource:    bf.catalogSource,
 		CatalogRevision:  bf.catalogRevision,
 		CatalogCachePath: bf.catalogCache,

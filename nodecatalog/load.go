@@ -63,7 +63,7 @@ func Load(options LoadOptions) (Loaded, error) {
 	switch strings.ToLower(source) {
 	case SourceEmbedded:
 		return loadEmbedded(pin)
-	case SourceAuto:
+	case SourceAuto, SourceRemote:
 		return loadAuto(options.CachePath, pin)
 	default:
 		loaded, err := loadPath(source)
@@ -130,19 +130,37 @@ func loadEmbedded(pin string) (Loaded, error) {
 	}, nil
 }
 
+// resolveCachePath picks the auto-source cache destination: the explicit
+// override, else the per-user default.
+func resolveCachePath(override string) (string, error) {
+	path := strings.TrimSpace(override)
+	if path != "" {
+		return path, nil
+	}
+	return DefaultCachePath()
+}
+
+// loadAuto serves the auto source: best-effort remote fetch first (see
+// remote.go), then the previously loaded cache, then the embedded snapshot.
+// Every remote failure — offline, unreachable mirrors, schema-invalid
+// content, pin mismatch — falls back silently by design.
 func loadAuto(cachePath, pin string) (Loaded, error) {
-	path := strings.TrimSpace(cachePath)
-	if path == "" {
-		var err error
-		path, err = DefaultCachePath()
-		if err != nil {
-			embedded, embeddedErr := loadEmbedded(pin)
-			if embeddedErr != nil {
-				return Loaded{}, errors.Join(err, embeddedErr)
-			}
-			embedded.Warning = err.Error()
-			return embedded, nil
+	path, resolveErr := resolveCachePath(cachePath)
+	if resolveErr != nil {
+		embedded, embeddedErr := loadEmbedded(pin)
+		if embeddedErr != nil {
+			return Loaded{}, errors.Join(resolveErr, embeddedErr)
 		}
+		embedded.Warning = resolveErr.Error()
+		return embedded, nil
+	}
+
+	if remoteConfigured() {
+		remote, err := loadRemote(path, pin)
+		if err == nil {
+			return remote, nil
+		}
+		// Silent fallback: offline must not nag.
 	}
 
 	cached, cacheErr := loadPath(path)
@@ -164,6 +182,17 @@ func loadAuto(cachePath, pin string) (Loaded, error) {
 		embedded.Warning = fmt.Sprintf("cached catalog ignored: %v", cacheErr)
 	}
 	return embedded, nil
+}
+
+// joinWarnings concatenates non-empty warning fragments with "; ".
+func joinWarnings(parts ...string) string {
+	nonEmpty := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if strings.TrimSpace(part) != "" {
+			nonEmpty = append(nonEmpty, part)
+		}
+	}
+	return strings.Join(nonEmpty, "; ")
 }
 
 func loadPath(path string) (Loaded, error) {

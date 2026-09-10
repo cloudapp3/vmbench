@@ -136,7 +136,7 @@ other = "将报告保存到本地历史"
 other = "与 --save-history 配合使用的可选标签"
 
 [cli.flag.nodeCatalog]
-other = "节点目录来源: embedded、auto 或 JSON 路径"
+other = "节点目录来源: embedded、auto（自动拉取，失败回退缓存）或 JSON 路径"
 
 [cli.flag.nodeRevision]
 other = "要求精确的节点目录版本"
@@ -171,11 +171,14 @@ other = "流媒体解锁集合: all、globe、tw、hk、jp、kr、na、sa、eu�
 [cli.flag.ipQualitySource]
 other = "IP 质量证据来源 (逗号分隔: builtin,securitycheck)"
 
+[cli.flag.redact]
+other = "报告脱敏本机公网 IP: ips（默认）或 none"
+
 [cli.flag.jsonSysinfo]
 other = "以 JSON 输出"
 
 [cli.flag.nodeCatalogNodes]
-other = "目录来源: embedded、auto 或 JSON 路径"
+other = "目录来源: embedded、auto（自动拉取）或 JSON 路径"
 
 [cli.flag.nodeCacheNodes]
 other = "覆盖 auto 目录缓存路径"
@@ -294,6 +297,9 @@ other = '错误: 未知流媒体集合 "{{.Value}}" (可用: {{.Available}})'
 [cli.error.unknownIPSource]
 other = '错误: 未知 IP 质量来源 "{{.Value}}" (可用: {{.Available}})'
 
+[cli.error.badRedact]
+other = '错误: 未知脱敏模式 "{{.Value}}" (可用: ips, none)'
+
 [cli.error.noValidSpeedProviders]
 other = '错误: "{{.Value}}" 中没有有效的测速提供方 (可用: {{.Available}})'
 
@@ -359,6 +365,9 @@ other = "错误: 存储的报告无效: {{.Err}}"
 
 [cli.notice.historySaved]
 other = "历史: 已保存 {{.ID}}"
+
+[cli.notice.redactDisabled]
+other = "提示: --redact none 会在报告中保留真实公网 IP，分享前请先自行检查"
 
 [cli.notice.missingHardwareTools]
 other = "提示: 缺少硬件测试工具: {{.Tools}};受影响的工作负载将记录为结构化错误"

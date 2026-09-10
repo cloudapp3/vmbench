@@ -20,7 +20,12 @@ func collectMemoryInfo(ctx context.Context) (MemoryInfo, []string) {
 	if err != nil {
 		return MemoryInfo{}, []string{"memory: " + err.Error()}
 	}
-	out := MemoryInfo{TotalBytes: vm.Total}
+	out := MemoryInfo{
+		TotalBytes:     vm.Total,
+		UsedBytes:      vm.Used,
+		AvailableBytes: vm.Available,
+		UsedPercent:    vm.UsedPercent,
+	}
 	text, cmdErr := runCommand(ctx, "powershell", "-NoProfile", "-Command", "Get-CimInstance Win32_PhysicalMemory | Select-Object -First 1 SMBIOSMemoryType,Speed | ConvertTo-Json -Compress")
 	if cmdErr == nil && strings.TrimSpace(text) != "" {
 		var probe winMemoryProbe

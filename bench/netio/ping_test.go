@@ -53,14 +53,16 @@ func TestPingTargetKeepsTimeoutAndUnreachableAsLoss(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := pingTargetWithDial(context.Background(), PingTarget{
+			// nil icmp probe keeps the TCP-only semantics: the fallback path
+			// is covered separately in ping_icmp_test.go.
+			result := pingTargetWithProbes(context.Background(), PingTarget{
 				ID:       "no-response",
 				Name:     "No response",
 				Endpoint: "192.0.2.1",
 				Port:     80,
 			}, func(context.Context, string, string) (net.Conn, error) {
 				return nil, tt.err
-			})
+			}, nil)
 
 			if result.Status != "error" {
 				t.Fatalf("Status = %q, want error", result.Status)
