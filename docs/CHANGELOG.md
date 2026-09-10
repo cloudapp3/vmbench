@@ -1,5 +1,55 @@
 # VMBench Changelog
 
+## v0.13.6（2026-09-11）
+
+### System Info 展开区多卡改版：虚拟化 / 存储 / 内存 / 运行环境证据
+
+- **背景**：Dashboard 选中 System Info 后的展开区（原 "Details" 卡）只有 Features/Arch/Cache 三行（外加 v0.13.3 的国家/ISP），而 `sysinfo.SystemInfo` 里已采集的虚拟化平台、磁盘清单、内存水位、平台诊断等证据没有展示面；CLI `vmbench sysinfo` 已渲染大部分，TUI 一直没接。
+- **数据层**：① 新增 `DMIInfo`（product_name/sys_vendor/board_vendor/board_name），Linux 读 `/sys/class/dmi/id/*`（免 root、静默、过滤 "To Be Filled By O.E.M." 类占位串），其他平台零值；写入报告 `system.dmi`（写新读旧兼容，旧报告无此字段按未知跳过）。② Linux `collectMemoryInfo` best-effort 解析 `dmidecode -t 17` 填 `type/freq_mhz/channels`（需 root；非 root 或工具缺失静默留空，零值=未知，对齐 ping ICMP fallback 先例）；此前该三字段仅 Windows 填充。
+- **展示层**：`dashboardSysExpanded` 由单卡改为多张条件渲染证据卡（无证据整卡消失），`≥100` 列两列并排、窄端堆叠。卡片：处理器（特性/微架构/缓存/步进/NUMA）、网络（国家/ISP）、虚拟化（平台+guest/host、DMI 机型/厂商、嵌套虚拟化、balloon/KSM 明细含 KSM 共享页数、风险 `(!)` 标记沿用 OversellSignals 语义）、内存（规格 `DDR4 2666 MT/s ×2`、占用快照）、存储（启动盘+设备/FS/容量/挂载点）、运行环境（uptime/负载/swap）。`formatDuration` 补天/小时分支（原先 30 天 uptime 会渲染成 "43200 分"）。KV 行统一走 `comp.KVGrid`（标签列自动对齐）。
+- **CLI**：`vmbench sysinfo` 控制台在 virtual 行后新增 DMI 机型行（`机型 : ProductName (Vendor)`，有值才显示）；memory 行追加 `2666 MT/s ×2` 速度后缀（未知时维持原样）。
+- **文档**：`docs/tui-design.md` Dashboard 展开区描述重写；`docs/capabilities.md` sysinfo JSON 示例补 `dmi` 字段。
+- **测试**：`sysinfo/dmi_linux_test.go`（识别串采集、占位串过滤、缺目录零值）；`sysinfo/memory_linux_test.go`（dmidecode 解析：双通道 DDR4、半插槽 LPDDR5、空槽 Unknown 不抢占、坏速度/孤儿字段健壮性）；`tui/dashboard_render_test.go`（全证据卡渲染、窄端堆叠、空证据整卡消失）；`cmd/vmbench/main_test.go`（控制台 DMI/内存规格显示与未知省略）。
+
+## v0.13.5（2026-09-10）
+
+### TUI：报告历史页
+
+- **背景**：`--save-history` 保存的本地报告此前只有 CLI（`vmbench history list/show`）和被隐藏的 ComparePicker 两个查看途径，TUI 没有直接的「查看历史」入口。
+- **改动**：Dashboard 菜单新增「报告历史」（`tui/history.go`）——列表页展示 time/kind/tag/id（与 picker 同一 `loadHistoryCmd`/`historyListMsg` 加载链路，按当前页面分流，最新在前、上限 50 条，懒加载一次会话内复用）；`↵`/`v` 打开当前记录（run -> Results 页、体检 -> CheckupResults 页，复用 `viewRecordCmd`），`Esc` 逐级返回（报告页 -> History -> Dashboard）；空态提示 `--save-history` 与 `vmbench history add`。原 `reportCameFromPicker` 布尔泛化为 `reportFrom page`，picker 与 history 两个来源共用同一返回语义，原行为不变。
+- **帮助/滚动**：`helpFor`/`helpSectionTitle`/`helpPageOrder` 注册新页（footer 与帮助页同源），`focusedContentLine` 接入 `historyFocusedLine` 光标跟随；i18n 新增 `tui.menu.history`、`tui.help.sec.history`、`tui.history.*` 双语 key。
+- **compare 临时隐藏**：新增根级 `features.go` 单开关 `FeatureCompare=false`，收口全部 compare 出入口——`vmbench compare` CLI、`vmbench history compare`、TUI compare 菜单/选择页与 `-compare-a/-compare-b` flag 均按 unknown-command 处理；实现（checkupcompare、report/compare、TUI compare 页）完整保留在树中，置回 true 即恢复。双语 README/capabilities 的 compare 条目同步移除。
+- **测试**：`tui/history_test.go`（列表渲染 en+zh 边界、空态/错误态、enter 打开 run/体检并逐级返回、focused-line 与渲染互锁、dashboard 菜单进入懒加载）；`TestDashboardClickActivatesMenuItem` 改点历史菜单行并取消 skip；`TestCtrlCQuitsFromEveryPage` 经 `helpPageOrder` 自动覆盖新页。
+
+## v0.13.4（2026-09-10）
+
+### 流媒体解锁默认集合收敛为 globe
+
+- **背景**：`media` section 默认跑 `all` 全平台 180+ 家，是所有 section 里耗时最长的一块；多数场景只关心主流跨国平台与 AI 服务。UnlockTests 的 `globe`（Multination，41 家）已包含全部 14 家 AI 平台（ChatGPT/Claude/Gemini/Copilot/DeepSeek 等），`ai` 集合仅用于单独测 AI，`globe,ai` 与 `globe` 等价。
+- **改动**：`checkup.DefaultMediaSet()` 由 `all` 改为 `globe`；checkup 归一化空值兜底、`--media-set` flag 默认值（改为直接引用 `DefaultMediaSet()`，不再漂移）、MCP 工具描述、双语 flag 帮助、README/capabilities 默认值列一并收敛。全平台改为显式 `--media-set all`。
+- **不变**：显式传入的 media_set（`all` 与任意地区组合）原样透传；报告 `set` 字段与展示面无改动。TUI 配置页仍不暴露 media set 选择（维持"别往这页加配置项"的决策），勾选流媒体即按默认集跑。
+- **测试**：`checkup/options_test.go` 新增 `TestDefaultMediaSetResolvesAndFillsMediaSection`——默认集可解析、media section 空值兜底默认集、显式 `all` 优先三条断言。
+
+## v0.13.3（2026-09-10）
+
+### TUI：首页 System 卡片显示公网 IP 与 ASN
+
+- **背景**：公网 IP / ASN 证据此前只在跑完体检后的 network_info 结果卡可见；打开 TUI 第一屏看不到「这台机器是谁」。买 VPS 后第一时间要确认的正是 IP、ASN 与归属，本版本把这份轻量证据搬到启动首页。
+- **数据层**：`bench/netio` 新增导出 `ProbePublicIdentityLite(ctx, ipVersion)`——复用 `probeNetworkIdentity` 核心链路（ipify 地址 + ipwho.is ASN/Org/ISP/国家元数据，v4/v6 双栈并行，单请求 8s 超时，元数据不完整 fail-closed），防御性置 nil 跳过体检用的补充探测（STUN NAT、RDAP/BGP 30s、CIDR 邻居、IPv6 子网），首页探测成本从 30s+ 降到两次轻量 HTTP。
+- **接线**：照 `loadSysinfo` 模式在 `Init()` 批处理里追加 `loadNetIdentity()`（整体 20s 预算兜底）→ `netIdentityDoneMsg` → Model 存 `netIdentState{loading, v4, v6}`；部分成功即采用（地址拿到、元数据超时 → 只显示 IP）。
+- **展示**：System 卡片网卡行后新增 `IPv4` / `IPv6` KV 行，格式与体检结果卡共用同一 `publicIdentityValue`（`IP  AS#### Org`，Org 缺省回退 ISP）；加载中显示 `detecting...` 占位（i18n en/zh-CN），离线静默隐藏整行（offline must not nag，对齐 nodecatalog 先例）。System Info 展开区另显示国家与 ISP。鼠标菜单命中区不受影响（卡片在菜单下方/右侧，不移动菜单行）。
+- **脱敏边界**：该行明文显示本机公网 IP——`--redact` 只覆盖保存/分享的报告导出面（JSON/HTML/console/history/MCP），不覆盖本机实时屏幕；与 System 卡片既有 hostname 明文同语义。
+- **测试**：`bench/netio/network_identity_test.go`（lite 探测不触碰补充 provider、离线返回空 partial 结果）；`tui/dashboard_render_test.go`（v4/v6 显示含 ISP 回退、加载占位、离线隐藏、展开区国家/ISP）；`tui/app_test.go`（消息落地更新模型与离线分支）。
+
+## v0.13.2（2026-09-10）
+
+### TUI：Ctrl+C 全局退出
+
+- **背景**：Bubble Tea 的 raw mode 清掉终端 `ISIG` 位，^C 不再产生 SIGINT，而是作为普通 `tea.KeyMsg` 进入 `Update`；此前没有任何页面绑定 `ctrl+c`，按键被静默吞掉，只能用 `q` 退出（bubbletea 内置的 SIGINT 处理只覆盖外部 `kill -INT`）。
+- **修复**：`tui/app.go` 的 `tea.KeyMsg` 分支最前面加全局 case——任意页面、包括取消确认弹窗内，`Ctrl+C` 先取消运行中的 run/checkup context 再 `tea.Quit`，语义与运行页的 `q` 一致；无运行时 `cancel` 为 nil，安全直退。
+- **帮助注册表**：`tui/help.go` 全局条目新增 `Ctrl+C`（复用 `tui.hint.quit`，进帮助页全局区、不进 footer——footer 已有 `q`）；README Keys 行与 `docs/tui-design.md` 全局按键节同步。
+- **测试**：`tui/app_test.go`——所有页面（含帮助页）Ctrl+C 产生 Quit 命令并调用 cancel；确认弹窗内绕过 y/n 直接退出；无 cancel 函数时不 panic。
+
 ## v0.13.1（2026-09-10）
 
 ### sysinfo 硬件证据展示接线

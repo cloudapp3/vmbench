@@ -24,7 +24,6 @@ VMBENCH_BIN_DIR="$(
 vmbench                          # interactive TUI (default)
 vmbench --json report.json       # hardware benchmark via external tools (default selection)
 vmbench --preset quick           # fast overview: hardware + network info + speed + IP quality
-vmbench compare a.json b.json    # auto-detect and compare reports
 vmbench score report.json        # deterministic assessment (dimension indexes, profile fit, coverage)
 vmbench update                   # self-update from GitHub Releases
 ```
@@ -76,9 +75,8 @@ Downloads are SHA-256 verified against the release `checksums.txt`, then atomica
 | `vmbench mcp serve [--transport stdio]` | Expose vmbench tools to LLM clients via MCP stdio |
 | `vmbench list` | List available workloads |
 | `vmbench sysinfo [--json]` | Show system information |
-| `vmbench compare <a.json> <b.json> [...]` | Auto-detect and compare benchmark or checkup reports |
 | `vmbench score <report.json\|->` | Derive a deterministic assessment from a report against the versioned scoring baseline |
-| `vmbench history <command>` | Add / list / show / delete / compare local reports |
+| `vmbench history <command>` | Add / list / show / delete local reports |
 | `vmbench update [--check] [--version TAG]` | Self-update from GitHub Releases (SHA-256 verified) |
 | `vmbench version` | Show version |
 
@@ -95,7 +93,7 @@ Downloads are SHA-256 verified against the release `checksums.txt`, then atomica
 | `--speed-provider` | cloudflare | cloudflare, speedtest_net, speedtest_cn, china_isp, speedtest_isp, iperf3 |
 | `--ip-quality-source` | builtin | builtin; opt-in `securitycheck` (external 18-database binary) |
 | `--redact` | ips | Mask this machine's public IPv4/IPv6 in reports (`none` to keep real addresses) |
-| `--media-set` | all | `globe`, `tw`, `hk`, `jp`, `kr`, `na`, `sa`, `eu`, `afr`, `sea`, `oce`, `ai`, or combinations |
+| `--media-set` | `globe` | `globe` covers the 41 international platforms (AI services included); `all` runs every platform, or combine region IDs |
 | `--node-catalog` | embedded | `embedded`, `auto` (fetch each run, silent cache/embedded fallback), or a JSON path |
 | `--node-revision` | — | Pin an exact catalog revision; fails before probes start on mismatch |
 | `--iperf-host` | — | iperf3 server for the iperf3 speed provider |
@@ -142,14 +140,14 @@ The checkup succeeds only when every enabled section ends `status=ok`; enabled e
 
 Launch with `vmbench` (no arguments):
 
-- **Dashboard** with benchmark / compare / sysinfo entry points; mouse clicks and wheel scrolling everywhere
+- **Dashboard** with benchmark / history / sysinfo entry points; mouse clicks and wheel scrolling everywhere. The System card shows the machine's public IPv4/IPv6 with ASN org (probed async at startup, silent when offline; System Info expands to country and ISP)
 - **Config**: one page for the same normalized fields as CLI/MCP — preset pills lead with Hardware Only (the CLI default) plus Custom and the checkup presets; section toggles reveal tool, filter, speed, route, media, and IP-source cards on demand, with a live planned-duration summary, missing-tool preflight, and `1-9` section jumps
 - **Running**: one progress page for both kinds — workload grid for hardware runs, section grid for checkup runs, cancel modal included
 - **Results**: cards / grouped / flat views; `d` opens per-workload detail with metrics, samples, errors, and raw tool output
-- **Compare picker**: browse history, view a record, or compare two — benchmark deltas in-TUI, checkup via the same output as the CLI
+- **History**: browse reports saved with `--save-history` (time, kind, tag, ID); `Enter` reopens a run in Results or a checkup in the checkup page, `Esc` returns
 - **Themes**: press `t` on Dashboard to cycle; the choice is saved locally
 
-Keys: `?` help · `↑↓` navigate · `Enter` select · `Tab` switch view · `d` detail · `s` save · `Esc` back · `q` quit. Every page scrolls with `PgUp/PgDn`, `Home/End`, and the mouse wheel; fits an 80x24 terminal.
+Keys: `?` help · `↑↓` navigate · `Enter` select · `Tab` switch view · `d` detail · `s` save · `Esc` back · `q` or `Ctrl+C` quit. Every page scrolls with `PgUp/PgDn`, `Home/End`, and the mouse wheel; fits an 80x24 terminal.
 
 ## Languages
 
@@ -159,7 +157,7 @@ CLI, TUI, and console/HTML report labels are localized in English and Simplified
 
 | Capability | Linux | macOS | Windows |
 |------------|:-----:|:-----:|:-------:|
-| CLI / TUI / JSON / HTML / compare | ✅ | ✅ | ✅ |
+| CLI / TUI / JSON / HTML | ✅ | ✅ | ✅ |
 | Default hardware tools | ✅ sysbench / fio / openssl | ⚠️ openssl (others via package manager) | ⚠️ WinSAT |
 | Checkup network diagnostics | ✅ | ✅ | ⚠️ partial / environment-dependent |
 | MCP stdio server | ✅ | ✅ | ✅ |

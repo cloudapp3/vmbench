@@ -520,7 +520,7 @@ func benchInputSchema() map[string]any {
 		"hardware_tools":     enumArraySchema(catalog.HardwareToolIDs(), "External hardware tools."),
 		"iperf_hosts":        stringArraySchema("iperf3 hosts; adds iperf3 speed provider when speed is enabled."),
 		"ip_version":         map[string]any{"type": "string", "enum": []string{"v4", "v6", "dual"}, "description": "Network IP version."},
-		"media_set":          map[string]any{"type": "string", "enum": checkup.MediaSets(), "description": "Media unlock set. Default all (full platform list)."},
+		"media_set":          map[string]any{"type": "string", "enum": checkup.MediaSets(), "description": "Media unlock set. Defaults to globe (international platforms, AI services included); use all for every platform."},
 		"ip_sources":         enumArraySchema(checkup.IPSourceIDs(), "IP quality evidence sources. securitycheck requires the external binary."),
 		"catalog_source":     map[string]any{"type": "string", "description": "Node catalog source: embedded, auto, or a local JSON path."},
 		"catalog_revision":   map[string]any{"type": "string", "description": "Require an exact node catalog revision before Checkup sections start."},

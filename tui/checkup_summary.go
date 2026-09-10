@@ -146,6 +146,20 @@ func estimateCheckupDuration(s configState, stats historyStats) time.Duration {
 
 func formatDuration(d time.Duration) string {
 	switch {
+	case d >= 24*time.Hour:
+		days := int(d.Hours()) / 24
+		hours := int(d.Hours()) % 24
+		if hours == 0 {
+			return i18n.Tf("tui.checkupSummary.days", map[string]any{"Days": days})
+		}
+		return i18n.Tf("tui.checkupSummary.daysHours", map[string]any{"Days": days, "Hours": hours})
+	case d >= time.Hour:
+		hours := int(d.Hours())
+		min := int(d.Minutes()) % 60
+		if min == 0 {
+			return i18n.Tf("tui.checkupSummary.hours", map[string]any{"Hours": hours})
+		}
+		return i18n.Tf("tui.checkupSummary.hoursMinutes", map[string]any{"Hours": hours, "Minutes": min})
 	case d >= time.Minute:
 		m := int(d.Minutes())
 		sec := int(d.Seconds()) % 60

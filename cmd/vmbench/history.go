@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
 
+	"github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/history"
 	"github.com/cloudapp3/vmbench/i18n"
 )
@@ -30,7 +32,12 @@ func runHistory(args []string) int {
 	case "delete", "rm":
 		return runHistoryDelete(args[1:])
 	case "compare":
-		return runHistoryCompare(args[1:])
+		if vmbench.FeatureCompare {
+			return runHistoryCompare(args[1:])
+		}
+		fmt.Fprintf(os.Stderr, "%s\n\n", i18n.Tf("cli.error.unknownHistoryCommand", map[string]any{"Command": args[0]}))
+		printHistoryUsage(os.Stderr)
+		return 2
 	case "-h", "--help", "help":
 		printHistoryUsage(os.Stdout)
 		return 0
@@ -41,15 +48,18 @@ func runHistory(args []string) int {
 	}
 }
 
-func printHistoryUsage(w *os.File) {
-	fmt.Fprintln(w, strings.Join([]string{
+func printHistoryUsage(w io.Writer) {
+	rows := []string{
 		i18n.T("cli.usage.header"),
 		"  vmbench history add FILE [--tag TAG]",
 		"  vmbench history list",
 		"  vmbench history show ID",
 		"  vmbench history delete ID",
-		"  vmbench history compare --last N",
-	}, "\n"))
+	}
+	if vmbench.FeatureCompare {
+		rows = append(rows, "  vmbench history compare --last N")
+	}
+	fmt.Fprintln(w, strings.Join(rows, "\n"))
 }
 
 func runHistoryAdd(args []string) int {

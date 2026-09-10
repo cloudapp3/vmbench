@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
@@ -24,6 +25,7 @@ type helpEntry struct {
 func globalHelpEntries() []helpEntry {
 	return []helpEntry{
 		{keys: "?", descKey: "tui.hint.help", short: true},
+		{keys: "Ctrl+C", descKey: "tui.hint.quit", short: false},
 		{keys: "PgUp/PgDn", descKey: "tui.hint.pageUp", short: false},
 		{keys: "Home/End", descKey: "tui.hint.top", short: false},
 		{keys: "Wheel", descKey: "tui.hint.wheel", short: false},
@@ -79,6 +81,13 @@ func helpFor(p page) []helpEntry {
 		}
 	case pageCheckupResults:
 		return []helpEntry{
+			{keys: "esc", descKey: "tui.hint.back", short: true},
+			{keys: "q", descKey: "tui.hint.quit", short: true},
+		}
+	case pageHistory:
+		return []helpEntry{
+			{keys: "↑↓/jk", descKey: "tui.hint.nav", short: true},
+			{keys: "↵/v", descKey: "tui.hint.viewRecord", short: true},
 			{keys: "esc", descKey: "tui.hint.back", short: true},
 			{keys: "q", descKey: "tui.hint.quit", short: true},
 		}
@@ -142,20 +151,26 @@ func helpSectionTitle(p page) string {
 		return i18n.T("tui.help.sec.compare")
 	case pageCheckupResults:
 		return i18n.T("tui.help.sec.checkupResults")
+	case pageHistory:
+		return i18n.T("tui.help.sec.history")
 	}
 	return ""
 }
 
-var helpPageOrder = []page{
-	pageDashboard,
-	pageConfig,
-	pageRunning,
-	pageResults,
-	pageResultDetail,
-	pageComparePicker,
-	pageCompare,
-	pageCheckupResults,
-}
+var helpPageOrder = func() []page {
+	pages := []page{
+		pageDashboard,
+		pageConfig,
+		pageRunning,
+		pageResults,
+		pageResultDetail,
+		pageHistory,
+	}
+	if vmbench.FeatureCompare {
+		pages = append(pages, pageComparePicker, pageCompare)
+	}
+	return append(pages, pageCheckupResults)
+}()
 
 func viewHelp(m Model) string {
 	t := theme.Active

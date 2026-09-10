@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/bench/netio"
 	"github.com/cloudapp3/vmbench/checkup"
 	"github.com/cloudapp3/vmbench/history"
 	"github.com/cloudapp3/vmbench/i18n"
@@ -32,6 +33,7 @@ const (
 	pageHelp
 	pageComparePicker
 	pageResultDetail
+	pageHistory
 )
 
 type menuItem struct {
@@ -43,12 +45,17 @@ type menuItem struct {
 // menuItems is a function, not a package var: package vars initialize
 // before main() runs, before the active language is selected.
 func menuItems() []menuItem {
-	return []menuItem{
+	items := []menuItem{
 		{label: i18n.T("tui.menu.benchmark"), desc: i18n.T("tui.menu.benchmarkDesc"), mode: "bench"},
-		{label: i18n.T("tui.menu.compare"), desc: i18n.T("tui.menu.compareDesc"), mode: "compare"},
-		{label: i18n.T("tui.menu.sysinfo"), desc: i18n.T("tui.menu.sysinfoDesc"), mode: "sysinfo"},
-		{label: i18n.T("tui.menu.quit"), desc: "", mode: "quit"},
 	}
+	if vmbench.FeatureCompare {
+		items = append(items, menuItem{label: i18n.T("tui.menu.compare"), desc: i18n.T("tui.menu.compareDesc"), mode: "compare"})
+	}
+	items = append(items, menuItem{label: i18n.T("tui.menu.history"), desc: i18n.T("tui.menu.historyDesc"), mode: "history"})
+	return append(items,
+		menuItem{label: i18n.T("tui.menu.sysinfo"), desc: i18n.T("tui.menu.sysinfoDesc"), mode: "sysinfo"},
+		menuItem{label: i18n.T("tui.menu.quit"), desc: "", mode: "quit"},
+	)
 }
 
 type benchmarkEventMsg struct{ event vmbench.Event }
@@ -57,7 +64,18 @@ type sysinfoDoneMsg struct {
 	info     sysinfo.SystemInfo
 	warnings []string
 }
+type netIdentityDoneMsg struct {
+	v4, v6 *netio.PublicIPIdentity
+}
 type tickMsg time.Time
+
+// netIdentState is the dashboard's public IP/ASN hint, fetched once at
+// startup. Offline leaves both identities nil and the rows stay hidden
+// (offline must not nag).
+type netIdentState struct {
+	loading bool
+	v4, v6  *netio.PublicIPIdentity
+}
 
 type workloadState struct {
 	name      string
@@ -76,6 +94,7 @@ type Model struct {
 	sysInfo     sysinfo.SystemInfo
 	sysWarnings []string
 	showSysInfo bool
+	netIdent    netIdentState
 
 	workloads []workloadState
 	report    *vmbench.Report
@@ -115,8 +134,13 @@ type Model struct {
 	compareKind        string
 	checkupCompareText string
 
-	picker               pickerState
-	reportCameFromPicker bool
+	picker  pickerState
+	history historyState
+
+	// reportFrom records the page that opened the currently viewed report
+	// (compare picker or history page); esc on the report pages returns
+	// there. pageDashboard means the report came from a fresh run.
+	reportFrom page
 
 	resultsTab    int
 	resultsCur    int
@@ -142,9 +166,11 @@ func NewModel(compareA, compareB string) Model {
 		spinner:  comp.NewSpinner(),
 		config:   newConfigState(),
 		picker:   newPickerState(compareA, compareB),
+		netIdent: netIdentState{loading: true},
 	}
 	// Flag users passing both reports land on the comparison directly.
-	if compareA != "" && compareB != "" {
+	// Guarded so library callers can't reach the hidden page either.
+	if vmbench.FeatureCompare && compareA != "" && compareB != "" {
 		m.page = pageCompare
 		m.compareLoading = true
 	}
@@ -152,7 +178,7 @@ func NewModel(compareA, compareB string) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{loadSysinfo(), tickEvery(), m.spinner.Tick}
+	cmds := []tea.Cmd{loadSysinfo(), loadNetIdentity(), tickEvery(), m.spinner.Tick}
 	if m.page == pageCompare && m.compareA != "" && m.compareB != "" {
 		cmds = append(cmds, loadCompareCmd(m.compareA, m.compareB))
 	}
@@ -163,6 +189,20 @@ func loadSysinfo() tea.Cmd {
 	return func() tea.Msg {
 		info, warnings := sysinfo.Collect(context.Background())
 		return sysinfoDoneMsg{info: info, warnings: warnings}
+	}
+}
+
+func loadNetIdentity() tea.Cmd {
+	return func() tea.Msg {
+		// The 20s budget bounds the worst case (ipify then ipwho.is, 8s each
+		// per family, families in parallel) so the placeholder never lingers.
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		result, _ := netio.ProbePublicIdentityLite(ctx, "dual")
+		if result == nil {
+			return netIdentityDoneMsg{}
+		}
+		return netIdentityDoneMsg{v4: result.PublicIPv4, v6: result.PublicIPv6}
 	}
 }
 
@@ -202,6 +242,15 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return updateMouse(m, msg)
 
 	case tea.KeyMsg:
+		// ctrl+c: raw mode clears ISIG, so ^C arrives here as a plain key
+		// instead of SIGINT. No page binds it, so quit globally — like "q"
+		// on the running page, cancel any in-flight run first.
+		if msg.String() == "ctrl+c" {
+			if m.cancel != nil {
+				m.cancel()
+			}
+			return m, tea.Quit
+		}
 		if m.confirm {
 			return handleConfirm(m, msg)
 		}
@@ -231,11 +280,18 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return updateComparePicker(m, msg)
 		case pageResultDetail:
 			return updateResultDetail(m, msg)
+		case pageHistory:
+			return updateHistory(m, msg)
 		}
 
 	case sysinfoDoneMsg:
 		m.sysInfo = msg.info
 		m.sysWarnings = msg.warnings
+		return m, nil
+
+	case netIdentityDoneMsg:
+		m.netIdent.loading = false
+		m.netIdent.v4, m.netIdent.v6 = msg.v4, msg.v6
 		return m, nil
 
 	case hardwareStartMsg:
@@ -277,6 +333,25 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case historyListMsg:
+		// loadHistoryCmd serves both the compare picker and the history
+		// page; route the result to whichever one is waiting.
+		if m.page == pageHistory {
+			m.history.loading = false
+			if msg.err != nil {
+				m.history.err = msg.err
+				m.history.records = nil
+			} else {
+				m.history.err = nil
+				m.history.records = msg.records
+				if m.history.cursor >= len(msg.records) {
+					m.history.cursor = len(msg.records) - 1
+				}
+				if m.history.cursor < 0 {
+					m.history.cursor = 0
+				}
+			}
+			return followFocus(m), nil
+		}
 		m.picker.loading = false
 		if msg.err != nil {
 			m.picker.err = msg.err
@@ -314,14 +389,14 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if msg.kind == history.KindCheckup && msg.checkup != nil {
 			m.checkupReport = msg.checkup
-			m.reportCameFromPicker = true
+			m.reportFrom = m.page
 			m.page = pageCheckupResults
 			return m, nil
 		}
 		if msg.run != nil {
 			doc := *msg.run
 			m.report = &doc
-			m.reportCameFromPicker = true
+			m.reportFrom = m.page
 			m.resultsCur = 0
 			m.page = pageResults
 		}

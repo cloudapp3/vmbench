@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/cloudapp3/vmbench"
+	"github.com/cloudapp3/vmbench/i18n"
+	"github.com/cloudapp3/vmbench/sysinfo"
 )
 
 func TestRunRejectsRemovedECSDiffCommands(t *testing.T) {
@@ -17,6 +21,30 @@ func TestRunRejectsRemovedECSDiffCommands(t *testing.T) {
 	printUsage(&output)
 	if strings.Contains(output.String(), "ecs-diff") || strings.Contains(output.String(), "ecs-compare") {
 		t.Fatalf("usage still advertises removed ECS command:\n%s", output.String())
+	}
+}
+
+func TestCompareSurfacesHiddenWhileFeatureCompareOff(t *testing.T) {
+	if vmbench.FeatureCompare {
+		t.Skip("compare surfaces exposed (FeatureCompare=true)")
+	}
+	for _, argv := range [][]string{
+		{"compare", "a.json", "b.json"},
+		{"history", "compare", "--last", "2"},
+	} {
+		if code := run(argv); code != 2 {
+			t.Fatalf("run(%v) = %d, want unknown command exit 2", argv, code)
+		}
+	}
+
+	var output bytes.Buffer
+	printUsage(&output)
+	if strings.Contains(output.String(), "vmbench compare") {
+		t.Fatalf("usage still advertises hidden compare command:\n%s", output.String())
+	}
+	printHistoryUsage(&output)
+	if strings.Contains(output.String(), "history compare") {
+		t.Fatalf("history usage still advertises hidden compare subcommand:\n%s", output.String())
 	}
 }
 
@@ -138,5 +166,40 @@ func TestAcceptsExpandedRoutePresetsWithoutStartingNetwork(t *testing.T) {
 		"--ip-version", "dual", "--node-revision", "missing-revision",
 	}); code != 2 {
 		t.Fatalf("expanded route preset preflight code = %d, want 2", code)
+	}
+}
+
+func TestWriteSysinfoConsoleShowsDMIAndMemorySpec(t *testing.T) {
+	info := sysinfo.SystemInfo{
+		OS:  sysinfo.OSInfo{Name: "Debian GNU/Linux 12", Kernel: "6.1", Hostname: "vps"},
+		CPU: sysinfo.CPUInfo{Model: "EPYC", Arch: "amd64", PhysicalCores: 2, LogicalCores: 4},
+		Memory: sysinfo.MemoryInfo{
+			TotalBytes: 16 << 30, Type: "DDR4", FreqMHz: 2666, Channels: 2,
+		},
+		Virtualization: sysinfo.VirtualizationInfo{System: "kvm", Role: "guest"},
+		DMI:            sysinfo.DMIInfo{ProductName: "Alibaba Cloud ECS", SysVendor: "Alibaba Cloud"},
+	}
+	var out bytes.Buffer
+	writeSysinfoConsole(&out, info, nil)
+	text := out.String()
+	for _, want := range []string{
+		"kvm (guest)",
+		"Alibaba Cloud ECS (Alibaba Cloud)",
+		"16.0 GB DDR4 2666 MT/s ×2",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("sysinfo console missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestWriteSysinfoConsoleOmitsUnknownMemoryAndDMI(t *testing.T) {
+	var out bytes.Buffer
+	writeSysinfoConsole(&out, sysinfo.SystemInfo{}, nil)
+	text := out.String()
+	for _, banned := range []string{"MT/s", "×", i18n.T("cli.sysinfo.dmi")} {
+		if strings.Contains(text, banned) {
+			t.Fatalf("sysinfo console must omit unknown DMI/memory evidence, found %q:\n%s", banned, text)
+		}
 	}
 }

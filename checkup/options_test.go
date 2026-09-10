@@ -28,6 +28,19 @@ func TestDefaultSectionsIncludeNetworkEvidence(t *testing.T) {
 	}
 }
 
+func TestDefaultMediaSetResolvesAndFillsMediaSection(t *testing.T) {
+	if _, err := StandardizeMediaSet(DefaultMediaSet()); err != nil {
+		t.Fatalf("StandardizeMediaSet(DefaultMediaSet() = %q) error: %v", DefaultMediaSet(), err)
+	}
+	opts := PrepareOptions(Options{Sections: SectionSelector{Media: true}})
+	if opts.MediaSet != DefaultMediaSet() {
+		t.Fatalf("media section MediaSet = %q, want default %q", opts.MediaSet, DefaultMediaSet())
+	}
+	if opts := PrepareOptions(Options{Sections: SectionSelector{Media: true}, MediaSet: "all"}); opts.MediaSet != "all" {
+		t.Fatalf("explicit MediaSet = %q, want all preserved", opts.MediaSet)
+	}
+}
+
 func TestSectionSelectorHardwareOnly(t *testing.T) {
 	tests := []struct {
 		name  string

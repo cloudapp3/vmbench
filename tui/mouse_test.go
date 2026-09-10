@@ -81,17 +81,23 @@ func TestDashboardClickActivatesMenuItem(t *testing.T) {
 	m := scrollTestModel(t, pageDashboard, nil)
 	top, _, _ := dashboardMenuRegion(m)
 
-	// Click "Compare Reports" (row 1).
-	updated, _ := m.Update(clickMsg(5, contentOriginY(m)+top+1))
+	// Click the "Report History" menu row, wherever it sits in this build.
+	row := 0
+	for i, item := range menuItems() {
+		if item.mode == "history" {
+			row = i
+		}
+	}
+	updated, _ := m.Update(clickMsg(5, contentOriginY(m)+top+row))
 	um, ok := updated.(Model)
 	if !ok {
 		t.Fatalf("Update returned %T, want Model", updated)
 	}
-	if um.cursor != 1 {
-		t.Fatalf("click should set cursor to row 1, got %d", um.cursor)
+	if um.cursor != row {
+		t.Fatalf("click should set cursor to row %d, got %d", row, um.cursor)
 	}
-	if um.page != pageComparePicker {
-		t.Fatalf("click should activate menu row 1 (compare picker), page = %d", um.page)
+	if um.page != pageHistory {
+		t.Fatalf("click should activate the history menu row, page = %d", um.page)
 	}
 }
 

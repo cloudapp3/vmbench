@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/i18n"
 	"github.com/cloudapp3/vmbench/tui"
 	"github.com/cloudapp3/vmbench/tui/theme"
@@ -19,8 +20,12 @@ func runTUI(args []string) int {
 		compareA string
 		compareB string
 	)
-	fs.StringVar(&compareA, "compare-a", "", "compare report A path")
-	fs.StringVar(&compareB, "compare-b", "", "compare report B path")
+	// Hidden while FeatureCompare is off: the flags vanish from help and
+	// passing them fails flag parsing, like any unknown flag.
+	if vmbench.FeatureCompare {
+		fs.StringVar(&compareA, "compare-a", "", "compare report A path")
+		fs.StringVar(&compareB, "compare-b", "", "compare report B path")
+	}
 	registerLangFlag(fs)
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {

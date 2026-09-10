@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/history"
 )
 
@@ -52,6 +53,9 @@ func TestWriteReportComparisonDetectsKindsAndRejectsMixed(t *testing.T) {
 }
 
 func TestHistoryCompareRejectsMixedLatestReports(t *testing.T) {
+	if !vmbench.FeatureCompare {
+		t.Skip("compare surfaces hidden (FeatureCompare=false)")
+	}
 	dir := t.TempDir()
 	t.Setenv("VMBENCH_HISTORY_DIR", dir)
 	store, err := history.Open("")
@@ -112,12 +116,14 @@ func TestHistoryCLILifecycleAndCheckupCompare(t *testing.T) {
 		t.Fatalf("history show exit = %d, output = %s", code, output)
 	}
 
-	output, code = captureStdout(t, func() int {
-		return run([]string{"history", "compare", "--last", "2"})
-	})
-	for _, want := range []string{"VMBench Checkup Compare", "node-a/latency", "▲+50.0%"} {
-		if code != 0 || !strings.Contains(output, want) {
-			t.Fatalf("history compare exit = %d, output missing %q:\n%s", code, want, output)
+	if vmbench.FeatureCompare {
+		output, code = captureStdout(t, func() int {
+			return run([]string{"history", "compare", "--last", "2"})
+		})
+		for _, want := range []string{"VMBench Checkup Compare", "node-a/latency", "▲+50.0%"} {
+			if code != 0 || !strings.Contains(output, want) {
+				t.Fatalf("history compare exit = %d, output missing %q:\n%s", code, want, output)
+			}
 		}
 	}
 

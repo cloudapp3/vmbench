@@ -154,15 +154,15 @@ func TestPickerViewRecordRoundTrip(t *testing.T) {
 	if m.page != pageCheckupResults || m.checkupReport == nil {
 		t.Fatalf("checkup record should open checkup results, page = %d", m.page)
 	}
-	if !m.reportCameFromPicker {
-		t.Fatal("reportCameFromPicker should be set")
+	if m.reportFrom != pageComparePicker {
+		t.Fatalf("reportFrom should point at the picker, got %d", m.reportFrom)
 	}
 
 	// esc returns to the picker, not the dashboard.
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	m = updated.(Model)
-	if m.page != pageComparePicker || m.reportCameFromPicker {
-		t.Fatalf("esc should return to picker, page = %d fromPicker = %v", m.page, m.reportCameFromPicker)
+	if m.page != pageComparePicker || m.reportFrom != pageDashboard {
+		t.Fatalf("esc should return to picker, page = %d reportFrom = %d", m.page, m.reportFrom)
 	}
 }
 

@@ -143,7 +143,7 @@ v0.8.0 起 `run` / `suite` 子命令合并进根命令。报告种类规则：�
 | `--hardware-tool` | 平台相关 | Linux: sysbench,openssl,fio；macOS: openssl；Windows: winsat |
 | `--speed-provider` | `cloudflare` | 速度测试提供商（逗号分隔） |
 | `--ip-version` | `v4` | IP 版本：`v4` / `v6` / `dual` |
-| `--media-set` | `all` | 流媒体解锁检测范围（地区代码组合，`all` 与地区互斥） |
+| `--media-set` | `globe` | 流媒体解锁检测范围（地区代码组合；`globe` 为 41 家跨国平台含 AI 服务，`all` 为全平台 180+ 家） |
 | `--ip-quality-source` | `builtin` | IP 质量数据源；`securitycheck` 为 opt-in 外部二进制 |
 | `--redact` | `ips` | 报告脱敏模式：`ips`（遮蔽本机公网 IP，默认）/ `none`（保留真实地址） |
 | `--route-presets` | `gz,bj,sh,cd,cernet,cstnet` | 广州、北京、上海、成都、教育网、科技网 |
@@ -960,6 +960,10 @@ CLI、TUI、MCP 复用同一体检（checkup）normalization/validation 契约�
   "virtualization": {
     "system": "kvm",
     "role": "guest"
+  },
+  "dmi": {
+    "product_name": "Alibaba Cloud ECS",
+    "sys_vendor": "Alibaba Cloud"
   }
 }
 ```

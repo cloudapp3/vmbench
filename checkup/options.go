@@ -389,8 +389,10 @@ func normalizeIPVersion(value string) string {
 	}
 }
 
-// DefaultMediaSet is the full-platform unlock set.
-func DefaultMediaSet() string { return "all" }
+// DefaultMediaSet is the international platform set. UnlockTests' Multination
+// list already covers the AI platforms (ChatGPT, Claude, Gemini, ...), so the
+// full-platform "all" stays available as an explicit --media-set opt-in.
+func DefaultMediaSet() string { return "globe" }
 
 // mediaSetIDs lists the UnlockTests region selections exposed to users.
 var mediaSetIDs = []string{"all", "globe", "tw", "hk", "jp", "kr", "na", "sa", "eu", "afr", "sea", "oce", "ai"}

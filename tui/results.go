@@ -26,9 +26,10 @@ func updateResults(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
-			if m.reportCameFromPicker {
-				m.reportCameFromPicker = false
-				m.page = pageComparePicker
+			if m.reportFrom != pageDashboard {
+				from := m.reportFrom
+				m.reportFrom = pageDashboard
+				m.page = from
 				return m, nil
 			}
 			m.page = pageDashboard

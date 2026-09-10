@@ -76,6 +76,17 @@ type VirtualizationInfo struct {
 	Role   string `json:"role,omitempty"`
 }
 
+// DMIInfo stores raw SMBIOS/DMI identity strings used to recognize the
+// platform (e.g. product_name "Alibaba Cloud ECS"). Fields stay empty when
+// the host exposes no DMI (containers, some hypervisors); renderers skip
+// empty values.
+type DMIInfo struct {
+	ProductName string `json:"product_name,omitempty"`
+	SysVendor   string `json:"sys_vendor,omitempty"`
+	BoardVendor string `json:"board_vendor,omitempty"`
+	BoardName   string `json:"board_name,omitempty"`
+}
+
 // SystemInfo aggregates all detected host information.
 type SystemInfo struct {
 	CPU            CPUInfo             `json:"cpu"`
@@ -85,6 +96,7 @@ type SystemInfo struct {
 	Disks          []DiskInfo          `json:"disks,omitempty"`
 	Network        NetworkInfo         `json:"network"`
 	Virtualization VirtualizationInfo  `json:"virtualization"`
+	DMI            DMIInfo             `json:"dmi,omitempty"`
 	Platform       PlatformDiagnostics `json:"platform,omitempty"`
 }
 
@@ -119,6 +131,8 @@ func Collect(ctx context.Context) (SystemInfo, []string) {
 	virtualization, virtualizationWarnings := collectVirtualizationInfo(ctx)
 	warnings = append(warnings, virtualizationWarnings...)
 
+	dmi := collectDMIInfo(ctx)
+
 	platform := collectPlatformDiagnostics(ctx)
 
 	return SystemInfo{
@@ -129,6 +143,7 @@ func Collect(ctx context.Context) (SystemInfo, []string) {
 		Disks:          disks,
 		Network:        network,
 		Virtualization: virtualization,
+		DMI:            dmi,
 		Platform:       platform,
 	}, compactWarnings(warnings)
 }

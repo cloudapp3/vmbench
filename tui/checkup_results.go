@@ -19,9 +19,10 @@ func updateCheckupResults(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
-			if m.reportCameFromPicker {
-				m.reportCameFromPicker = false
-				m.page = pageComparePicker
+			if m.reportFrom != pageDashboard {
+				from := m.reportFrom
+				m.reportFrom = pageDashboard
+				m.page = from
 				return m, nil
 			}
 			m.page = pageDashboard
@@ -204,13 +205,9 @@ func networkInfoResultCard(r checkup.CheckupReport, width int) string {
 		if identity == nil {
 			return
 		}
-		value := identity.IP
-		if identity.ASN > 0 {
-			value += fmt.Sprintf("  AS%d %s", identity.ASN, firstStr(identity.Org, identity.ISP))
-		}
 		lines = append(lines,
 			lipgloss.NewStyle().Foreground(t.Muted).Width(8).Render(label)+
-				lipgloss.NewStyle().Foreground(t.Fg).Render(truncStr(value, width-16)),
+				lipgloss.NewStyle().Foreground(t.Fg).Render(truncStr(publicIdentityValue(identity), width-16)),
 		)
 	}
 	appendPublic("IPv4", result.PublicIPv4)

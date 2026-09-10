@@ -28,7 +28,7 @@ func runMediaSection(ctx context.Context, opts Options, report *CheckupReport) {
 	section.Status = "ok"
 	set := strings.TrimSpace(result.Set)
 	if set == "" {
-		set = "all"
+		set = DefaultMediaSet()
 	}
 	section.Message = fmt.Sprintf("set %s · available %d · restricted %d · blocked %d · unknown %d",
 		set, result.Summary.Available, result.Summary.Restricted, result.Summary.Blocked, result.Summary.Unknown)

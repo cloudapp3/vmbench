@@ -112,6 +112,52 @@ func TestProbeNetworkIdentityMetadataFailureDoesNotDiscardPublicIP(t *testing.T)
 	assertIdentityProviderStatus(t, result, "ipwhois_v4", NetworkIdentityProviderError)
 }
 
+func TestProbePublicIdentityLiteSkipsSupplementaryProbes(t *testing.T) {
+	deps := validNetworkIdentityDependencies()
+	deps.publicIP = func(_ context.Context, family string) (string, error) {
+		if family == "v6" {
+			return "2001:db8::1", nil
+		}
+		return "198.51.100.20", nil
+	}
+	var stun, bgp, cidr, subnet bool
+	deps.stunNAT = func(context.Context, string) *NATProbeEvidence { stun = true; return nil }
+	deps.ipBGP = func(context.Context, string) *IPBGPEvidence { bgp = true; return nil }
+	deps.cidrNeighbors = func(context.Context, string) *CIDRNeighborsEvidence { cidr = true; return nil }
+	deps.ipv6Subnet = func(context.Context, string) *IPv6SubnetInfo { subnet = true; return nil }
+
+	result, err := probePublicIdentityLite(context.Background(), "dual", deps)
+	if err != nil {
+		t.Fatalf("probePublicIdentityLite() error = %v", err)
+	}
+	if stun || bgp || cidr || subnet {
+		t.Fatalf("lite probe must not call supplementary providers (stun=%v bgp=%v cidr=%v subnet=%v)", stun, bgp, cidr, subnet)
+	}
+	if result.STUNNAT != nil || result.IPBGP != nil || result.CIDRNeighbors != nil || result.IPv6Subnet != nil {
+		t.Fatalf("lite probe must not attach supplementary evidence: %+v", result)
+	}
+	if result.PublicIPv4 == nil || result.PublicIPv4.ASN != 64500 || result.PublicIPv4.Org != "Example Net" {
+		t.Fatalf("PublicIPv4 = %+v, want enriched identity", result.PublicIPv4)
+	}
+	if result.PublicIPv6 == nil || result.PublicIPv6.IP != "2001:db8::1" {
+		t.Fatalf("PublicIPv6 = %+v, want observed address", result.PublicIPv6)
+	}
+}
+
+func TestProbePublicIdentityLiteOfflineReturnsNoIdentity(t *testing.T) {
+	deps := validNetworkIdentityDependencies()
+	deps.publicIP = func(context.Context, string) (string, error) {
+		return "", errors.New("provider offline")
+	}
+	result, err := probePublicIdentityLite(context.Background(), "dual", deps)
+	if err == nil || !strings.Contains(err.Error(), "no requested public IP") {
+		t.Fatalf("probePublicIdentityLite() error = %v, want public IP failure", err)
+	}
+	if result == nil || result.PublicIPv4 != nil || result.PublicIPv6 != nil {
+		t.Fatalf("result identities = v4:%+v v6:%+v, want empty partial result", result.PublicIPv4, result.PublicIPv6)
+	}
+}
+
 func TestQueryPublicIPFromURLValidatesRequestedFamily(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("198.51.100.20\n"))

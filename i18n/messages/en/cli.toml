@@ -166,7 +166,7 @@ other = "skip selected sections (comma-separated: hardware,network_info,route,pi
 other = "network IP version: v4, v6, or dual"
 
 [cli.flag.mediaSet]
-other = "media unlock set: all, globe, tw, hk, jp, kr, na, sa, eu, afr, sea, oce, ai, or comma combinations"
+other = "media unlock set: all, globe, tw, hk, jp, kr, na, sa, eu, afr, sea, oce, ai, or comma combinations (default globe)"
 
 [cli.flag.ipQualitySource]
 other = "IP quality evidence sources (comma-separated: builtin,securitycheck)"
@@ -482,6 +482,9 @@ other = "Memory"
 
 [cli.sysinfo.virtual]
 other = "Virtual"
+
+[cli.sysinfo.dmi]
+other = "Model"
 
 [cli.sysinfo.features]
 other = "Features"

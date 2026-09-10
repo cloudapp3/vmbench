@@ -71,7 +71,10 @@ func run(args []string) int {
 	case "sysinfo":
 		return runSysinfo(args[1:])
 	case "compare":
-		return runCompare(args[1:])
+		if vmbench.FeatureCompare {
+			return runCompare(args[1:])
+		}
+		return unknownCommandExit(args[0])
 	case "score":
 		return runScore(args[1:])
 	case "history":
@@ -95,16 +98,22 @@ func run(args []string) int {
 		if strings.HasPrefix(args[0], "-") {
 			return runBenchmark(args)
 		}
-		fmt.Fprintf(os.Stderr, "%s\n\n", i18n.Tf("cli.error.unknownCommand", map[string]any{"Command": args[0]}))
-		printUsage(os.Stderr)
-		return 2
+		return unknownCommandExit(args[0])
 	}
+}
+
+// unknownCommandExit reports an unrecognized subcommand. Hidden features
+// (FeatureCompare=false) reuse this so they look absent, not disabled.
+func unknownCommandExit(name string) int {
+	fmt.Fprintf(os.Stderr, "%s\n\n", i18n.Tf("cli.error.unknownCommand", map[string]any{"Command": name}))
+	printUsage(os.Stderr)
+	return 2
 }
 
 // usageRows renders the command list shared by the short usage and the full
 // root help. The first row is the merged root benchmark surface.
 func usageRows() []string {
-	return []string{
+	rows := []string{
 		"  vmbench [flags]                      " + i18n.T("cli.usage.cmdBench"),
 		"  vmbench tui                          " + i18n.T("cli.usage.cmdTui"),
 		"  vmbench mcp serve [flags]            " + i18n.T("cli.usage.cmdMcp"),
@@ -112,13 +121,17 @@ func usageRows() []string {
 		"  vmbench nodes     <command> [flags]   " + i18n.T("cli.usage.cmdNodes"),
 		"  vmbench tools    <command> [flags]   " + i18n.T("cli.usage.cmdTools"),
 		"  vmbench sysinfo   [--json]            " + i18n.T("cli.usage.cmdSysinfo"),
-		"  vmbench compare   <a.json> <b.json>   " + i18n.T("cli.usage.cmdCompare"),
-		"  vmbench score     <report.json|->    " + i18n.T("cli.usage.cmdScore"),
-		"  vmbench history   <command>           " + i18n.T("cli.usage.cmdHistory"),
-		"  vmbench update   [flags]              " + i18n.T("cli.usage.cmdUpdate"),
-		"  vmbench uninstall [flags]             " + i18n.T("cli.usage.cmdUninstall"),
-		"  vmbench version                       " + i18n.T("cli.usage.cmdVersion"),
 	}
+	if vmbench.FeatureCompare {
+		rows = append(rows, "  vmbench compare   <a.json> <b.json>   "+i18n.T("cli.usage.cmdCompare"))
+	}
+	return append(rows,
+		"  vmbench score     <report.json|->    "+i18n.T("cli.usage.cmdScore"),
+		"  vmbench history   <command>           "+i18n.T("cli.usage.cmdHistory"),
+		"  vmbench update   [flags]              "+i18n.T("cli.usage.cmdUpdate"),
+		"  vmbench uninstall [flags]             "+i18n.T("cli.usage.cmdUninstall"),
+		"  vmbench version                       "+i18n.T("cli.usage.cmdVersion"),
+	)
 }
 
 func printUsage(w io.Writer) {
@@ -397,9 +410,12 @@ func writeSysinfoConsole(w io.Writer, info sysinfo.SystemInfo, warnings []string
 	fmt.Fprintf(w, "  %s : %s\n", sysLabel("host"), firstNonEmpty(info.OS.Hostname, "-"))
 	fmt.Fprintf(w, "  %s : %s (%s)\n", sysLabel("os"), firstNonEmpty(info.OS.Name, "-"), firstNonEmpty(info.OS.Kernel, "-"))
 	fmt.Fprintf(w, "  %s : %s (%s, %dC/%dT)\n", sysLabel("cpu"), firstNonEmpty(info.CPU.Model, "-"), firstNonEmpty(info.CPU.Arch, "-"), info.CPU.PhysicalCores, info.CPU.LogicalCores)
-	fmt.Fprintf(w, "  %s : %.1f GB %s\n", sysLabel("memory"), float64(info.Memory.TotalBytes)/(1024*1024*1024), firstNonEmpty(info.Memory.Type, ""))
+	fmt.Fprintf(w, "  %s : %.1f GB %s\n", sysLabel("memory"), float64(info.Memory.TotalBytes)/(1024*1024*1024), strings.TrimSpace(strings.Join([]string{firstNonEmpty(info.Memory.Type, ""), memorySpeedText(info.Memory)}, " ")))
 	if info.Virtualization.System != "" || info.Virtualization.Role != "" {
 		fmt.Fprintf(w, "  %s : %s (%s)\n", sysLabel("virtual"), firstNonEmpty(info.Virtualization.System, i18n.Unknown()), firstNonEmpty(info.Virtualization.Role, i18n.Unknown()))
+	}
+	if product := firstNonEmpty(info.DMI.ProductName, info.DMI.BoardName); product != "" {
+		fmt.Fprintf(w, "  %s : %s (%s)\n", sysLabel("dmi"), product, firstNonEmpty(info.DMI.SysVendor, info.DMI.BoardVendor, "-"))
 	}
 	if len(info.CPU.Features) > 0 {
 		features := slices.Clone(info.CPU.Features)
@@ -600,6 +616,19 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// memorySpeedText renders "2666 MT/s ×2" from whatever SMBIOS evidence exists;
+// empty when neither speed nor channel count is known.
+func memorySpeedText(mem sysinfo.MemoryInfo) string {
+	var parts []string
+	if mem.FreqMHz > 0 {
+		parts = append(parts, fmt.Sprintf("%d MT/s", mem.FreqMHz))
+	}
+	if mem.Channels > 0 {
+		parts = append(parts, fmt.Sprintf("×%d", mem.Channels))
+	}
+	return strings.Join(parts, " ")
 }
 
 func formatBytes(value uint64) string {

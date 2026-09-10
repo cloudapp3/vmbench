@@ -8,6 +8,7 @@
 Dashboard -> Config -> Running(run) -> Results -> ResultDetail
 Dashboard -> Config -> Running(checkup) -> CheckupResults
 Dashboard -> ComparePicker -> Compare
+Dashboard -> History -> Results / CheckupResults（查看单条历史记录）
 Dashboard -> System Info
 任意页 -> Help（? 切换，Esc 返回来源页）
 ```
@@ -21,6 +22,7 @@ v0.8.0 起 run/suite 合并为单一配置页与单一运行页：启动时按�
 所有页面共享一组全局按键，注册表在 `tui/help.go`（footer 提示与帮助页同源）：
 
 - `?`：打开/关闭帮助页（文本输入聚焦时抑制）
+- `Ctrl+C`：立即退出（任意页面、包括确认弹窗内；运行中先取消再退出，等价运行页的 `q`。注意 raw mode 清掉了 ISIG，^C 不会产生 SIGINT，必须由程序自己处理）
 - `PgUp` / `PgDn`：按视口高度翻页
 - `Home` / `End`：跳到顶部/底部
 - 鼠标滚轮：上下滚动 3 行
@@ -36,6 +38,8 @@ v0.8.0 起 run/suite 合并为单一配置页与单一运行页：启动时按�
 
 - 当前版本
 - CPU / Memory / OS / GPU 摘要（GPU 可用时）
+- 公网 IP / ASN 行（IPv4/IPv6，System 卡片内；`netio.ProbePublicIdentityLite` 轻量探测：ipify 地址 + ipwho.is 元数据，v4/v6 并行、单请求 8s 超时、整体 20s 预算，启动后异步加载。加载中显示 `detecting...` 占位，离线静默隐藏整行（offline must not nag）；格式与体检结果页一致：`IP  AS#### Org`（Org 缺省回退 ISP）。该行明文显示本机公网 IP——脱敏只覆盖保存/分享的报告导出面，不覆盖本机实时屏幕，与 hostname 明文同语义）
+- System Info 展开区（菜单选中 System Info 回车）：多张条件渲染证据卡，无证据的卡整体消失；`≥100` 列宽时两列并排，窄端垂直堆叠。卡片序：处理器（特性/微架构/缓存/步进/NUMA）、网络（国家/ISP）、虚拟化（平台 guest/host、DMI 机型与厂商、嵌套虚拟化、balloon/KSM 超售明细含 KSM 共享页数）、内存（规格 `DDR4 2666 MT/s ×2`、占用快照——零值=未知不显示）、存储（启动盘 + 设备/文件系统/容量/挂载点）、运行环境（uptime/负载/swap；uptime 按天-小时-分-秒自适应格式化）。DMI 识别串读 `/sys/class/dmi/id/*`（免 root，占位串过滤）；Linux 内存代际/频率/通道 best-effort 解析 `dmidecode -t 17`（需 root，缺失静默留空）。
 - Go 主线入口菜单：
   - Run Benchmark（进入统一 Config 页）
   - Compare Reports（进入 ComparePicker 页）
@@ -192,6 +196,15 @@ Compare 页展示（benchmark 文档）：
 CLI/history 的体检 delta 额外要求 unit、protocol、provider、target/node identity 和所需 catalog revision 一致；Route 还要求显式 `status=ok` 且 `destination_reached=true`。不兼容或缺到达证据时不显示伪 delta。TUI benchmark Compare 仍按 workload 的 time/throughput/latency 规则工作；体检对比在 TUI 内以 textgrid 快照呈现，不再要求用户退出到 CLI。
 
 Compare/ComparePicker 按键：`Esc` 返回上一级（Compare -> Picker -> Dashboard），`r`（Compare 页）返回 picker 重选。
+
+## History（报告历史）
+
+Dashboard 菜单「报告历史」进入（`tui/history.go`）：
+
+- 历史列表与 ComparePicker 共用同一加载链路（`loadHistoryCmd`/`historyListMsg`，最新在前、重验证每条记录、上限 50 条），按当前页面分流结果；列为 time/kind/tag/id，表下有计数行；懒加载一次，会话内复用
+- `↑↓/jk` 移动，`↵`/`v` 打开当前记录：run -> Results 页、体检 -> CheckupResults 页（复用 `viewRecordCmd`/`recordViewMsg`，`reportFrom` 记录来源页）
+- `Esc` 逐级返回（报告页 -> History -> Dashboard），`q` 退出；空态提示 `--save-history` 与 `vmbench history add`，加载失败显示结构化错误
+- 与 ComparePicker 的区别：无 A/B 选择与手动路径模式，纯浏览查看
 
 ## 样式原则
 

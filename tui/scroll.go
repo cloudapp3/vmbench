@@ -80,6 +80,8 @@ func pageContent(m Model) string {
 		return viewComparePicker(m)
 	case pageResultDetail:
 		return viewResultDetail(m)
+	case pageHistory:
+		return viewHistory(m)
 	}
 	return ""
 }
@@ -238,6 +240,8 @@ func focusedContentLine(m Model) (int, bool) {
 		return pickerFocusedLine(m)
 	case pageConfig:
 		return configFocusedLine(m)
+	case pageHistory:
+		return historyFocusedLine(m)
 	}
 	return 0, false
 }

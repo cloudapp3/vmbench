@@ -54,7 +54,7 @@ type benchmarkFlags struct {
 func newBenchmarkFlags() *benchmarkFlags {
 	return &benchmarkFlags{
 		ipVersion:     "v4",
-		mediaSet:      "all",
+		mediaSet:      checkup.DefaultMediaSet(),
 		ipSource:      "builtin",
 		redact:        string(redact.Default),
 		catalogSource: nodecatalog.SourceEmbedded,

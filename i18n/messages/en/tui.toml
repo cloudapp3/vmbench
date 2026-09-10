@@ -12,6 +12,12 @@ other = "Compare Reports"
 [tui.menu.compareDesc]
 other = "Compare two JSON reports"
 
+[tui.menu.history]
+other = "Report History"
+
+[tui.menu.historyDesc]
+other = "Browse reports saved with --save-history"
+
 [tui.menu.sysinfo]
 other = "System Info"
 
@@ -113,6 +119,8 @@ other = "Benchmark Results"
 other = "Compare Reports"
 [tui.help.sec.checkupResults]
 other = "Checkup Results"
+[tui.help.sec.history]
+other = "Report History"
 
 [tui.hint.digits]
 other = "toggle section 1-9"
@@ -228,6 +236,14 @@ other = "~{{.Eta}} left"
 [tui.running.samples]
 other = "{{.Done}}/{{.Total}} samples"
 
+[tui.checkupSummary.days]
+other = "{{.Days}}d"
+[tui.checkupSummary.daysHours]
+other = "{{.Days}}d{{.Hours}}h"
+[tui.checkupSummary.hours]
+other = "{{.Hours}}h"
+[tui.checkupSummary.hoursMinutes]
+other = "{{.Hours}}h{{.Minutes}}m"
 [tui.checkupSummary.minutes]
 other = "{{.Minutes}}m"
 [tui.checkupSummary.minutesSeconds]
@@ -316,6 +332,39 @@ other = "history error: {{.Err}}"
 [tui.compare.loadingHistory]
 other = "loading history…"
 
+[tui.history.title]
+other = "☰ Report History"
+
+[tui.history.desc]
+other = "Saved benchmark reports. Enter to open one."
+
+[tui.history.loading]
+other = "loading history…"
+
+[tui.history.error]
+other = "history error: {{.Err}}"
+
+[tui.history.empty]
+other = "No saved reports yet."
+
+[tui.history.emptyHint]
+other = "Run a benchmark with --save-history, or use vmbench history add."
+
+[tui.history.count]
+other = "{{.Count}} reports"
+
+[tui.history.col.time]
+other = "Time"
+
+[tui.history.col.kind]
+other = "Kind"
+
+[tui.history.col.tag]
+other = "Tag"
+
+[tui.history.col.id]
+other = "ID"
+
 [tui.help.sec.comparePicker]
 other = "Compare Picker"
 
@@ -396,6 +445,81 @@ other = "Features"
 
 [tui.sys.arch]
 other = "Arch"
+
+[tui.sys.netLoading]
+other = "detecting..."
+
+[tui.sys.country]
+other = "Country"
+
+[tui.sys.isp]
+other = "ISP"
+
+[tui.sys.cpuTitle]
+other = "CPU"
+
+[tui.sys.netTitle]
+other = "Network"
+
+[tui.sys.virtTitle]
+other = "Virtualization"
+
+[tui.sys.memTitle]
+other = "Memory"
+
+[tui.sys.diskTitle]
+other = "Storage"
+
+[tui.sys.runtimeTitle]
+other = "Runtime"
+
+[tui.sys.stepping]
+other = "Stepping"
+
+[tui.sys.numa]
+other = "NUMA"
+
+[tui.sys.numaNodes]
+other = "{{.Count}} node(s)"
+
+[tui.sys.virt]
+other = "Platform"
+
+[tui.sys.dmiProduct]
+other = "Model"
+
+[tui.sys.dmiVendor]
+other = "Vendor"
+
+[tui.sys.nestedVirt]
+other = "Nested virt"
+
+[tui.sys.balloon]
+other = "Balloon"
+
+[tui.sys.ksm]
+other = "KSM"
+
+[tui.sys.memSpec]
+other = "Spec"
+
+[tui.sys.memWater]
+other = "Usage"
+
+[tui.sys.memAvailable]
+other = "{{.Value}} free"
+
+[tui.sys.bootDisk]
+other = "Boot disk"
+
+[tui.sys.uptime]
+other = "Uptime"
+
+[tui.sys.load]
+other = "Load"
+
+[tui.sys.swap]
+other = "Swap"
 
 [tui.checkupRunning.title]
 other = "◈ Running Checkup"
@@ -482,7 +606,7 @@ other = "website availability"
 other = "port 25/587 probes"
 
 [tui.config.sectionDesc.media]
-other = "Netflix · Disney+ · YouTube"
+other = "Netflix · Disney+ · ChatGPT"
 
 [tui.checkupResults.title]
 other = "◈ Checkup Report"

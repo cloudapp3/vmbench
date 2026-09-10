@@ -12,6 +12,12 @@ other = "对比报告"
 [tui.menu.compareDesc]
 other = "对比两份 JSON 报告"
 
+[tui.menu.history]
+other = "报告历史"
+
+[tui.menu.historyDesc]
+other = "浏览 --save-history 保存的报告"
+
 [tui.menu.sysinfo]
 other = "系统信息"
 
@@ -113,6 +119,8 @@ other = "跑分结果"
 other = "报告对比"
 [tui.help.sec.checkupResults]
 other = "体检结果"
+[tui.help.sec.history]
+other = "报告历史"
 
 [tui.hint.digits]
 other = "切换 section 1-9"
@@ -228,6 +236,14 @@ other = "剩余 ~{{.Eta}}"
 [tui.running.samples]
 other = "{{.Done}}/{{.Total}} 采样"
 
+[tui.checkupSummary.days]
+other = "{{.Days}} 天"
+[tui.checkupSummary.daysHours]
+other = "{{.Days}} 天 {{.Hours}} 小时"
+[tui.checkupSummary.hours]
+other = "{{.Hours}} 小时"
+[tui.checkupSummary.hoursMinutes]
+other = "{{.Hours}} 小时 {{.Minutes}} 分"
 [tui.checkupSummary.minutes]
 other = "{{.Minutes}} 分"
 [tui.checkupSummary.minutesSeconds]
@@ -316,6 +332,39 @@ other = "历史记录错误: {{.Err}}"
 [tui.compare.loadingHistory]
 other = "正在加载历史…"
 
+[tui.history.title]
+other = "☰ 报告历史"
+
+[tui.history.desc]
+other = "已保存的基准报告,回车打开查看。"
+
+[tui.history.loading]
+other = "正在加载历史…"
+
+[tui.history.error]
+other = "历史记录错误: {{.Err}}"
+
+[tui.history.empty]
+other = "暂无已保存的报告。"
+
+[tui.history.emptyHint]
+other = "跑分时加 --save-history,或用 vmbench history add 添加。"
+
+[tui.history.count]
+other = "{{.Count}} 份报告"
+
+[tui.history.col.time]
+other = "时间"
+
+[tui.history.col.kind]
+other = "类型"
+
+[tui.history.col.tag]
+other = "标签"
+
+[tui.history.col.id]
+other = "ID"
+
 [tui.help.sec.comparePicker]
 other = "对比选择器"
 
@@ -396,6 +445,81 @@ other = "特性"
 
 [tui.sys.arch]
 other = "架构"
+
+[tui.sys.netLoading]
+other = "检测中..."
+
+[tui.sys.country]
+other = "国家"
+
+[tui.sys.isp]
+other = "运营商"
+
+[tui.sys.cpuTitle]
+other = "处理器"
+
+[tui.sys.netTitle]
+other = "网络"
+
+[tui.sys.virtTitle]
+other = "虚拟化"
+
+[tui.sys.memTitle]
+other = "内存"
+
+[tui.sys.diskTitle]
+other = "存储"
+
+[tui.sys.runtimeTitle]
+other = "运行环境"
+
+[tui.sys.stepping]
+other = "步进"
+
+[tui.sys.numa]
+other = "NUMA"
+
+[tui.sys.numaNodes]
+other = "{{.Count}} 节点"
+
+[tui.sys.virt]
+other = "平台"
+
+[tui.sys.dmiProduct]
+other = "机型"
+
+[tui.sys.dmiVendor]
+other = "厂商"
+
+[tui.sys.nestedVirt]
+other = "嵌套虚拟化"
+
+[tui.sys.balloon]
+other = "内存气球"
+
+[tui.sys.ksm]
+other = "KSM"
+
+[tui.sys.memSpec]
+other = "规格"
+
+[tui.sys.memWater]
+other = "占用"
+
+[tui.sys.memAvailable]
+other = "可用 {{.Value}}"
+
+[tui.sys.bootDisk]
+other = "启动盘"
+
+[tui.sys.uptime]
+other = "运行时长"
+
+[tui.sys.load]
+other = "负载"
+
+[tui.sys.swap]
+other = "Swap"
 
 [tui.checkupRunning.title]
 other = "◈ 综合测试运行中"
@@ -482,7 +606,7 @@ other = "建站可用性"
 other = "25/587 端口"
 
 [tui.config.sectionDesc.media]
-other = "Netflix · Disney+ · YouTube"
+other = "Netflix · Disney+ · ChatGPT"
 
 [tui.checkupResults.title]
 other = "◈ 综合测试报告"

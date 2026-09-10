@@ -166,7 +166,7 @@ other = "跳过所选 section (逗号分隔: hardware,network_info,route,ping,sp
 other = "网络 IP 版本: v4、v6 或 dual"
 
 [cli.flag.mediaSet]
-other = "流媒体解锁集合: all、globe、tw、hk、jp、kr、na、sa、eu、afr、sea、oce、ai 或逗号组合"
+other = "流媒体解锁集合: all、globe、tw、hk、jp、kr、na、sa、eu、afr、sea、oce、ai 或逗号组合（默认 globe）"
 
 [cli.flag.ipQualitySource]
 other = "IP 质量证据来源 (逗号分隔: builtin,securitycheck)"
@@ -482,6 +482,9 @@ other = "内存"
 
 [cli.sysinfo.virtual]
 other = "虚拟化"
+
+[cli.sysinfo.dmi]
+other = "机型"
 
 [cli.sysinfo.features]
 other = "特性"

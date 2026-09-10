@@ -119,6 +119,29 @@ func ProbeNetworkIdentity(ctx context.Context, ipVersion string) (*NetworkIdenti
 	})
 }
 
+// ProbePublicIdentityLite observes only the public IPv4/IPv6 addresses and
+// their ASN metadata (ipify + ipwho.is). Supplementary evidence — STUN NAT,
+// RDAP/BGP ownership, CIDR neighbors, IPv6 subnet — is skipped so cheap
+// surfaces (TUI dashboard) get an identity hint without the full probe
+// budget. Offline returns a non-nil partial result plus an error.
+func ProbePublicIdentityLite(ctx context.Context, ipVersion string) (*NetworkIdentityResult, error) {
+	return probePublicIdentityLite(ctx, ipVersion, networkIdentityDependencies{
+		localAddresses: collectLocalGlobalAddresses,
+		publicIP:       queryPublicIP,
+		metadata:       queryPublicIPMetadata,
+	})
+}
+
+func probePublicIdentityLite(ctx context.Context, ipVersion string, deps networkIdentityDependencies) (*NetworkIdentityResult, error) {
+	// Defensive: the lite probe must never trigger supplementary providers,
+	// even when a caller (or a future refactor) wires them.
+	deps.stunNAT = nil
+	deps.ipBGP = nil
+	deps.cidrNeighbors = nil
+	deps.ipv6Subnet = nil
+	return probeNetworkIdentity(ctx, ipVersion, deps)
+}
+
 func probeNetworkIdentity(ctx context.Context, ipVersion string, deps networkIdentityDependencies) (*NetworkIdentityResult, error) {
 	if ctx == nil {
 		ctx = context.Background()
