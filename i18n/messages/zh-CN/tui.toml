@@ -376,6 +376,15 @@ other = "系统"
 [tui.sys.kernel]
 other = "内核"
 
+[tui.sys.nic]
+other = "网卡"
+
+[tui.sys.oversell]
+other = "超售"
+
+[tui.sys.cache]
+other = "缓存"
+
 [tui.sys.freq]
 other = "频率 {{.Base}} / {{.Max}} MHz"
 

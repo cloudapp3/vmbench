@@ -376,6 +376,15 @@ other = "OS"
 [tui.sys.kernel]
 other = "Kernel"
 
+[tui.sys.nic]
+other = "NIC"
+
+[tui.sys.oversell]
+other = "Oversell"
+
+[tui.sys.cache]
+other = "Cache"
+
 [tui.sys.freq]
 other = "freq {{.Base}} / {{.Max}} MHz"
 

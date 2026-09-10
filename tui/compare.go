@@ -156,6 +156,12 @@ func compareSysCard(label, path string, doc gbreport.Document, width int, accent
 		{Key: i18n.T("tui.sys.memory"), Value: fmt.Sprintf("%.1f GB", float64(doc.System.Memory.TotalBytes)/(1024*1024*1024))},
 		{Key: i18n.T("tui.sys.os"), Value: truncStr(doc.System.OS.Name, width-12)},
 	}
+	if nic := doc.System.Network.PrimaryNIC(); nic != "" {
+		rows = append(rows, comp.KV{Key: i18n.T("tui.sys.nic"), Value: truncStr(nic, width-12)})
+	}
+	if oversell := doc.System.Platform.OversellSignalsText(); oversell != "" {
+		rows = append(rows, comp.KV{Key: i18n.T("tui.sys.oversell"), Value: truncStr(oversell, width-12)})
+	}
 	body := comp.KVGrid(width-4, rows)
 	_ = t
 	return comp.Card{

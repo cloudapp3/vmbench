@@ -11,9 +11,10 @@ import (
 // says whether the capability is active here, Risk says whether On means
 // oversell exposure for the buyer (Off is therefore reassurance, not risk).
 type OversellSignal struct {
-	Key  string `json:"key"`  // stable id: "balloon" | "ksm"
-	On   bool   `json:"on"`   // capability detected on this host
-	Risk bool   `json:"risk"` // true when On marks an oversell signal
+	Key   string `json:"key"`   // stable id: "balloon" | "ksm"
+	State string `json:"state"` // raw evidence word: present/absent/enabled/disabled
+	On    bool   `json:"on"`    // capability detected on this host
+	Risk  bool   `json:"risk"`  // true when On marks an oversell signal
 }
 
 // OversellSignals maps raw platform evidence (virtio balloon, KSM) into
@@ -23,17 +24,50 @@ func (d PlatformDiagnostics) OversellSignals() []OversellSignal {
 	signals := make([]OversellSignal, 0, 2)
 	switch d.VirtioBalloon {
 	case "present":
-		signals = append(signals, OversellSignal{Key: "balloon", On: true, Risk: true})
+		signals = append(signals, OversellSignal{Key: "balloon", State: "present", On: true, Risk: true})
 	case "absent":
-		signals = append(signals, OversellSignal{Key: "balloon", On: false})
+		signals = append(signals, OversellSignal{Key: "balloon", State: "absent", On: false})
 	}
 	switch d.KSM {
 	case "enabled":
-		signals = append(signals, OversellSignal{Key: "ksm", On: true, Risk: true})
+		signals = append(signals, OversellSignal{Key: "ksm", State: "enabled", On: true, Risk: true})
 	case "disabled":
-		signals = append(signals, OversellSignal{Key: "ksm", On: false})
+		signals = append(signals, OversellSignal{Key: "ksm", State: "disabled", On: false})
 	}
 	return signals
+}
+
+// OversellSignalsText renders the signals as one plain-text line, e.g.
+// "balloon=present (!) / ksm=disabled"; "(!)" marks buyer-facing risk.
+// Empty when there is no evidence, so text surfaces can skip the line.
+func (d PlatformDiagnostics) OversellSignalsText() string {
+	signals := d.OversellSignals()
+	if len(signals) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(signals))
+	for _, signal := range signals {
+		text := signal.Key + "=" + signal.State
+		if signal.Risk {
+			text += " (!)"
+		}
+		parts = append(parts, text)
+	}
+	return strings.Join(parts, " / ")
+}
+
+// PrimaryNIC renders the primary physical NIC as display text, e.g.
+// "virtio_net (1af4:1000)". Empty when no device-backed interface exists —
+// renderers skip the line entirely.
+func (n NetworkInfo) PrimaryNIC() string {
+	driver := strings.TrimSpace(n.PrimaryDriver)
+	pci := strings.TrimSpace(n.PrimaryPCI)
+	switch {
+	case driver != "" && pci != "":
+		return driver + " (" + pci + ")"
+	default:
+		return driver + pci
+	}
 }
 
 // cacheOrder fixes the display order of the well-known cache levels; unknown

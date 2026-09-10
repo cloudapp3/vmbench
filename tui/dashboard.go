@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/cloudapp3/vmbench/i18n"
+	"github.com/cloudapp3/vmbench/sysinfo"
 	"github.com/cloudapp3/vmbench/tui/comp"
 	"github.com/cloudapp3/vmbench/tui/theme"
 )
@@ -157,6 +158,12 @@ func dashboardSysCard(m Model, width int) string {
 		{Key: i18n.T("tui.sys.os"), Value: truncStr(osInfo.Name, width-12)},
 		{Key: i18n.T("tui.sys.kernel"), Value: truncStr(osInfo.Kernel, width-12)},
 	}
+	if nic := m.sysInfo.Network.PrimaryNIC(); nic != "" {
+		rows = append(rows, comp.KV{Key: i18n.T("tui.sys.nic"), Value: truncStr(nic, width-12)})
+	}
+	if oversell := m.sysInfo.Platform.OversellSignalsText(); oversell != "" {
+		rows = append(rows, comp.KV{Key: i18n.T("tui.sys.oversell"), Value: truncStr(oversell, width-12)})
+	}
 
 	body := comp.KVGrid(width-4, rows)
 
@@ -186,6 +193,9 @@ func dashboardSysExpanded(m Model, width int) string {
 	}
 	if cpu.MicroArch != "" {
 		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.PadCells(i18n.T("tui.sys.arch"), 9)+"  ")+lipgloss.NewStyle().Foreground(t.Fg).Render(cpu.MicroArch))
+	}
+	if cache := sysinfo.FormatCacheLine(cpu.CacheSizes); cache != "" {
+		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.PadCells(i18n.T("tui.sys.cache"), 9)+"  ")+lipgloss.NewStyle().Foreground(t.Fg).Render(truncStr(cache, width-12)))
 	}
 	if len(lines) == 0 {
 		return ""

@@ -7,6 +7,7 @@ import (
 
 	vmbench "github.com/cloudapp3/vmbench"
 	"github.com/cloudapp3/vmbench/bench/netio"
+	"github.com/cloudapp3/vmbench/sysinfo"
 )
 
 func TestWriteHTMLHandlesMissingOptionalResults(t *testing.T) {
@@ -177,6 +178,52 @@ func TestWriteHTMLIncludesRouteLineSummary(t *testing.T) {
 	} {
 		if !strings.Contains(output.String(), want) {
 			t.Fatalf("HTML route line summary missing %q", want)
+		}
+	}
+}
+
+func TestWriteHTMLIncludesHardwareEvidence(t *testing.T) {
+	report := CheckupReport{
+		System: sysinfo.SystemInfo{
+			CPU: sysinfo.CPUInfo{
+				Model: "Evidence CPU", PhysicalCores: 2, LogicalCores: 4,
+				CacheSizes: map[string]int64{"L1d": 32 << 10, "L2": 4 << 20, "L3": 16 << 20},
+			},
+			Network: sysinfo.NetworkInfo{PrimaryDriver: "virtio_net", PrimaryPCI: "1af4:1000"},
+			Platform: sysinfo.PlatformDiagnostics{
+				VirtioBalloon: "present",
+				KSM:           "disabled",
+			},
+		},
+	}
+	var output bytes.Buffer
+	if err := WriteHTML(&output, report); err != nil {
+		t.Fatal(err)
+	}
+	html := output.String()
+	for _, want := range []string{
+		"L1d 32 KiB, L2 4 MiB, L3 16 MiB",
+		"virtio_net (1af4:1000)",
+		`class="badge warn"`, // balloon=present is buyer-facing risk
+		"balloon present",
+		`class="badge ok"`, // ksm=disabled is reassurance
+		"ksm disabled",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("HTML hardware evidence missing %q", want)
+		}
+	}
+}
+
+func TestWriteHTMLOmitsHardwareEvidenceWhenAbsent(t *testing.T) {
+	var output bytes.Buffer
+	if err := WriteHTML(&output, CheckupReport{}); err != nil {
+		t.Fatal(err)
+	}
+	html := output.String()
+	for _, banned := range []string{"balloon", "ksm", "virtio", "L1d"} {
+		if strings.Contains(html, banned) {
+			t.Fatalf("HTML must omit absent hardware evidence, found %q", banned)
 		}
 	}
 }

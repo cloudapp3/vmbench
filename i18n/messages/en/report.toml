@@ -27,6 +27,15 @@ other = "OS"
 [report.label.go]
 other = "Go"
 
+[report.label.cache]
+other = "Cache"
+
+[report.label.nic]
+other = "NIC"
+
+[report.label.oversell]
+other = "Oversell"
+
 [report.col.workload]
 other = "Workload"
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cloudapp3/vmbench/i18n"
+	"github.com/cloudapp3/vmbench/sysinfo"
 	"github.com/cloudapp3/vmbench/textgrid"
 )
 
@@ -23,6 +24,15 @@ func WriteConsole(w io.Writer, doc Document) error {
 	_, _ = fmt.Fprintf(w, "  %s: %.1f GB %s\n", i18n.PadCells(i18n.T("report.label.memory"), 9), float64(doc.System.Memory.TotalBytes)/(1024*1024*1024), doc.System.Memory.Type)
 	_, _ = fmt.Fprintf(w, "  %s: %s (%s)\n", i18n.PadCells(i18n.T("report.label.os"), 9), doc.System.OS.Name, doc.System.OS.Kernel)
 	_, _ = fmt.Fprintf(w, "  %s: %s\n", i18n.PadCells(i18n.T("report.label.go"), 9), doc.System.OS.GoVersion)
+	if cache := sysinfo.FormatCacheLine(doc.System.CPU.CacheSizes); cache != "" {
+		_, _ = fmt.Fprintf(w, "  %s: %s\n", i18n.PadCells(i18n.T("report.label.cache"), 9), cache)
+	}
+	if nic := doc.System.Network.PrimaryNIC(); nic != "" {
+		_, _ = fmt.Fprintf(w, "  %s: %s\n", i18n.PadCells(i18n.T("report.label.nic"), 9), nic)
+	}
+	if oversell := doc.System.Platform.OversellSignalsText(); oversell != "" {
+		_, _ = fmt.Fprintf(w, "  %s: %s\n", i18n.PadCells(i18n.T("report.label.oversell"), 9), oversell)
+	}
 	_, _ = fmt.Fprintf(w, "%s\n\n", line)
 
 	writeWorkloadTable(w, i18n.T("report.console.measured"), doc.Results.Workloads, line)

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cloudapp3/vmbench/i18n"
+	"github.com/cloudapp3/vmbench/sysinfo"
 )
 
 var htmlTemplate = template.Must(template.New("checkup-report").Funcs(template.FuncMap{
@@ -109,6 +110,7 @@ var htmlTemplate = template.Must(template.New("checkup-report").Funcs(template.F
 	"routeLineText":   RouteLineText,
 	"routeLineTone":   RouteLineTone,
 	"routeConfidence": routeConfidenceText,
+	"cacheLine":       sysinfo.FormatCacheLine,
 	"sectionNames": func(value SectionSelector) string {
 		return strings.Join(value.Names(), ", ")
 	},
@@ -179,9 +181,11 @@ ul { margin:8px 0 0; padding-left:20px; }
   <h2>{{ t "report.sh.sysConfig" }}</h2>
   <div class="grid">
     <div class="metric"><span class="label">{{ t "report.sh.host" }}</span><strong>{{ defaultText .System.OS.Hostname "-" }}</strong><span class="small">{{ defaultText .System.OS.Name (t "report.sh.unknownOS") }} / {{ defaultText .System.OS.Kernel (t "report.sh.unknownKernel") }}</span></div>
-    <div class="metric"><span class="label">{{ t "report.label.cpu" }}</span><strong>{{ defaultText .System.CPU.Model "-" }}</strong><span class="small">{{ .System.CPU.PhysicalCores }} cores / {{ .System.CPU.LogicalCores }} threads / {{ defaultText .System.CPU.Arch "-" }}</span></div>
+    <div class="metric"><span class="label">{{ t "report.label.cpu" }}</span><strong>{{ defaultText .System.CPU.Model "-" }}</strong><span class="small">{{ .System.CPU.PhysicalCores }} cores / {{ .System.CPU.LogicalCores }} threads / {{ defaultText .System.CPU.Arch "-" }}{{ with cacheLine .System.CPU.CacheSizes }} / {{ . }}{{ end }}</span></div>
     <div class="metric"><span class="label">{{ t "report.label.memory" }}</span><strong>{{ formatBytes .System.Memory.TotalBytes }}</strong><span class="small">{{ defaultText .System.Memory.Type (t "report.sh.typeUnknown") }} / {{ .System.Memory.FreqMHz }} MHz / {{ .System.Memory.Channels }} channels</span></div>
     <div class="metric"><span class="label">{{ t "report.sh.virtualization" }}</span><strong>{{ defaultText .System.Virtualization.System (t "common.unknown") }}</strong><span class="small">{{ t "report.sh.role" }} {{ defaultText .System.Virtualization.Role (t "common.unknown") }}</span></div>
+    {{ with .System.Network.PrimaryNIC }}<div class="metric"><span class="label">{{ t "report.label.nic" }}</span><strong>{{ . }}</strong></div>{{ end }}
+    {{ with .System.Platform.OversellSignals }}<div class="metric"><span class="label">{{ t "report.label.oversell" }}</span>{{ range . }}<span class="badge {{ if .Risk }}warn{{ else }}ok{{ end }}">{{ .Key }} {{ .State }}</span> {{ end }}</div>{{ end }}
     <div class="metric"><span class="label">{{ t "report.checkup.preset" }}</span><strong>{{ defaultText .Config.Preset (t "status.custom") }}</strong><span class="small">IP {{ defaultText .Config.IPVersion "v4" }} / {{ .Config.Iterations }} iterations</span></div>
     <div class="metric"><span class="label">{{ t "report.checkup.sections" }}</span><strong>{{ sectionNames .Config.Sections }}</strong><span class="small">timeout {{ .Config.TimeoutMS }} ms</span></div>
     <div class="metric"><span class="label">{{ t "report.sh.nodeCatalog" }}</span><strong>{{ defaultText .Config.CatalogRevision (t "report.sh.notUsed") }}</strong><span class="small">source {{ defaultText .Config.CatalogSource "-" }} / {{ len .Config.NodeIDs }} selected nodes</span></div>

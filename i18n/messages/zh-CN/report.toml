@@ -27,6 +27,15 @@ other = "系统"
 [report.label.go]
 other = "Go"
 
+[report.label.cache]
+other = "缓存"
+
+[report.label.nic]
+other = "网卡"
+
+[report.label.oversell]
+other = "超售信号"
+
 [report.col.workload]
 other = "工作负载"
 

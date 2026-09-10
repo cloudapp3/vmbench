@@ -1,5 +1,15 @@
 # VMBench Changelog
 
+## v0.13.1（2026-09-10）
+
+### sysinfo 硬件证据展示接线
+
+- **背景**：v0.13.0 落库的硬件证据（超售信号、主网卡、缓存层级）只进 JSON，屏幕上看不到。本版本把三组证据接入全部展示面，取值收敛在 `sysinfo/present.go`，无新采集。
+- **共享取值**：`OversellSignals()` 增补 `State` 原始证据词并新增 `OversellSignalsText()`（`balloon=present (!) / ksm=disabled` 一行文本，`(!)` 标记买家风险）；`NetworkInfo.PrimaryNIC()` 渲染 `virtio_net (1af4:1000)`；复用 `FormatCacheLine`。
+- **五个展示面**：benchmark console 系统头三个条件行（checkup console 经 hardware 段复用自动继承）；benchmark HTML sys-cards 下一行 muted 证据行；checkup HTML 系统信息区（超售/网卡 metric + badge 分级：Risk=warn、Off=ok reassurance，CPU metric small 追加缓存行）；TUI dashboard 系统卡与详情卡；TUI compare 报告卡（两机对比超售差异）。
+- **零证据即零渲染**：裸机无 balloon/KSM 证据 → 整行消失（不显示假安心）；无设备 backed 网卡、无缓存证据同样跳过。CPU `stepping` 仅入 JSON 不接显示（裸数字买家无从解读）；内存运行态 used/available 暂不接显示（采集时点语义需专门文案，待后续版本）。
+- **测试**：`sysinfo/present_test.go`（State 与 On/Risk 一致性、PrimaryNIC 五形态、缓存排序与分数渲染）、`report/render_test.go`（console/HTML 正反向）、`tui/dashboard_render_test.go`（dashboard/compare 卡正反向）。
+
 ## v0.13.0（2026-09-10）
 
 ### 报告脱敏：本机公网 IP 默认替换为文档保留段地址
@@ -39,7 +49,7 @@
 
 - **内存运行态**：`MemoryInfo` 增补 `used_bytes` / `available_bytes` / `used_percent`（Linux/macOS/Windows 采集，`omitempty`）——是 best-effort 运行时状态而非容量，渲染层须把零值当 unknown 而非空。
 - **CPU/网卡证据**：`CPUInfo` 增补 `stepping`；`NetworkInfo` 增补 `primary_driver` / `primary_pci`（首个物理网卡的驱动与 PCI ID，如 `virtio_net` / `1af4:1000`，无设备 backed 接口时留空）。
-- **展示辅助（`sysinfo/present.go`）**：`PlatformDiagnostics.OversellSignals()` 把已有的 balloon/KSM 证据映射为买家视角超售信号（On=能力开启、Risk=对买家意味着超售暴露，证据未知则省略）；`FormatCacheLine` 以固定 L1d/L1i/L2/L3 顺序渲染缓存行。均为纯函数，本版本仅入库未接显示。
+- **展示辅助（`sysinfo/present.go`）**：`PlatformDiagnostics.OversellSignals()` 把已有的 balloon/KSM 证据映射为买家视角超售信号（On=能力开启、Risk=对买家意味着超售暴露，证据未知则省略）；`FormatCacheLine` 以固定 L1d/L1i/L2/L3 顺序渲染缓存行。均为纯函数，本版本仅入库未接显示（v0.13.1 接线）。
 
 ## v0.12.0（2026-09-10）
 

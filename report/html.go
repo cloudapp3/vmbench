@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cloudapp3/vmbench/i18n"
+	"github.com/cloudapp3/vmbench/sysinfo"
 )
 
 var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
@@ -18,6 +19,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 	"formatRate":  formatHTMLThroughput,
 	"formatLat":   formatHTMLLatency,
 	"formatText":  formatHTMLDetail,
+	"sysExtra":    sysExtraLine,
 	"t":           i18n.T,
 	"langTag":     i18n.LanguageTag,
 }).Parse(`<!doctype html>
@@ -45,6 +47,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sa
 .sys-card .label { font-size: 11px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; }
 .sys-card .value { font-weight: 600; margin: 4px 0; font-size: 14px; word-break: break-word; }
 .sys-card .detail { font-size: 13px; color: var(--gray-500); }
+.sys-extra { text-align: center; color: var(--gray-500); font-size: 12px; margin: -8px 0 12px; }
 .section-title { font-size: 18px; font-weight: 600; margin: 28px 0 12px; padding-bottom: 8px; border-bottom: 2px solid var(--gray-200); }
 table { border-collapse: collapse; width: 100%; margin: 8px 0 20px; font-size: 14px; }
 th { background: var(--gray-50); color: var(--gray-700); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
@@ -87,6 +90,7 @@ td.error { color: var(--danger); }
     <div class="detail">&nbsp;</div>
   </div>
 </div>
+{{ with sysExtra .System }}<p class="sys-extra">{{ . }}</p>{{ end }}
 
 {{ range $cat := categories . }}
 <div class="section-title">{{ $cat }}</div>
@@ -201,6 +205,23 @@ func formatHTMLLatency(result *ResultEntry) string {
 		metric += " (p99 " + formatLatencyP99NS(result.LatencyP99NS) + ")"
 	}
 	return metric
+}
+
+// sysExtraLine renders the secondary hardware evidence (cache hierarchy,
+// primary NIC, oversell signals) as one muted line under the sys-cards grid.
+// Empty when the report carries none of it — the template skips the line.
+func sysExtraLine(system sysinfo.SystemInfo) string {
+	var parts []string
+	if cache := sysinfo.FormatCacheLine(system.CPU.CacheSizes); cache != "" {
+		parts = append(parts, cache)
+	}
+	if nic := system.Network.PrimaryNIC(); nic != "" {
+		parts = append(parts, nic)
+	}
+	if oversell := system.Platform.OversellSignalsText(); oversell != "" {
+		parts = append(parts, oversell)
+	}
+	return strings.Join(parts, " · ")
 }
 
 func formatHTMLDetail(result *ResultEntry) string {
