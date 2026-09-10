@@ -1,5 +1,20 @@
 # VMBench Changelog
 
+## v0.12.0（2026-09-10）
+
+### 派生评估层：`vmbench score`（政策反转）
+
+- **政策反转**：vmbench 此前承诺"不输出总分/等级"（原始指标优先）。本版本在保持原始指标为唯一事实来源的前提下，新增**确定性派生评估层**：`vmbench score <report.json|->` 基于版本化基线生成 assessment（综合 index/rating、五维度明细、web/build/proxy/storage 场景适配、覆盖率披露）。`Evaluate` 是纯函数——同一报告 + 同一基线 ⇒ 字节级相同输出；评分路径无网络、无时钟。
+- **覆盖率不撒谎**：期望指标集按报告自身 config（hardware_tools）∩ requires_kind ∩ platform 计算，optional 指标缺失不拉低覆盖率；CPU 维度无数据或性能维度 <2 有数据时综合分置空并给出 warning；部分维度缺失时 reweight 并在 `basis`/`excluded` 显式披露。legacy suite 报告与 checkup 同样可评。
+- **基线数据**：内嵌 `score/baselines.json`（schema_version 1，revision `2026-09.1`）：log 曲线归一化吞吐、固定阈值带归一化延迟/丢包，严格单位纪律（MiB/s ≠ MB/s）；`--baseline` 换外部基线、`--baseline-rev` 钉版本（不匹配即失败）。锚点为知情占位值，待真实 VPS 语料校准。设计细节见 `docs/score-design.md`。
+- **一票否决**：场景 profile 的 veto 触发时仅封顶评级至 C（不动 index）；fio Q1 延迟与 Q32 IOPS 各有专属否决线。Ping 平均延迟是地理属性，不入综合分，仅用于 proxy 场景否决。
+
+### 数据层（additive，schema v2 兼容）
+
+- **fio 尾延迟**：新增 `latency_p99_ns` 字段（`ResultEntry` / `RunDetail`，omitempty），fio workload 解析 clat percentile p99；报告各展示面（JSON/HTML/console/TUI/compare）在 p99>0 时并列显示。
+- **CPU steal 探针**：新增 workload `CPU Steal (/proc/stat)`（Linux-only，无外部工具依赖，默认 5s 采样，`--filter 'Steal'` 可选/排除），fail-closed：计数器不前进、回退或格式变化即报错。
+- **MCP 政策串**：capabilities policy 从"不输出总分/等级"改为"派生评估走 `vmbench score` CLI，MCP 本身不评分"。
+
 ## v0.11.0（2026-09-09）
 
 ### "suite" 全面更名为 "checkup"（BREAKING）

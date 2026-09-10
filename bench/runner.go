@@ -19,6 +19,7 @@ type RunDetail struct {
 	BytesProcessed   int64           `json:"bytes_processed,omitempty"`
 	OpsProcessed     float64         `json:"ops_processed,omitempty"`
 	AverageLatencyNS float64         `json:"average_latency_ns,omitempty"`
+	LatencyP99NS     float64         `json:"latency_p99_ns,omitempty"`
 	Detail           string          `json:"detail,omitempty"`
 	Error            string          `json:"error,omitempty"`
 }
@@ -137,6 +138,7 @@ func runWorkload(ctx context.Context, workload Workload, iterations int, timeout
 	processedSamples := make([]int64, 0, iterations)
 	throughputSamples := make([]float64, 0, iterations)
 	latencySamples := make([]float64, 0, iterations)
+	latencyP99Samples := make([]float64, 0, iterations)
 	throughputUnit := ""
 	processedKind := ProcessedUnknown
 	processedKindConsistent := true
@@ -163,6 +165,9 @@ func runWorkload(ctx context.Context, workload Workload, iterations int, timeout
 		}
 		if result.averageLatencyNS > 0 {
 			latencySamples = append(latencySamples, result.averageLatencyNS)
+		}
+		if result.latencyP99NS > 0 {
+			latencyP99Samples = append(latencyP99Samples, result.latencyP99NS)
 		}
 		after(iteration, "ok")
 	}
@@ -198,6 +203,9 @@ func runWorkload(ctx context.Context, workload Workload, iterations int, timeout
 	} else if latency, ok := workload.(LatencyWorkload); ok {
 		detail.AverageLatencyNS = latency.AverageLatencyNS(medianProcessed, medianTime)
 	}
+	if len(latencyP99Samples) > 0 {
+		detail.LatencyP99NS = common.MedianFloat64(latencyP99Samples)
+	}
 	if reporter, ok := workload.(DetailReporter); ok {
 		detail.Detail = reporter.Detail()
 	}
@@ -219,6 +227,7 @@ type sampleResult struct {
 	throughput       float64
 	throughputUnit   string
 	averageLatencyNS float64
+	latencyP99NS     float64
 	err              error
 }
 
@@ -266,6 +275,9 @@ func (r *sampleResult) captureMetrics(workload Workload) {
 	}
 	if latency, ok := workload.(LatencyWorkload); ok {
 		r.averageLatencyNS = latency.AverageLatencyNS(r.processed, r.elapsed)
+	}
+	if percentile, ok := workload.(LatencyPercentileWorkload); ok {
+		r.latencyP99NS = percentile.LatencyP99NS()
 	}
 }
 

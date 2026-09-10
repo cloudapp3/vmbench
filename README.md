@@ -6,7 +6,7 @@ Cross-platform VPS benchmark toolkit written in Go, with a TUI interface.
 [![Go Reference](https://pkg.go.dev/badge/github.com/cloudapp3/vmbench.svg)](https://pkg.go.dev/github.com/cloudapp3/vmbench)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-vmbench measures CPU / memory / disk with **external tools only** (sysbench, fio, OpenSSL by default on Linux; more opt-in), diagnoses VPS network quality (route, ping, speed, IP quality, mail, media unlock), and exports JSON / HTML reports for comparison and automation. It reports raw metrics and structured diagnostics — deliberately no total score or grade.
+vmbench measures CPU / memory / disk with **external tools only** (sysbench, fio, OpenSSL by default on Linux; more opt-in), diagnoses VPS network quality (route, ping, speed, IP quality, mail, media unlock), and exports JSON / HTML reports for comparison and automation. It reports raw metrics and structured diagnostics. On top of that raw layer, the optional `vmbench score` command derives a deterministic assessment (dimension indexes, scenario fit, coverage disclosure) from a versioned baseline — raw measurements always remain the source of truth.
 
 Documentation: [中文说明](docs/README.zh-CN.md) · [Full capability reference](docs/capabilities.md) · [Tech stack](docs/tech-stack.md) · [Changelog](docs/CHANGELOG.md)
 
@@ -25,6 +25,7 @@ vmbench                          # interactive TUI (default)
 vmbench --json report.json       # hardware benchmark via external tools (default selection)
 vmbench --preset quick           # fast overview: hardware + network info + speed + IP quality
 vmbench compare a.json b.json    # auto-detect and compare reports
+vmbench score report.json        # deterministic assessment (dimension indexes, profile fit, coverage)
 vmbench update                   # self-update from GitHub Releases
 ```
 
@@ -76,6 +77,7 @@ Downloads are SHA-256 verified against the release `checksums.txt`, then atomica
 | `vmbench list` | List available workloads |
 | `vmbench sysinfo [--json]` | Show system information |
 | `vmbench compare <a.json> <b.json> [...]` | Auto-detect and compare benchmark or checkup reports |
+| `vmbench score <report.json\|->` | Derive a deterministic assessment from a report against the versioned scoring baseline |
 | `vmbench history <command>` | Add / list / show / delete / compare local reports |
 | `vmbench update [--check] [--version TAG]` | Self-update from GitHub Releases (SHA-256 verified) |
 | `vmbench version` | Show version |

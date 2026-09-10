@@ -30,6 +30,9 @@ other = "显示系统信息"
 [cli.usage.cmdCompare]
 other = "对比两份报告"
 
+[cli.usage.cmdScore]
+other = "按评分基线评估报告"
+
 [cli.usage.cmdHistory]
 other = "管理本地报告历史"
 
@@ -74,6 +77,9 @@ other = "显示当前主机的系统信息。"
 
 [cli.usage.compareDetail]
 other = "并排对比两份基准测试报告。"
+
+[cli.usage.scoreDetail]
+other = "使用确定性评分基线评估报告（不调用 LLM）。可用旗标：--json、--out、--baseline、--baseline-rev。"
 
 [cli.usage.updateDetail]
 other = "检查 GitHub Releases 是否有新版本并原地替换当前二进制 (按发布 checksums.txt 做 SHA-256 校验)。"
@@ -299,6 +305,9 @@ other = "错误: 至少需要保留一个启用的体检 section"
 
 [cli.error.compareNeedsTwo]
 other = "错误: 至少需要 2 个 JSON 报告文件"
+
+[cli.error.scoreNeedsReport]
+other = "错误: 需要恰好一个报告路径，或 ' - '（标准输入）"
 
 [cli.error.readingReport]
 other = "读取 {{.Path}} 失败: {{.Err}}"
@@ -716,4 +725,64 @@ other = "vmbench 已卸载。自定义 VMBENCH_HISTORY_DIR 下的报告已保留
 
 [cli.uninstall.error.requires]
 other = "错误:uninstall 不接受参数"
+
+[cli.score.baseline]
+other = "基线"
+
+[cli.score.composite]
+other = "综合"
+
+[cli.score.compositeWithheld]
+other = "未输出（报告缺少支撑综合分的数据）"
+
+[cli.score.basis]
+other = "参与维度"
+
+[cli.score.excluded]
+other = "排除维度"
+
+[cli.score.coverage]
+other = "覆盖率"
+
+[cli.score.confidence]
+other = "置信度"
+
+[cli.score.dimension]
+other = "维度"
+
+[cli.score.index]
+other = "指数"
+
+[cli.score.rating]
+other = "评级"
+
+[cli.score.metric]
+other = "指标"
+
+[cli.score.value]
+other = "数值"
+
+[cli.score.normalized]
+other = "归一化"
+
+[cli.score.status]
+other = "状态"
+
+[cli.score.note]
+other = "备注"
+
+[cli.score.missing]
+other = "缺失"
+
+[cli.score.profile]
+other = "场景"
+
+[cli.score.fit]
+other = "适配"
+
+[cli.score.veto]
+other = "否决"
+
+[cli.score.warnings]
+other = "警告"
 

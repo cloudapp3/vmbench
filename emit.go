@@ -62,7 +62,11 @@ func metricText(detail *gbbench.RunDetail) string {
 		return ""
 	}
 	if detail.AverageLatencyNS > 0 {
-		return fmt.Sprintf("%.2f ns/op", detail.AverageLatencyNS)
+		metric := fmt.Sprintf("%.2f ns/op", detail.AverageLatencyNS)
+		if detail.LatencyP99NS > 0 {
+			metric += fmt.Sprintf(" (p99 %s)", formatLatencyP99NS(detail.LatencyP99NS))
+		}
+		return metric
 	}
 	if detail.Throughput > 0 {
 		unit := strings.TrimSpace(detail.ThroughputUnit)
@@ -72,4 +76,16 @@ func metricText(detail *gbbench.RunDetail) string {
 		return fmt.Sprintf("%.2f %s", detail.Throughput, unit)
 	}
 	return detail.MedianTime.Round(time.Millisecond).String()
+}
+
+// formatLatencyP99NS renders a nanosecond latency with a human-readable unit.
+func formatLatencyP99NS(ns float64) string {
+	switch {
+	case ns >= 1e6:
+		return fmt.Sprintf("%.2f ms", ns/1e6)
+	case ns >= 1e3:
+		return fmt.Sprintf("%.2f µs", ns/1e3)
+	default:
+		return fmt.Sprintf("%.2f ns", ns)
+	}
 }

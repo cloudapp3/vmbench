@@ -12,12 +12,13 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，提供 CLI、
 
 ## 产品原则
 
-- 输出原始指标，不输出综合总分
+- 输出原始指标，原始指标是唯一事实来源
 - 保留结构化错误，便于自动化系统判断工具缺失或网络受限
 - Compare 只基于原始指标：
   - time / latency 越低越好
   - throughput 越高越好
 - IP Quality 的 0-100 风险评分属于业务诊断，不等于 benchmark 总分
+- 综合评估是独立派生层：`vmbench score` 用版本化基线做确定性评分（同输入 ⇒ 同输出），不修改原始报告
 
 ## 快速开始
 
@@ -47,6 +48,9 @@ vmbench --quiet --json checkup.json
 # 报告对比
 vmbench compare a.json b.json
 vmbench history compare --last 3
+
+# 派生评估（版本化基线，确定性评分）
+vmbench score report.json
 
 # 节点目录
 vmbench nodes list --node-catalog embedded
@@ -162,5 +166,6 @@ Dashboard 支持：
 
 - [产品说明](product.md)
 - [技术栈](tech-stack.md)
+- [评分与诊断设计](score-design.md)
 - [TUI 设计](tui-design.md)
 - [变更记录](CHANGELOG.md)

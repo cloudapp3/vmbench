@@ -40,7 +40,7 @@ vmbench 是一款**跨平台 VPS 基准测试工具**，使用 Go 编写，面�
 
 | 原则 | 含义 |
 |------|------|
-| **原始指标优先** | 只输出 median time、throughput、latency、detail/error，不输出综合总分、等级或 category score |
+| **原始指标优先（评估为派生层）** | run/checkup 报告只包含 median time、throughput、latency、detail/error；`vmbench score` 基于版本化基线生成派生 assessment（维度 index/rating、场景适配、覆盖率披露，见 `docs/score-design.md`） |
 | **外部工具驱动** | 硬件测评只调用外部工具（如 sysbench、fio、OpenSSL、WinSAT），Go 只负责编排和解析，不使用进程内算法 |
 | **串行隔离测量** | 不并发不同 workload；线程数/队列深度由外部工具参数定义，网络 workload 只执行一次真实探测 |
 | **结构化错误保留** | 缺失工具、网络失败等全部以结构化 error 记录，不伪造结果、不静默跳过 |
@@ -118,6 +118,7 @@ vmbench [flags]                              # 运行基准测试：默认仅 ha
 vmbench list                                 # 列出可用 workload
 vmbench sysinfo [--json]                     # 显示系统信息
 vmbench compare <a.json> <b.json> [...]      # 自动识别并对比 benchmark/体检报告
+vmbench score <report.json|->                 # 按版本化基线生成确定性 assessment
 vmbench history add|list|show|delete|compare # 本地报告历史
 vmbench nodes list|verify|update|health      # 版本化节点目录管理
 vmbench mcp serve [--transport stdio]        # 启动 MCP 服务器
@@ -609,6 +610,23 @@ vmbench history compare --last 3
 
 体检 Compare 对齐两份或更多体检 v1/v2 JSON 的 raw metrics。Route/Ping 结果记录实际 `probe_protocol/probe_tool`，并显式保留成功的零值 Ping 指标。只有 unit、实际 protocol/IP family、provider/probe tool、target/node identity，以及节点型证据所需的 catalog revision 都兼容时才输出 delta；HTTP status 等分类码不参与百分比 delta。不兼容时仍显示各报告值，但 delta 留空并给出 reason/warning。Route 指标还要求逐项显式为 `status=ok` 且 `destination_reached=true`；旧报告没有到达证据时不参与 delta。Route hop count 等中性证据只用于对照，不解释成性能提升。Mail 只有 `status=open` 的连接延迟进入比较；`refused/timeout/error` 耗时不作为成功 latency。未知扩展 section 继续按通用 raw-metric 规则提取，不套用 IP Quality 的端口状态门禁。
 
+### 评估报告（`score`）
+
+```bash
+vmbench score report.json                 # 控制台评估视图
+vmbench score --json report.json          # 输出 assessment JSON
+vmbench score --baseline my.json --baseline-rev 2026-09.1 report.json
+```
+
+`score` 是**确定性派生层**：`Evaluate` 为纯函数，同一报告 + 同一基线 ⇒ 字节级相同输出；全程无网络、无时钟。要点：
+
+- **维度加权**：cpu .30 / memory .20 / disk .30 / network .12（仅体检报告）/ stability .08；评级 S≥90 / A≥80 / B≥65 / C≥50 / D。
+- **归一化**：吞吐类走 log 曲线（floor→0、ceiling→100）；延迟/丢包类走固定阈值带（exc/good/fair/cut 分段线性过点 100/70/40/0）。单位纪律：指标只匹配基线声明的单位（MiB/s ≠ MB/s），错配记为缺项并出 warning。
+- **stability 维度**：CPU steal%（/proc/stat 探针）、样本变异系数（samples_ms）、ping 丢包（仅体检）。Ping 平均延迟是地理属性，不入综合分，仅用于 proxy 场景否决。
+- **场景 profile**（web/build/proxy/storage）：维度重加权 + 一票否决（触发仅封顶评级至 C，不改 index；Q1 延迟与 Q32 IOPS 各有专属否决线）。
+- **覆盖率不撒谎**：期望指标集 = 报告 config 的 hardware_tools ∩ requires_kind ∩ platform；optional 指标缺失不拉低覆盖率。CPU 维度无数据或性能维度 <2 有数据时综合分置空（`composite` 缺失 + warning）；部分维度缺失时 reweight 并在 `basis`/`excluded` 显式披露。
+- **基线数据**：内嵌 `score/baselines.json`（schema_version 1，revision `2026-09.1`），可 `--baseline` 换用外部文件、`--baseline-rev` 钉住版本（不匹配即失败）。锚点为知情占位值，待真实 VPS 语料校准。设计细节见 `docs/score-design.md`。
+
 ### 体检报告结构
 
 体检报告使用独立的 schema-v2 envelope，并保留 v1 兼容字段：
@@ -861,7 +879,7 @@ vmbench mcp serve --transport stdio
 | 默认保守 | `vmbench_run` 不带 section 参数时只跑 hardware |
 | 网络显式开启 | checkup 通过 preset 或 only 显式启用 |
 | stdout 专用 | stdout 只写 JSON-RPC response，诊断信息写 stderr |
-| 原始指标 | 返回原始指标和结构化错误，不输出总分/等级 |
+| 原始指标 | 返回原始指标和结构化错误；派生评估只存在于 `vmbench score` CLI，MCP 本身不评分 |
 
 参数缺省与显式非法值严格区分：省略 `iterations` 时默认为 1，省略 `timeout_ms` 时默认为 5 分钟；显式传入非正数、超过上限、非法 regex，或在合法枚举数组中混入未知 section/provider/tool/route preset 时，整个 tool call 以 `isError=true` 拒绝且不启动测量。
 
@@ -1155,6 +1173,7 @@ type ResultEntry struct {
     ThroughputPerSec float64   `json:"throughput_per_sec"`         // 吞吐量/秒
     ThroughputUnit   string    `json:"throughput_unit"`            // 吞吐量单位
     AvgNSPerAccess   float64   `json:"avg_ns_per_access,omitempty"` // 平均延迟
+    LatencyP99NS     float64   `json:"latency_p99_ns,omitempty"`   // 尾延迟 p99（fio）
     BytesProcessed   int64     `json:"bytes_processed,omitempty"`  // 可选累计字节数
     OpsProcessed     float64   `json:"ops_processed,omitempty"`    // 可选累计操作数
     Detail           string    `json:"detail,omitempty"`           // 详情

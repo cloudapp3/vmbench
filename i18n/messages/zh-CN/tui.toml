@@ -262,6 +262,9 @@ other = "字节"
 [tui.col.ops]
 other = "操作数"
 
+[tui.col.latencyP99]
+other = "p99 延迟"
+
 [tui.hint.detail]
 other = "详情"
 
@@ -384,9 +387,6 @@ other = "特性"
 
 [tui.sys.arch]
 other = "架构"
-
-[tui.sys.cache]
-other = "缓存"
 
 [tui.checkupRunning.title]
 other = "◈ 综合测试运行中"

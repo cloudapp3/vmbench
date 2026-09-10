@@ -15,6 +15,7 @@ type ResultEntry struct {
 	ThroughputPerSec float64   `json:"throughput_per_sec"`
 	ThroughputUnit   string    `json:"throughput_unit"`
 	AvgNSPerAccess   float64   `json:"avg_ns_per_access,omitempty"`
+	LatencyP99NS     float64   `json:"latency_p99_ns,omitempty"`
 	BytesProcessed   int64     `json:"bytes_processed,omitempty"`
 	OpsProcessed     float64   `json:"ops_processed,omitempty"`
 	Detail           string    `json:"detail,omitempty"`
@@ -112,6 +113,7 @@ func convertDetail(detail *bench.RunDetail) *ResultEntry {
 		ThroughputPerSec: detail.Throughput,
 		ThroughputUnit:   detail.ThroughputUnit,
 		AvgNSPerAccess:   detail.AverageLatencyNS,
+		LatencyP99NS:     detail.LatencyP99NS,
 		BytesProcessed:   detail.BytesProcessed,
 		OpsProcessed:     detail.OpsProcessed,
 		Detail:           detail.Detail,

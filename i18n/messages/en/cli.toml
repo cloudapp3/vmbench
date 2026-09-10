@@ -30,6 +30,9 @@ other = "show system information"
 [cli.usage.cmdCompare]
 other = "compare two reports"
 
+[cli.usage.cmdScore]
+other = "assess a report against the scoring baseline"
+
 [cli.usage.cmdHistory]
 other = "manage local report history"
 
@@ -74,6 +77,9 @@ other = "Show system information for the current host."
 
 [cli.usage.compareDetail]
 other = "Compare two benchmark reports side by side."
+
+[cli.usage.scoreDetail]
+other = "Evaluate a report with the deterministic scoring baseline (no LLM involved). Flags: --json, --out, --baseline, --baseline-rev."
 
 [cli.usage.updateDetail]
 other = "Check GitHub Releases for a newer vmbench and replace this binary in place (SHA-256 verified against the release checksums.txt)."
@@ -299,6 +305,9 @@ other = "error: at least one checkup section must remain enabled"
 
 [cli.error.compareNeedsTwo]
 other = "error: at least 2 JSON report files required"
+
+[cli.error.scoreNeedsReport]
+other = "error: exactly one report path or '-' (stdin) is required"
 
 [cli.error.readingReport]
 other = "error reading {{.Path}}: {{.Err}}"
@@ -716,4 +725,64 @@ other = "vmbench uninstalled. Reports under a custom VMBENCH_HISTORY_DIR are pre
 
 [cli.uninstall.error.requires]
 other = "error: uninstall takes no arguments"
+
+[cli.score.baseline]
+other = "Baseline"
+
+[cli.score.composite]
+other = "Composite"
+
+[cli.score.compositeWithheld]
+other = "withheld (report lacks the data for a meaningful composite)"
+
+[cli.score.basis]
+other = "basis"
+
+[cli.score.excluded]
+other = "excluded"
+
+[cli.score.coverage]
+other = "Coverage"
+
+[cli.score.confidence]
+other = "Confidence"
+
+[cli.score.dimension]
+other = "Dimension"
+
+[cli.score.index]
+other = "Index"
+
+[cli.score.rating]
+other = "Rating"
+
+[cli.score.metric]
+other = "Metric"
+
+[cli.score.value]
+other = "Value"
+
+[cli.score.normalized]
+other = "Norm"
+
+[cli.score.status]
+other = "Status"
+
+[cli.score.note]
+other = "Note"
+
+[cli.score.missing]
+other = "missing"
+
+[cli.score.profile]
+other = "Profile"
+
+[cli.score.fit]
+other = "Fit"
+
+[cli.score.veto]
+other = "Veto"
+
+[cli.score.warnings]
+other = "Warnings"
 

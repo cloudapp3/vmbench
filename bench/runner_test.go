@@ -307,3 +307,54 @@ func TestRunAllEmitsStartBeforeEachDuplicateNamedWorkloadRuns(t *testing.T) {
 		}
 	}
 }
+
+type percentileWorkload struct {
+	p99     []float64
+	idx     int
+	lastP99 float64
+}
+
+func (w *percentileWorkload) Name() string        { return "percentile" }
+func (w *percentileWorkload) Category() string    { return CategoryInteger }
+func (w *percentileWorkload) Description() string { return "p99 plumbing test workload" }
+func (w *percentileWorkload) Validate() error     { return nil }
+func (w *percentileWorkload) SkipWarmup() bool    { return true }
+
+func (w *percentileWorkload) Run(context.Context) (time.Duration, int64, error) {
+	if w.idx >= len(w.p99) {
+		return time.Millisecond, 1, nil
+	}
+	w.lastP99 = w.p99[w.idx]
+	w.idx++
+	return time.Duration(w.idx) * time.Millisecond, int64(w.idx), nil
+}
+
+func (w *percentileWorkload) Throughput(int64, time.Duration) (float64, string) {
+	return 1, "ops/s"
+}
+
+func (w *percentileWorkload) LatencyP99NS() float64 {
+	return w.lastP99
+}
+
+func TestRunWorkloadMediansLatencyP99(t *testing.T) {
+	workload := &percentileWorkload{p99: []float64{100, 300, 200}}
+	detail, err := runWorkload(context.Background(), workload, 3, time.Second, func(int, string) {})
+	if err != nil {
+		t.Fatalf("runWorkload error = %v", err)
+	}
+	if detail.LatencyP99NS != 200 {
+		t.Fatalf("latency p99 = %f, want 200", detail.LatencyP99NS)
+	}
+}
+
+func TestRunWorkloadWithoutPercentileInterfaceLeavesP99Zero(t *testing.T) {
+	workload := &sampleMetricWorkload{throughputs: []float64{100}, latencies: []float64{10}}
+	detail, err := runWorkload(context.Background(), workload, 1, time.Second, func(int, string) {})
+	if err != nil {
+		t.Fatalf("runWorkload error = %v", err)
+	}
+	if detail.LatencyP99NS != 0 {
+		t.Fatalf("latency p99 = %f, want 0", detail.LatencyP99NS)
+	}
+}

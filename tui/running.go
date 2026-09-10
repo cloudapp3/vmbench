@@ -54,7 +54,7 @@ func startBenchmark(m Model, opts vmbench.Options) (tea.Model, tea.Cmd) {
 	// Prefill from the exact definition set the runner will execute (tools
 	// + filter), so the running page never shows waiting ghost rows for
 	// adapters that are not part of the configured run.
-	defs := catalog.ExternalHardwareDefinitionsForTools("", opts.HardwareTools)
+	defs := append(catalog.ExternalHardwareDefinitionsForTools("", opts.HardwareTools), catalog.PlatformProbeDefinitions()...)
 	if expr := strings.TrimSpace(opts.Filter); expr != "" {
 		if re, err := regexp.Compile(expr); err == nil {
 			filtered := defs[:0]

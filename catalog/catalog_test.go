@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cloudapp3/vmbench/bench"
 )
@@ -364,5 +365,146 @@ func assertNoNativeHardwareDefinitions(t *testing.T, defs []Definition) {
 		if forbidden[def.Name] {
 			t.Fatalf("registered native hardware workload %q", def.Name)
 		}
+	}
+}
+
+func writeFakeFio(t *testing.T, json string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("shell fixture is Unix-only")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fio")
+	script := "#!/bin/sh\nprintf '%s' '" + json + "'\n"
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+}
+
+func TestFioWorkloadParsesLatencyP99(t *testing.T) {
+	writeFakeFio(t, `{"jobs":[{"read":{"iops":91234.5,"bw_bytes":1048576,"lat_ns":{"mean":150000},"clat_ns":{"mean":149000,"percentile":{"50.000000":140000,"99.000000":342016}}},"write":{"iops":12,"bw_bytes":4096,"lat_ns":{"mean":9000},"clat_ns":{"mean":8800,"percentile":{"99.000000":777}}}}]}`)
+	read := &fioWorkload{rw: "randread", bs: "4k", size: "1M", iodepth: 1, runtimeSeconds: 1}
+	if _, _, err := read.Run(context.Background()); err != nil {
+		t.Fatalf("read Run() error = %v", err)
+	}
+	if got := read.LatencyP99NS(); got != 342016 {
+		t.Fatalf("read LatencyP99NS() = %f, want 342016", got)
+	}
+	write := &fioWorkload{rw: "randwrite", bs: "4k", size: "1M", iodepth: 1, runtimeSeconds: 1}
+	if _, _, err := write.Run(context.Background()); err != nil {
+		t.Fatalf("write Run() error = %v", err)
+	}
+	if got := write.LatencyP99NS(); got != 777 {
+		t.Fatalf("write LatencyP99NS() = %f, want 777", got)
+	}
+}
+
+func TestFioWorkloadWithoutPercentileLeavesP99Zero(t *testing.T) {
+	writeFakeFio(t, `{"jobs":[{"read":{"iops":10,"bw_bytes":4096,"lat_ns":{"mean":150000},"clat_ns":{"mean":149000}}}]}`)
+	workload := &fioWorkload{rw: "randread", bs: "4k", size: "1M", iodepth: 1, runtimeSeconds: 1}
+	if _, _, err := workload.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got := workload.LatencyP99NS(); got != 0 {
+		t.Fatalf("LatencyP99NS() = %f, want 0", got)
+	}
+}
+
+func TestCPUStealWorkloadComputesStealPercent(t *testing.T) {
+	first := []uint64{100, 0, 50, 300, 0, 0, 10, 4, 0, 0}
+	second := []uint64{200, 0, 150, 400, 0, 0, 10, 104, 0, 0}
+	calls := 0
+	workload := &cpuStealWorkload{interval: time.Millisecond}
+	workload.readStat = func() ([]uint64, error) {
+		calls++
+		if calls == 1 {
+			return first, nil
+		}
+		return second, nil
+	}
+	elapsed, _, err := workload.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if elapsed <= 0 {
+		t.Fatalf("elapsed = %v, want positive", elapsed)
+	}
+	// total delta = 100+100+100+100 = 400, steal delta = 100 -> 25%
+	if got := workload.stealPercent; got != 25 {
+		t.Fatalf("stealPercent = %f, want 25", got)
+	}
+	throughput, unit := workload.Throughput(0, elapsed)
+	if throughput != 25 || unit != "%" {
+		t.Fatalf("Throughput() = %f %q, want 25 %%", throughput, unit)
+	}
+	if !strings.Contains(workload.Detail(), "steal=25.00%") {
+		t.Fatalf("Detail() = %q, want steal percentage", workload.Detail())
+	}
+	if workload.MaxIterations() != 1 || !workload.SkipWarmup() {
+		t.Fatalf("steal probe must run once without warmup")
+	}
+	if workload.Name() != "CPU Steal (/proc/stat)" || workload.Category() != "CPU" {
+		t.Fatalf("unexpected identity %q / %q", workload.Name(), workload.Category())
+	}
+}
+
+func TestCPUStealWorkloadFailsWhenCountersDoNotAdvance(t *testing.T) {
+	static := []uint64{100, 0, 50, 300, 0, 0, 10, 4}
+	workload := &cpuStealWorkload{interval: time.Millisecond, readStat: func() ([]uint64, error) {
+		return static, nil
+	}}
+	_, _, err := workload.Run(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "did not advance") {
+		t.Fatalf("Run() error = %v, want counters-did-not-advance", err)
+	}
+	if err := workload.Validate(); err == nil {
+		t.Fatal("Validate() must fail without samples")
+	}
+}
+
+func TestCPUStealWorkloadFailsWhenCountersMoveBackwards(t *testing.T) {
+	first := []uint64{100, 0, 50, 300, 0, 0, 10, 4}
+	backwards := []uint64{50, 0, 50, 300, 0, 0, 10, 4}
+	calls := 0
+	workload := &cpuStealWorkload{interval: time.Millisecond}
+	workload.readStat = func() ([]uint64, error) {
+		calls++
+		if calls == 1 {
+			return first, nil
+		}
+		return backwards, nil
+	}
+	if _, _, err := workload.Run(context.Background()); err == nil {
+		t.Fatal("Run() must fail when counters move backwards")
+	}
+}
+
+func TestStealProbeRegisteredPerPlatform(t *testing.T) {
+	defs := DefaultDefinitions()
+	found := false
+	for _, def := range defs {
+		if def.Name == "CPU Steal (/proc/stat)" {
+			found = true
+		}
+	}
+	if runtime.GOOS == "linux" && !found {
+		t.Fatal("steal probe missing on linux")
+	}
+	if runtime.GOOS != "linux" && found {
+		t.Fatal("steal probe registered outside linux")
+	}
+}
+
+func TestReadProcStatCPULinux(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("/proc/stat is Linux-only")
+	}
+	values, err := readProcStatCPU()
+	if err != nil {
+		t.Fatalf("readProcStatCPU() error = %v", err)
+	}
+	if len(values) < 8 {
+		t.Fatalf("readProcStatCPU() = %v, want at least 8 counters", values)
 	}
 }

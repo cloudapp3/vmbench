@@ -94,7 +94,23 @@ func formatLatency(result *ResultEntry) string {
 	if result == nil || result.AvgNSPerAccess <= 0 {
 		return "-"
 	}
-	return fmt.Sprintf("%.2f ns/op", result.AvgNSPerAccess)
+	metric := fmt.Sprintf("%.2f ns/op", result.AvgNSPerAccess)
+	if result.LatencyP99NS > 0 {
+		metric += " (p99 " + formatLatencyP99NS(result.LatencyP99NS) + ")"
+	}
+	return metric
+}
+
+// formatLatencyP99NS renders a nanosecond latency with a human-readable unit.
+func formatLatencyP99NS(ns float64) string {
+	switch {
+	case ns >= 1e6:
+		return fmt.Sprintf("%.2f ms", ns/1e6)
+	case ns >= 1e3:
+		return fmt.Sprintf("%.2f µs", ns/1e3)
+	default:
+		return fmt.Sprintf("%.2f ns", ns)
+	}
 }
 
 func formatDetail(result *ResultEntry) string {

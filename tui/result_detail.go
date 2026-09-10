@@ -56,8 +56,11 @@ func viewResultDetail(m Model) string {
 		{Key: i18n.T("tui.col.time"), Value: tuiTime(res)},
 		{Key: i18n.T("tui.col.throughput"), Value: tuiThroughput(res)},
 		{Key: i18n.T("tui.col.latency"), Value: tuiLatency(res)},
-		{Key: i18n.T("tui.col.iterations"), Value: fmt.Sprintf("%d", res.Iterations)},
 	}
+	if res.LatencyP99NS > 0 {
+		rows = append(rows, comp.KV{Key: i18n.T("tui.col.latencyP99"), Value: formatLatencyP99NS(res.LatencyP99NS)})
+	}
+	rows = append(rows, comp.KV{Key: i18n.T("tui.col.iterations"), Value: fmt.Sprintf("%d", res.Iterations)})
 	if res.BytesProcessed > 0 {
 		rows = append(rows, comp.KV{Key: i18n.T("tui.col.bytes"), Value: fmt.Sprintf("%d", res.BytesProcessed)})
 	}

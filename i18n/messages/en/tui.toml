@@ -262,6 +262,9 @@ other = "Bytes"
 [tui.col.ops]
 other = "Ops"
 
+[tui.col.latencyP99]
+other = "Latency p99"
+
 [tui.hint.detail]
 other = "detail"
 
@@ -384,9 +387,6 @@ other = "Features"
 
 [tui.sys.arch]
 other = "Arch"
-
-[tui.sys.cache]
-other = "Cache"
 
 [tui.checkupRunning.title]
 other = "◈ Running Checkup"

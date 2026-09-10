@@ -238,6 +238,24 @@ func ExternalHardwareDefinitionsForTools(diskPath string, hardwareTools []string
 	return defs
 }
 
+// PlatformProbeDefinitions returns built-in probe workloads that need no
+// external tool, such as CPU steal sampling (Linux only). Callers assembling
+// the full workload list for a run must append these; per-tool definition
+// lists deliberately exclude them so missing-tool checks stay tool-scoped.
+func PlatformProbeDefinitions() []Definition {
+	if runtime.GOOS != "linux" {
+		return nil
+	}
+	return []Definition{{
+		Name:        "CPU Steal (/proc/stat)",
+		Category:    "CPU",
+		Description: "steal% sampled from /proc/stat over 5s",
+		Factory: func(string) bench.Workload {
+			return &cpuStealWorkload{}
+		},
+	}}
+}
+
 // HardwareTools returns selectable external hardware tool metadata in display order.
 func HardwareTools() []HardwareToolSpec {
 	out := make([]HardwareToolSpec, 0, len(hardwareToolOrder))
@@ -389,7 +407,7 @@ func normalizeHardwareToolID(value string) string {
 // list command and MCP capabilities). Network diagnostics are not run-scope
 // workloads anymore; they live in the checkup sections.
 func DefaultDefinitions() []Definition {
-	return ExternalHardwareDefinitionsForTools("", nil)
+	return append(ExternalHardwareDefinitionsForTools("", nil), PlatformProbeDefinitions()...)
 }
 
 // --- helpers ---
@@ -722,6 +740,112 @@ func (w *sysbenchMemoryWorkload) isLatencyProbe() bool {
 	return strings.EqualFold(w.accessMode, "rnd") || strings.EqualFold(w.blockSize, "64")
 }
 
+// cpuStealWorkload samples CPU steal time from the aggregate /proc/stat cpu
+// line. It is a diagnostic probe, not a load generator: counters are read twice
+// across a fixed interval and steal% is the steal jiffy share of the delta.
+type cpuStealWorkload struct {
+	interval     time.Duration
+	readStat     func() ([]uint64, error) // injectable for tests
+	stealPercent float64
+	totalDelta   uint64
+	detailText   string
+}
+
+func (w *cpuStealWorkload) Name() string        { return "CPU Steal (/proc/stat)" }
+func (w *cpuStealWorkload) Category() string    { return "CPU" }
+func (w *cpuStealWorkload) Description() string { return "steal% sampled from /proc/stat over 5s" }
+func (w *cpuStealWorkload) SkipWarmup() bool    { return true }
+func (w *cpuStealWorkload) MaxIterations() int  { return 1 }
+func (w *cpuStealWorkload) Detail() string      { return w.detailText }
+func (w *cpuStealWorkload) Throughput(int64, time.Duration) (float64, string) {
+	return w.stealPercent, "%"
+}
+
+func (w *cpuStealWorkload) Validate() error {
+	if w.totalDelta == 0 {
+		return fmt.Errorf("cpu steal: no /proc/stat samples collected")
+	}
+	return nil
+}
+
+func (w *cpuStealWorkload) Run(ctx context.Context) (time.Duration, int64, error) {
+	interval := w.interval
+	if interval <= 0 {
+		interval = 5 * time.Second
+	}
+	w.stealPercent = 0
+	w.totalDelta = 0
+	w.detailText = ""
+	read := w.readStat
+	if read == nil {
+		read = readProcStatCPU
+	}
+	first, err := read()
+	if err != nil {
+		return 0, 0, fmt.Errorf("cpu steal: %w", err)
+	}
+	start := time.Now()
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return time.Since(start), 0, fmt.Errorf("cpu steal: %w", ctx.Err())
+	case <-timer.C:
+	}
+	second, err := read()
+	if err != nil {
+		return time.Since(start), 0, fmt.Errorf("cpu steal: %w", err)
+	}
+	elapsed := time.Since(start)
+	if len(second) != len(first) {
+		return elapsed, 0, fmt.Errorf("cpu steal: /proc/stat field count changed during sampling (%d -> %d)", len(first), len(second))
+	}
+	total := uint64(0)
+	for i := range second {
+		if second[i] < first[i] {
+			return elapsed, 0, fmt.Errorf("cpu steal: /proc/stat counters moved backwards")
+		}
+		total += second[i] - first[i]
+	}
+	if total == 0 {
+		return elapsed, 0, fmt.Errorf("cpu steal: /proc/stat counters did not advance over %s", interval)
+	}
+	percent := func(delta uint64) float64 { return float64(delta) / float64(total) * 100 }
+	w.totalDelta = total
+	w.stealPercent = percent(second[7] - first[7])
+	w.detailText = fmt.Sprintf("steal=%.2f%% user=%.1f%% sys=%.1f%% idle=%.1f%% over %s",
+		w.stealPercent, percent(second[0]-first[0]), percent(second[2]-first[2]), percent(second[3]-first[3]), interval)
+	return elapsed, 0, nil
+}
+
+// readProcStatCPU parses the aggregate cpu line of /proc/stat into jiffy
+// counters: user nice system idle iowait irq softirq steal guest guest_nice.
+func readProcStatCPU() ([]uint64, error) {
+	data, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		return nil, err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if !strings.HasPrefix(line, "cpu ") {
+			continue
+		}
+		fields := strings.Fields(line)[1:]
+		values := make([]uint64, 0, len(fields))
+		for _, field := range fields {
+			value, err := strconv.ParseUint(field, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("invalid /proc/stat field %q", field)
+			}
+			values = append(values, value)
+		}
+		if len(values) < 8 {
+			return nil, fmt.Errorf("/proc/stat cpu line has %d fields, expected at least 8", len(values))
+		}
+		return values, nil
+	}
+	return nil, fmt.Errorf("/proc/stat has no aggregate cpu line")
+}
+
 // opensslWorkload wraps openssl speed.
 type opensslWorkload struct {
 	algo    string
@@ -794,6 +918,7 @@ type fioWorkload struct {
 	bwBytes        int64
 	iops           float64
 	latencyNS      float64
+	latencyP99NS   float64
 	command        string
 }
 
@@ -830,6 +955,9 @@ func (w *fioWorkload) Throughput(int64, time.Duration) (float64, string) {
 }
 func (w *fioWorkload) AverageLatencyNS(int64, time.Duration) float64 {
 	return w.latencyNS
+}
+func (w *fioWorkload) LatencyP99NS() float64 {
+	return w.latencyP99NS
 }
 
 func (w *fioWorkload) Run(ctx context.Context) (time.Duration, int64, error) {
@@ -880,7 +1008,8 @@ func (w *fioWorkload) Run(ctx context.Context) (time.Duration, int64, error) {
 					Mean float64 `json:"mean"`
 				} `json:"lat_ns"`
 				ClatNS struct {
-					Mean float64 `json:"mean"`
+					Mean       float64            `json:"mean"`
+					Percentile map[string]float64 `json:"percentile"`
 				} `json:"clat_ns"`
 			} `json:"read"`
 			Write struct {
@@ -890,7 +1019,8 @@ func (w *fioWorkload) Run(ctx context.Context) (time.Duration, int64, error) {
 					Mean float64 `json:"mean"`
 				} `json:"lat_ns"`
 				ClatNS struct {
-					Mean float64 `json:"mean"`
+					Mean       float64            `json:"mean"`
+					Percentile map[string]float64 `json:"percentile"`
 				} `json:"clat_ns"`
 			} `json:"write"`
 		} `json:"jobs"`
@@ -905,10 +1035,12 @@ func (w *fioWorkload) Run(ctx context.Context) (time.Duration, int64, error) {
 		w.iops = result.Jobs[0].Write.IOPS
 		w.bwBytes = result.Jobs[0].Write.BWBytes
 		w.latencyNS = firstPositiveFloat(result.Jobs[0].Write.LatNS.Mean, result.Jobs[0].Write.ClatNS.Mean)
+		w.latencyP99NS = fioPercentileNS(result.Jobs[0].Write.ClatNS.Percentile, 99)
 	} else {
 		w.iops = result.Jobs[0].Read.IOPS
 		w.bwBytes = result.Jobs[0].Read.BWBytes
 		w.latencyNS = firstPositiveFloat(result.Jobs[0].Read.LatNS.Mean, result.Jobs[0].Read.ClatNS.Mean)
+		w.latencyP99NS = fioPercentileNS(result.Jobs[0].Read.ClatNS.Percentile, 99)
 	}
 
 	metric := w.iops
@@ -934,6 +1066,17 @@ func fioIOEngine() string {
 	default:
 		return "libaio"
 	}
+}
+
+// fioPercentileNS extracts one percentile (in nanoseconds) from an fio
+// clat_ns percentile object keyed by strings such as "99.000000".
+func fioPercentileNS(percentile map[string]float64, target float64) float64 {
+	for key, value := range percentile {
+		if parsed, err := strconv.ParseFloat(strings.TrimSpace(key), 64); err == nil && parsed == target {
+			return value
+		}
+	}
+	return 0
 }
 
 func (w *fioWorkload) isRandom() bool {

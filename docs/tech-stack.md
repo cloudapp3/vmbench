@@ -105,12 +105,13 @@ cmd/vmbench/mcp.go
 - `bytes_processed`
 - `ops_processed`
 - `avg_ns_per_access`
+- `latency_p99_ns`（可选，仅实现 `LatencyPercentileWorkload` 的 workload，如 fio）
 - `detail`
 - `error`
 
 `bytes_processed` / `ops_processed` 是可选累计量：只有 workload 通过 `ProcessedMetricReporter` 明确声明 `ProcessedBytes` / `ProcessedOperations`，且所有成功 sample 的语义一致时才写入。dd 与 HTTP download/upload 可写累计 bytes，sysbench memory latency 只有解析到 total events 时才写 ops；events/s、IOPS、MB/s、score、latency 或其他语义未知值不会被猜测到任一字段。
 
-报告根节点使用 `schema_version: 2`。`run` 报告固定 `scope=hardware`、`extensions=false`，不再输出 `iperf_hosts` 与 catalog provenance 字段；旧版本网络报告中的这些字段仍可被 compare/history 解析。项目不再包含 `score/` 包，也不再输出 benchmark 总分。
+报告根节点使用 `schema_version: 2`。`run` 报告固定 `scope=hardware`、`extensions=false`，不再输出 `iperf_hosts` 与 catalog provenance 字段；旧版本网络报告中的这些字段仍可被 compare/history 解析。评分以独立派生层回归：`score/` 包的 `Evaluate` 为确定性纯函数（版本化基线 + 覆盖率披露，见 `docs/score-design.md`），报告本身仍只含原始指标。
 
 Runner 行为：
 

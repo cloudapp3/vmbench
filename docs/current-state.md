@@ -13,7 +13,7 @@ vmbench 是一个 Go 编写的跨平台 VPS / 主机测评工具，面向三类�
 
 产品原则保持不变：
 
-- 只输出原始指标，不输出综合总分
+- 原始指标是唯一事实来源；综合评估只存在于派生层（`vmbench score` 确定性评分），不回写原始报告
 - 保留结构化错误和 detail
 - Compare 只基于 time / throughput / latency
 - 体检 delta 只在 unit/protocol/provider/node/catalog revision 兼容时计算

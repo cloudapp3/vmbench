@@ -1,0 +1,327 @@
+{
+  "schema_version": 1,
+  "revision": "2026-09.1",
+  "grades": {
+    "s": 90,
+    "a": 80,
+    "b": 65,
+    "c": 50
+  },
+  "metrics": {
+    "cpu.sysbench.single": {
+      "dimension": "cpu",
+      "weight": 0.4,
+      "source": { "workload": "CPU Single-Core (sysbench)", "field": "throughput_per_sec" },
+      "units": ["events/sec"],
+      "class": "log",
+      "floor": 500,
+      "ceiling": 10000,
+      "requires_tool": "sysbench"
+    },
+    "cpu.sysbench.multi": {
+      "dimension": "cpu",
+      "weight": 0.3,
+      "source": { "workload": "CPU Multi-Core (sysbench)", "field": "throughput_per_sec" },
+      "units": ["events/sec"],
+      "class": "log",
+      "floor": 2000,
+      "ceiling": 150000,
+      "requires_tool": "sysbench"
+    },
+    "cpu.openssl.aes": {
+      "dimension": "cpu",
+      "weight": 0.15,
+      "source": { "workload": "OpenSSL AES-256-CBC", "field": "throughput_per_sec" },
+      "units": ["MiB/s"],
+      "class": "log",
+      "floor": 200,
+      "ceiling": 8000,
+      "requires_tool": "openssl"
+    },
+    "cpu.openssl.sha": {
+      "dimension": "cpu",
+      "weight": 0.15,
+      "source": { "workload": "OpenSSL SHA256", "field": "throughput_per_sec" },
+      "units": ["MiB/s"],
+      "class": "log",
+      "floor": 150,
+      "ceiling": 5000,
+      "requires_tool": "openssl"
+    },
+    "cpu.winsat": {
+      "dimension": "cpu",
+      "weight": 1.0,
+      "source": { "workload": "WinSAT CPU", "field": "throughput_per_sec" },
+      "units": ["MB/s"],
+      "class": "log",
+      "floor": 5,
+      "ceiling": 120,
+      "requires_tool": "winsat",
+      "platform": "windows"
+    },
+    "mem.read.bw": {
+      "dimension": "memory",
+      "weight": 0.35,
+      "source": { "workload": "Memory Read Bandwidth (sysbench)", "field": "throughput_per_sec" },
+      "units": ["MiB/s"],
+      "class": "log",
+      "floor": 2000,
+      "ceiling": 40000,
+      "requires_tool": "sysbench"
+    },
+    "mem.write.bw": {
+      "dimension": "memory",
+      "weight": 0.25,
+      "source": { "workload": "Memory Write Bandwidth (sysbench)", "field": "throughput_per_sec" },
+      "units": ["MiB/s"],
+      "class": "log",
+      "floor": 1500,
+      "ceiling": 35000,
+      "requires_tool": "sysbench"
+    },
+    "mem.rand.lat": {
+      "dimension": "memory",
+      "weight": 0.4,
+      "source": { "workload": "Memory Random Read Latency (sysbench)", "field": "avg_ns_per_access" },
+      "class": "band",
+      "bands": { "excellent": 60, "good": 90, "fair": 150, "cutoff": 400 },
+      "requires_tool": "sysbench"
+    },
+    "mem.stream": {
+      "dimension": "memory",
+      "weight": 0.3,
+      "source": { "workload": "Memory Bandwidth (STREAM)", "field": "throughput_per_sec" },
+      "units": ["MB/s"],
+      "class": "log",
+      "floor": 2000,
+      "ceiling": 60000,
+      "requires_tool": "stream",
+      "optional": true,
+      "fallback_for": "mem.read.bw"
+    },
+    "mem.mbw": {
+      "dimension": "memory",
+      "weight": 0.3,
+      "source": { "workload": "Memory Bandwidth (mbw)", "field": "throughput_per_sec" },
+      "units": ["MiB/s"],
+      "class": "log",
+      "floor": 2000,
+      "ceiling": 40000,
+      "requires_tool": "mbw",
+      "optional": true,
+      "fallback_for": "mem.read.bw"
+    },
+    "mem.winsat": {
+      "dimension": "memory",
+      "weight": 1.0,
+      "source": { "workload": "WinSAT Memory", "field": "throughput_per_sec" },
+      "units": ["MB/s"],
+      "class": "log",
+      "floor": 5,
+      "ceiling": 150,
+      "requires_tool": "winsat",
+      "platform": "windows"
+    },
+    "disk.rand4k.read.q32": {
+      "dimension": "disk",
+      "weight": 0.25,
+      "source": { "workload": "Disk 4K Random Read Q32 (fio)", "field": "throughput_per_sec" },
+      "units": ["IOPS"],
+      "class": "log",
+      "floor": 3000,
+      "ceiling": 400000,
+      "requires_tool": "fio"
+    },
+    "disk.rand4k.write.q32": {
+      "dimension": "disk",
+      "weight": 0.15,
+      "source": { "workload": "Disk 4K Random Write Q32 (fio)", "field": "throughput_per_sec" },
+      "units": ["IOPS"],
+      "class": "log",
+      "floor": 2000,
+      "ceiling": 300000,
+      "requires_tool": "fio"
+    },
+    "disk.rand4k.read.q1.lat": {
+      "dimension": "disk",
+      "weight": 0.25,
+      "source": { "workload": "Disk 4K Random Read Q1 (fio)", "field": "latency_p99_ns", "fallback_field": "avg_ns_per_access" },
+      "class": "band",
+      "bands": { "excellent": 100000, "good": 300000, "fair": 1000000, "cutoff": 10000000 },
+      "requires_tool": "fio"
+    },
+    "disk.rand4k.read.q1.iops": {
+      "dimension": "disk",
+      "weight": 0.1,
+      "source": { "workload": "Disk 4K Random Read Q1 (fio)", "field": "throughput_per_sec" },
+      "units": ["IOPS"],
+      "class": "log",
+      "floor": 500,
+      "ceiling": 30000,
+      "requires_tool": "fio"
+    },
+    "disk.rand4k.write.q1.lat": {
+      "dimension": "disk",
+      "weight": 0.1,
+      "source": { "workload": "Disk 4K Random Write Q1 (fio)", "field": "latency_p99_ns", "fallback_field": "avg_ns_per_access" },
+      "class": "band",
+      "bands": { "excellent": 150000, "good": 500000, "fair": 2000000, "cutoff": 15000000 },
+      "requires_tool": "fio"
+    },
+    "disk.seq1m.read.q8": {
+      "dimension": "disk",
+      "weight": 0.1,
+      "source": { "workload": "Disk 1M Sequential Read Q8 (fio)", "field": "throughput_per_sec" },
+      "units": ["MiB/s"],
+      "class": "log",
+      "floor": 100,
+      "ceiling": 15000,
+      "requires_tool": "fio"
+    },
+    "disk.seq1m.write.q8": {
+      "dimension": "disk",
+      "weight": 0.05,
+      "source": { "workload": "Disk 1M Sequential Write Q8 (fio)", "field": "throughput_per_sec" },
+      "units": ["MiB/s"],
+      "class": "log",
+      "floor": 80,
+      "ceiling": 12000,
+      "requires_tool": "fio"
+    },
+    "disk.dd.read": {
+      "dimension": "disk",
+      "weight": 0.08,
+      "source": { "workload": "Disk Read (dd)", "field": "throughput_per_sec" },
+      "units": ["MiB/s"],
+      "class": "log",
+      "floor": 50,
+      "ceiling": 5000,
+      "requires_tool": "dd",
+      "optional": true,
+      "fallback_for": "disk.seq1m.read.q8"
+    },
+    "disk.dd.write": {
+      "dimension": "disk",
+      "weight": 0.05,
+      "source": { "workload": "Disk Write (dd)", "field": "throughput_per_sec" },
+      "units": ["MiB/s"],
+      "class": "log",
+      "floor": 50,
+      "ceiling": 5000,
+      "requires_tool": "dd",
+      "optional": true,
+      "fallback_for": "disk.seq1m.write.q8"
+    },
+    "disk.winsat": {
+      "dimension": "disk",
+      "weight": 1.0,
+      "source": { "workload": "WinSAT Disk", "field": "throughput_per_sec" },
+      "units": ["MB/s"],
+      "class": "log",
+      "floor": 20,
+      "ceiling": 2000,
+      "requires_tool": "winsat",
+      "platform": "windows"
+    },
+    "net.download": {
+      "dimension": "network",
+      "weight": 0.4,
+      "source": { "workload": "", "field": "download_mbps" },
+      "class": "log",
+      "floor": 50,
+      "ceiling": 5000,
+      "requires_kind": "checkup"
+    },
+    "net.upload": {
+      "dimension": "network",
+      "weight": 0.3,
+      "source": { "workload": "", "field": "upload_mbps" },
+      "class": "log",
+      "floor": 30,
+      "ceiling": 3000,
+      "requires_kind": "checkup"
+    },
+    "net.ping.jitter": {
+      "dimension": "network",
+      "weight": 0.3,
+      "source": { "workload": "", "field": "jitter_ms" },
+      "class": "band",
+      "bands": { "excellent": 1, "good": 3, "fair": 8, "cutoff": 50 },
+      "requires_kind": "checkup"
+    },
+    "net.ping.latency": {
+      "dimension": "network",
+      "weight": 0,
+      "source": { "workload": "", "field": "avg_latency_ms" },
+      "class": "band",
+      "bands": { "excellent": 10, "good": 50, "fair": 120, "cutoff": 250 },
+      "requires_kind": "checkup",
+      "optional": true,
+      "veto_only": true
+    },
+    "stability.cpu.steal": {
+      "dimension": "stability",
+      "weight": 0.5,
+      "source": { "workload": "CPU Steal (/proc/stat)", "field": "throughput_per_sec" },
+      "units": ["%"],
+      "class": "band",
+      "bands": { "excellent": 0.5, "good": 1.5, "fair": 3, "cutoff": 8 },
+      "platform": "linux",
+      "optional": true
+    },
+    "stability.samples.cv": {
+      "dimension": "stability",
+      "weight": 0.3,
+      "source": { "workload": "", "field": "samples_cv" },
+      "class": "band",
+      "bands": { "excellent": 0.05, "good": 0.15, "fair": 0.3, "cutoff": 0.6 }
+    },
+    "stability.net.loss": {
+      "dimension": "stability",
+      "weight": 0.2,
+      "source": { "workload": "", "field": "packet_loss" },
+      "class": "band",
+      "bands": { "excellent": 0, "good": 0.005, "fair": 0.02, "cutoff": 0.1 },
+      "requires_kind": "checkup"
+    }
+  },
+  "dimensions": {
+    "cpu": { "weight": 0.3 },
+    "memory": { "weight": 0.2 },
+    "disk": { "weight": 0.3 },
+    "network": { "weight": 0.12 },
+    "stability": { "weight": 0.08 }
+  },
+  "profiles": {
+    "web": {
+      "weights": { "cpu": 0.32, "memory": 0.22, "disk": 0.26, "network": 0.13, "stability": 0.07 },
+      "vetoes": [
+        { "metric": "disk.rand4k.read.q1.lat", "op": "gt", "value": 2000000, "unit": "ns", "cap": "C" },
+        { "metric": "stability.net.loss", "op": "gt", "value": 0.02, "unit": "fraction", "cap": "C" },
+        { "metric": "cpu.sysbench.single", "op": "lt", "value": 800, "unit": "events/sec", "cap": "C" }
+      ]
+    },
+    "build": {
+      "weights": { "cpu": 0.48, "memory": 0.28, "disk": 0.19, "network": 0, "stability": 0.05 },
+      "vetoes": [
+        { "metric": "cpu.sysbench.multi", "op": "lt", "value": 3000, "unit": "events/sec", "cap": "C" },
+        { "metric": "disk.seq1m.write.q8", "op": "lt", "value": 50, "unit": "MiB/s", "cap": "C" }
+      ]
+    },
+    "proxy": {
+      "weights": { "cpu": 0.28, "memory": 0.12, "disk": 0.07, "network": 0.38, "stability": 0.15 },
+      "vetoes": [
+        { "metric": "net.ping.latency", "op": "gt", "value": 150, "unit": "ms", "cap": "C" },
+        { "metric": "stability.net.loss", "op": "gt", "value": 0.01, "unit": "fraction", "cap": "C" },
+        { "metric": "cpu.sysbench.single", "op": "lt", "value": 600, "unit": "events/sec", "cap": "C" }
+      ]
+    },
+    "storage": {
+      "weights": { "cpu": 0.08, "memory": 0.17, "disk": 0.55, "network": 0.13, "stability": 0.07 },
+      "vetoes": [
+        { "metric": "disk.rand4k.read.q32", "op": "lt", "value": 15000, "unit": "IOPS", "cap": "C" },
+        { "metric": "disk.seq1m.read.q8", "op": "lt", "value": 100, "unit": "MiB/s", "cap": "C" }
+      ]
+    }
+  }
+}

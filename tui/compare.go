@@ -198,6 +198,7 @@ func appendDeltaRows(rows []comp.TableRow, name string, rA, rB *gbreport.ResultE
 		name = ""
 	}
 	add("latency", valueLatency(rA), valueLatency(rB), "ns/op", true)
+	add("latency p99", valueLatencyP99(rA), valueLatencyP99(rB), "ns", true)
 	return rows
 }
 
@@ -234,6 +235,13 @@ func valueLatency(r *gbreport.ResultEntry) float64 {
 		return 0
 	}
 	return r.AvgNSPerAccess
+}
+
+func valueLatencyP99(r *gbreport.ResultEntry) float64 {
+	if r == nil || strings.TrimSpace(r.Error) != "" {
+		return 0
+	}
+	return r.LatencyP99NS
 }
 
 func firstThroughputUnit(items ...*gbreport.ResultEntry) string {

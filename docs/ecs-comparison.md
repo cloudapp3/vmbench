@@ -44,7 +44,7 @@
 | 邮件端口 | portchecker（25 端口可建邮局） | portchecker | mail section：8 端口顺序探测，`open/refused/timeout/error` 分类 | 对齐 |
 | 流媒体解锁 | UnlockTests 二进制 + shell 双版本 | UnlockTests 并发，区域可选（0–22） | UnlockTests 200+ 服务，13 个区域子集（`--media-set`） | 同源同能力 |
 | 热门网站/Telegram | `-web`/`-tgdc` 开关 | 有 | reachability section：Google/GitHub/Cloudflare HTTPS + Telegram DC TCP，带 latency/status | 对齐 |
-| 综合评分 | 无总分（展示原始数据） | 无总分（`-analysis` 为汇总展示） | **明文原则：不输出总分/等级** | 一致；此维度不是差距 |
+| 综合评分 | 无总分（展示原始数据） | 无总分（`-analysis` 为汇总展示） | 原始指标优先；派生评估走独立命令 `vmbench score`（版本化基线，确定性、可复现） | vmbench 多出可复现的派生层，原始指标地位不变 |
 | 交互界面 | 交互式菜单（三层 `-m` 选择） | 菜单 + 完整 flags | Bubble Tea TUI（配置/运行/结果/对比，8 主题，80x24 适配） | 各有取向：菜单更低门槛，TUI 更完整 |
 | 多语言 | 中文默认，`-en` | 中文默认，`-l en/zh` | CLI/报告为英文；文档有中文 | **vmbench 缺中文输出**，对目标社区是实际门槛 |
 | 硬件工具策略 | 运行时自动安装（改系统） | 内置替代实现/自带二进制 | 外部工具 fail-closed，缺失时结构化报错 + Debian/Ubuntu 安装提示 | 设计取舍：vmbench 不伪造数字，代价是首次使用多一步 `apt install sysbench fio` |

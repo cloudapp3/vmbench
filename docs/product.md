@@ -56,9 +56,9 @@ vmbench 输出的是原始测量数据：
 - optional cumulative bytes / ops processed（仅语义明确时输出）
 - detail / error
 
-硬件默认 workload 会拆分输出 memory read/write/latency 与 fio 4K/1M 多队列深度结果，便于直接比较具体瓶颈；这些细分项仍然只是原始指标，不参与综合打分。
+硬件默认 workload 会拆分输出 memory read/write/latency 与 fio 4K/1M 多队列深度结果，便于直接比较具体瓶颈；这些细分项仍然只是原始指标。
 
-不输出综合评分、等级或 category score。
+原始指标是唯一事实来源。确定性派生评估（综合 index/等级）由独立命令 `vmbench score` 基于版本化基线生成，派生命令不会回写或修改原始报告。
 
 体检 JSON 使用 schema v2 envelope：`report_kind`、`report_id`、app build、system、timestamps/duration、规范化 config、catalog provenance 和九个 section，同时保留旧 `version`/Unix time 字段给 v1 consumer。Route 结果包含 `resolved_target/destination_reached/status`，Ping 结果包含 `connection_state`。体检 HTML 展示硬件 workload、网络身份、完整 route hops、ping、speed provider、IP quality、网站/TG、mail、media 及其 detail/error，而不是只给 section 摘要。
 
@@ -81,6 +81,7 @@ vmbench --node-catalog auto --node-revision 2026-07-13.1 --save-history
 vmbench mcp serve --transport stdio
 vmbench compare a.json b.json
 vmbench history compare --last 3
+vmbench score report.json
 vmbench nodes list --node-catalog embedded
 vmbench nodes health --node-catalog auto --ip-family v6
 ```
@@ -166,7 +167,7 @@ vmbench nodes health --node-catalog auto --kind route --ip-family v6 --json
 | `vmbench_sysinfo` | 输出当前主机系统信息和 warning |
 | `vmbench_run` | 运行基准（MCP 默认 `iterations=1`；不带 section 参数只跑 hardware，preset/only/skip 选择网络 section 后返回体检报告） |
 
-MCP 输出仍然遵守 vmbench 的产品原则：只返回原始指标和结构化诊断，不输出 benchmark 总分、等级或 category score。IP Quality 的风险评分属于业务诊断，不是 benchmark 总分。
+MCP 输出仍然遵守 vmbench 的产品原则：只返回原始指标和结构化诊断；派生评估由 `vmbench score` CLI 提供，MCP 本身不评分。IP Quality 的风险评分属于业务诊断，不是 benchmark 总分。
 
 安全边界：
 

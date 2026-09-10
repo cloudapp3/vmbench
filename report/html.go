@@ -196,7 +196,11 @@ func formatHTMLLatency(result *ResultEntry) string {
 	if result == nil || result.AvgNSPerAccess <= 0 {
 		return "-"
 	}
-	return fmt.Sprintf("%.2f ns/op", result.AvgNSPerAccess)
+	metric := fmt.Sprintf("%.2f ns/op", result.AvgNSPerAccess)
+	if result.LatencyP99NS > 0 {
+		metric += " (p99 " + formatLatencyP99NS(result.LatencyP99NS) + ")"
+	}
+	return metric
 }
 
 func formatHTMLDetail(result *ResultEntry) string {

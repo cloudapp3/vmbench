@@ -68,6 +68,12 @@ type LatencyWorkload interface {
 	AverageLatencyNS(processed int64, elapsed time.Duration) float64
 }
 
+// LatencyPercentileWorkload reports a tail (p99) completion latency in
+// nanoseconds from the most recent successful Run.
+type LatencyPercentileWorkload interface {
+	LatencyP99NS() float64
+}
+
 // DetailReporter can return a human-readable detail string for display in reports.
 type DetailReporter interface {
 	Detail() string

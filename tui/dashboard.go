@@ -187,13 +187,6 @@ func dashboardSysExpanded(m Model, width int) string {
 	if cpu.MicroArch != "" {
 		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.PadCells(i18n.T("tui.sys.arch"), 9)+"  ")+lipgloss.NewStyle().Foreground(t.Fg).Render(cpu.MicroArch))
 	}
-	if len(cpu.CacheSizes) > 0 {
-		var parts []string
-		for k, v := range cpu.CacheSizes {
-			parts = append(parts, fmt.Sprintf("%s %s", k, formatBytesSmall(uint64(v))))
-		}
-		lines = append(lines, lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.PadCells(i18n.T("tui.sys.cache"), 9)+"  ")+lipgloss.NewStyle().Foreground(t.Fg).Render(strings.Join(parts, "  ")))
-	}
 	if len(lines) == 0 {
 		return ""
 	}
@@ -205,16 +198,6 @@ func dashboardSysExpanded(m Model, width int) string {
 		Width:  width,
 	}
 	return card.Render()
-}
-
-func formatBytesSmall(value uint64) string {
-	if value < 1024 {
-		return fmt.Sprintf("%dB", value)
-	}
-	if value < 1024*1024 {
-		return fmt.Sprintf("%dK", value/1024)
-	}
-	return fmt.Sprintf("%dM", value/(1024*1024))
 }
 
 func truncStr(s string, max int) string {

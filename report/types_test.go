@@ -76,3 +76,31 @@ func TestHasFailures(t *testing.T) {
 func zeroSystemInfo() sysinfo.SystemInfo {
 	return sysinfo.SystemInfo{}
 }
+
+func TestConvertDetailMapsLatencyP99(t *testing.T) {
+	entry := convertDetail(&bench.RunDetail{
+		MedianTime:       5 * time.Millisecond,
+		Throughput:       1000,
+		ThroughputUnit:   "IOPS",
+		AverageLatencyNS: 150000,
+		LatencyP99NS:     342016,
+	})
+	if entry == nil || entry.LatencyP99NS != 342016 {
+		t.Fatalf("latency_p99_ns = %+v, want 342016", entry)
+	}
+}
+
+func TestLatencyP99OmittedWhenAbsent(t *testing.T) {
+	doc := BuildDocument("test", zeroSystemInfo(), RunConfig{Scope: "hardware"}, []bench.BenchResult{{
+		Workload: "sample",
+		Category: "Disk",
+		Result:   &bench.RunDetail{MedianTime: time.Millisecond, Throughput: 1, ThroughputUnit: "IOPS"},
+	}}, nil)
+	data, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	if strings.Contains(string(data), "latency_p99_ns") {
+		t.Fatalf("latency_p99_ns emitted without a value: %s", data)
+	}
+}

@@ -85,7 +85,7 @@ func normalizeStringList(values []string) []string {
 }
 
 func buildWorkloads(diskPath, filterExpr string, hardwareTools []string) []gbbench.Workload {
-	defs := catalog.ExternalHardwareDefinitionsForTools(diskPath, hardwareTools)
+	defs := append(catalog.ExternalHardwareDefinitionsForTools(diskPath, hardwareTools), catalog.PlatformProbeDefinitions()...)
 	var filter *regexp.Regexp
 	if filterExpr != "" {
 		filter = regexp.MustCompile(filterExpr)

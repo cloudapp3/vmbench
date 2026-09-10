@@ -72,6 +72,8 @@ func run(args []string) int {
 		return runSysinfo(args[1:])
 	case "compare":
 		return runCompare(args[1:])
+	case "score":
+		return runScore(args[1:])
 	case "history":
 		return runHistory(args[1:])
 	case "update":
@@ -111,6 +113,7 @@ func usageRows() []string {
 		"  vmbench tools    <command> [flags]   " + i18n.T("cli.usage.cmdTools"),
 		"  vmbench sysinfo   [--json]            " + i18n.T("cli.usage.cmdSysinfo"),
 		"  vmbench compare   <a.json> <b.json>   " + i18n.T("cli.usage.cmdCompare"),
+		"  vmbench score     <report.json|->    " + i18n.T("cli.usage.cmdScore"),
 		"  vmbench history   <command>           " + i18n.T("cli.usage.cmdHistory"),
 		"  vmbench update   [flags]              " + i18n.T("cli.usage.cmdUpdate"),
 		"  vmbench uninstall [flags]             " + i18n.T("cli.usage.cmdUninstall"),

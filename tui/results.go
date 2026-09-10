@@ -460,6 +460,18 @@ func tuiLatency(result *gbreport.ResultEntry) string {
 	return fmt.Sprintf("%.2fns", result.AvgNSPerAccess)
 }
 
+// formatLatencyP99NS renders a nanosecond latency with a human-readable unit.
+func formatLatencyP99NS(ns float64) string {
+	switch {
+	case ns >= 1e6:
+		return fmt.Sprintf("%.2f ms", ns/1e6)
+	case ns >= 1e3:
+		return fmt.Sprintf("%.2f µs", ns/1e3)
+	default:
+		return fmt.Sprintf("%.2f ns", ns)
+	}
+}
+
 func tuiStatusText(result *gbreport.ResultEntry) string {
 	t := theme.Active
 	if result == nil {

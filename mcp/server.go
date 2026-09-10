@@ -476,7 +476,7 @@ func capabilitiesPayload() map[string]any {
 		"workloads":            workloads,
 		"node_catalog":         catalogInfo,
 		"policy": map[string]string{
-			"scoring": "vmbench MCP returns raw metrics and structured diagnostics only; no benchmark total score, grade, or category score.",
+			"scoring": "vmbench MCP returns raw metrics and structured diagnostics only. Derived assessments are produced by the deterministic 'vmbench score' CLI against a versioned baseline; MCP itself does not score reports.",
 			"network": "network checkup sections run only when explicitly requested by preset or only sections.",
 		},
 	}
