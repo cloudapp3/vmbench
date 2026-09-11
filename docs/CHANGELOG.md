@@ -1,5 +1,24 @@
 # VMBench Changelog
 
+## v0.14.0（2026-09-11）
+
+### 论坛直贴 markdown 报告（`--markdown FILE`）
+
+- **背景**：对比 NodeQuality 的结论——它的"上传→渲染→截图"链路要到达的终点其实是"一条能直接粘进帖子的内容"，而 vmbench 的分享终点此前只有本地 JSON/HTML。新增 markdown 导出补上这一环，无后端、粘帖即发；定位为 [share 设计](share-design.md) §4 "text 投影"的第一块落地。
+- **版式**：一级标题 + 引用行溯源（状态/preset/版本+commit/UTC 时间/耗时/catalog source@revision）；每个 section 一个 `##` 标题，正文为围栏代码块内的 textgrid 等宽表格（CJK 对齐，任意 markdown 渲染器下不乱版式）；run 报告为系统卡 + 硬件表 + 警告列表。
+- **media 折叠**：checkup 的流媒体 section 在 markdown 下折叠为总计计数 + 每区域 `available/total` 计数 + 仅异常项（不可看/受限/未知）逐行；console 全列表输出不变。
+- **复用与重构**：`report/console.go` 抽出 `writeSystemLines`/`renderWorkloadGrid`，`checkup/console.go` 按同样方式抽出每 section 的 body builder（`writeRouteBody`/`writePingBody`/`writeSpeedBody`/`writeIPQualityBody`/`writeMailBody`/`writeMediaBody`/`writeNetworkInfoBody`/`writeReachabilityBody`），console 输出逐字节不变（既有 console 测试锁定）；markdown writer 与 console 共享这些 builder，未来 `share` text 投影同源。
+- **边界**：不嵌 score 评估（share 设计"不出总分"底线）；报告不含 hostname；与 JSON/HTML 同一报告数据源、共享同一份脱敏结果，导出走 `writeFile` 原子写（0600）。
+- **测试**：`report/markdown_test.go`（标题/围栏/证据行/缺块省略）；`checkup/markdown_test.go`（fixture 全 section、media 折叠含区域计数与异常项、禁用/失败/空 section 表驱动健壮性、禁用 section 跳过）；`cmd/vmbench/output_test.go`（`--markdown` 双路径接线：run 报告与 checkup 报告落盘、0600）。
+
+### Geekbench 低内存预检 + 临时 swap（Linux）
+
+- **背景**：同为 NodeQuality 借鉴项。geekbench（opt-in 工具）在 <1 GiB RAM 的小机上会失败；NodeQuality 的做法是检测低内存后临时 dd 一个 swapfile 跑完即删。
+- **触发**：`catalog.HardwareToolActiveForFilter`（新导出，判定 geekbench 是否真的会跑——含 `--filter` 过滤与空选择=默认集语义）+ `sysinfo.MeminfoTotals`（新导出，Linux `/proc/meminfo` 的 MemTotal/SwapTotal，字节）；阈值 RAM < 1 GiB 且 RAM+swap < 1.5 GiB，swapfile 尺寸补足到 1.5 GiB（64 MiB–2 GiB 夹取）。
+- **授权链**：默认只在终端弹 y/n 确认（`confirmUninstall` 泛化为 `confirmPrompt`，uninstall 行为不变）；`--auto-swap` 免确认；非终端（含脚本/--json 场景）只打告警；非 root 只打告警（swapon 需 root）。任何失败都只告警不阻断测评。
+- **安全清理**：swapfile 非 tmpfs 位置优先（`statfs` 拒绝 TMPFS_MAGIC——/tmp 常为 tmpfs）、剩余空间含 256 MiB 余量检查；文件名 `.vmbench-swap-<pid>`，`O_EXCL` 创建 0600，**进程内零填充**（swapfile 不能稀疏；比 shell 出 dd 避免 coreutils/busybox 差异）；`mkswap`/`swapon`/`swapoff` 走 `exec`。清理幂等（`sync.Once`）：先 `swapoff` 后删文件，swapoff 失败保留文件并打印手动清理指引（绝不删活跃 swapfile）；swap 生效期拦截 SIGINT/SIGTERM，信号也走同一清理（INT→130 / TERM→143）。macOS/Windows 为同签名 no-op stub（`swap_other.go`）。
+- **测试**：`cmd/vmbench/swap_linux_test.go`（阈值表测、非交互/非 root/拒绝确认/tmpfs/空间不足只告警、mkswap→swapon→swapoff 序列、swapoff 失败保文件、setup 失败清理残file）；`sysinfo` MeminfoTotals；`--auto-swap` flag 接线。
+
 ## v0.13.6（2026-09-11）
 
 ### System Info 展开区多卡改版：虚拟化 / 存储 / 内存 / 运行环境证据

@@ -3,6 +3,7 @@
 package sysinfo
 
 import (
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -173,4 +174,15 @@ func readMeminfoInt(key string) (int64, bool) {
 		return parsed, true
 	}
 	return 0, false
+}
+
+// MeminfoTotals returns MemTotal and SwapTotal from /proc/meminfo in bytes.
+// A missing SwapTotal key reads as zero swap; only MemTotal is mandatory.
+func MeminfoTotals() (memTotal, swapTotal uint64, err error) {
+	memKB, ok := readMeminfoInt("MemTotal")
+	if !ok {
+		return 0, 0, errors.New("meminfo: MemTotal missing")
+	}
+	swapKB, _ := readMeminfoInt("SwapTotal")
+	return uint64(memKB) * 1024, uint64(swapKB) * 1024, nil
 }

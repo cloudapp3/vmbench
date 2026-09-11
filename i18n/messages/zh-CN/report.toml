@@ -60,6 +60,27 @@ other = "指标"
 [report.html.title]
 other = "VMBench 报告"
 
+[report.markdown.title]
+other = "VMBench {{.Version}} — 硬件测评报告"
+
+[report.markdown.checkupTitle]
+other = "VMBench {{.Version}} — 检查报告"
+
+[report.markdown.system]
+other = "系统"
+
+[report.markdown.duration]
+other = "耗时: {{.Duration}}"
+
+[report.markdown.mediaTotals]
+other = "总计: 可看 {{.Available}} · 受限 {{.Restricted}} · 不可看 {{.Blocked}} · 未知 {{.Unknown}}"
+
+[report.markdown.mediaRegion]
+other = "{{.Region}}: 可看 {{.Available}}/{{.Total}}"
+
+[report.markdown.mediaExceptions]
+other = "异常项:"
+
 [report.compare.title]
 other = "VMBench 对比"
 

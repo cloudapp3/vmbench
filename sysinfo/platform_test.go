@@ -76,3 +76,16 @@ func TestCollectPlatformDiagnosticsIsSafe(t *testing.T) {
 		t.Fatalf("unexpected KSM value: %+v", diagnostics)
 	}
 }
+
+func TestMeminfoTotalsReturnsBytes(t *testing.T) {
+	mem, swap, err := MeminfoTotals()
+	if err != nil {
+		t.Fatalf("MeminfoTotals() error = %v", err)
+	}
+	if mem < 16<<20 {
+		t.Fatalf("MemTotal = %d bytes, want a plausible machine size", mem)
+	}
+	if swap%1024 != 0 {
+		t.Fatalf("SwapTotal = %d bytes, want kB-aligned value", swap)
+	}
+}

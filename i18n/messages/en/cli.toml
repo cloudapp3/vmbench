@@ -123,8 +123,14 @@ other = "write JSON report to file"
 [cli.flag.html]
 other = "write HTML report to file"
 
+[cli.flag.markdown]
+other = "write forum-pasteable markdown report to file (sections in fenced code blocks, media folded)"
+
 [cli.flag.quiet]
 other = "suppress progress output"
+
+[cli.flag.autoSwap]
+other = "(Linux) low-memory geekbench runs: create a temporary swapfile without asking"
 
 [cli.flag.hardwareTool]
 other = "hardware tools (comma-separated: sysbench,openssl,fio,dd,stream,mbw,geekbench,winsat; use all for every adapter)"
@@ -276,6 +282,9 @@ other = "error writing JSON: {{.Err}}"
 [cli.error.writingHTML]
 other = "error writing HTML: {{.Err}}"
 
+[cli.error.writingMarkdown]
+other = "error writing markdown: {{.Err}}"
+
 [cli.error.badIPVersion]
 other = "error: --ip-version must be one of: v4, v6, dual"
 
@@ -371,6 +380,30 @@ other = "notice: --redact none keeps real public IPs in reports; do not share th
 
 [cli.notice.missingHardwareTools]
 other = "notice: missing hardware tools: {{.Tools}}; affected workloads will be recorded as structured errors"
+
+[cli.notice.lowMemoryGeekbench]
+other = "notice: geekbench needs ~1.5 GiB of memory; this host has {{.Mem}} RAM + {{.Swap}} swap"
+
+[cli.prompt.tempSwap]
+other = "create a temporary swapfile for this run and remove it afterwards? [y/N] "
+
+[cli.notice.swapNeedsRoot]
+other = "notice: creating a swapfile requires root; continuing without it"
+
+[cli.notice.swapEnabled]
+other = "notice: temporary swap enabled: {{.Path}} ({{.Size}})"
+
+[cli.notice.swapRemoved]
+other = "notice: temporary swap removed"
+
+[cli.error.swapSetup]
+other = "warning: temporary swap setup failed: {{.Err}}"
+
+[cli.error.swapNoLocation]
+other = "warning: no suitable non-tmpfs location with enough free space for a temporary swapfile; continuing without it"
+
+[cli.error.swapTeardown]
+other = "warning: temporary swap cleanup failed ({{.Err}}); swapfile kept at {{.Path}} — run 'swapoff {{.Path}}' and delete it manually"
 
 [cli.notice.installHint]
 other = "hint: Debian/Ubuntu: sudo apt-get install -y {{.Packages}}"

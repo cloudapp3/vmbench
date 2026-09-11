@@ -105,3 +105,62 @@ func TestHardwareToolPreflightRespectsWorkloadFilter(t *testing.T) {
 		t.Fatalf("non-matching preflight output = %q, want empty", output.String())
 	}
 }
+
+func TestMarkdownFlagWritesRunReport(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	dir := t.TempDir()
+	path := filepath.Join(dir, "report.md")
+	_, code := captureStdout(t, func() int {
+		return run([]string{"--only", "hardware", "--markdown", path, "--iterations", "1", "--quiet"})
+	})
+	if code != 1 {
+		t.Fatalf("run with missing tools = %d, want 1", code)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	markdown := string(data)
+	for _, want := range []string{"# VMBench", "## System", "```", "ERR"} {
+		if !strings.Contains(markdown, want) {
+			t.Fatalf("markdown report missing %q:\n%s", want, markdown)
+		}
+	}
+	if mode := fileMode(t, path); mode != 0o600 {
+		t.Fatalf("markdown report mode = %o, want 600", mode)
+	}
+}
+
+func TestMarkdownFlagWritesCheckupReport(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "checkup.md")
+	_, code := captureStdout(t, func() int {
+		return run([]string{"--only", "speed", "--speed-provider", "iperf3", "--markdown", path, "--quiet"})
+	})
+	if code != 1 {
+		t.Fatalf("run(iperf3 without host) = %d, want 1", code)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	markdown := string(data)
+	for _, want := range []string{"# VMBench", "## Speed", "```"} {
+		if !strings.Contains(markdown, want) {
+			t.Fatalf("checkup markdown missing %q:\n%s", want, markdown)
+		}
+	}
+}
+
+func fileMode(t *testing.T, path string) os.FileMode {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits are not portable on windows")
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return info.Mode().Perm()
+}

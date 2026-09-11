@@ -32,6 +32,7 @@ type benchmarkFlags struct {
 	timeout         time.Duration
 	jsonOut         string
 	htmlOut         string
+	markdownOut     string
 	preset          string
 	routePreset     string
 	speedProvider   string
@@ -49,6 +50,7 @@ type benchmarkFlags struct {
 	catalogRevision string
 	catalogCache    string
 	quiet           bool
+	autoSwap        bool
 }
 
 func newBenchmarkFlags() *benchmarkFlags {
@@ -73,6 +75,7 @@ func newBenchmarkFlagSet(bf *benchmarkFlags) *flag.FlagSet {
 	fs.DurationVar(&bf.timeout, "timeout", 0, i18n.T("cli.flag.timeout"))
 	fs.StringVar(&bf.jsonOut, "json", "", i18n.T("cli.flag.json"))
 	fs.StringVar(&bf.htmlOut, "html", "", i18n.T("cli.flag.html"))
+	fs.StringVar(&bf.markdownOut, "markdown", "", i18n.T("cli.flag.markdown"))
 	fs.StringVar(&bf.preset, "preset", "", i18n.T("cli.flag.preset"))
 	fs.StringVar(&bf.routePreset, "route-presets", "", i18n.T("cli.flag.routePresets"))
 	fs.StringVar(&bf.speedProvider, "speed-provider", "", i18n.T("cli.flag.speedProvider"))
@@ -87,6 +90,7 @@ func newBenchmarkFlagSet(bf *benchmarkFlags) *flag.FlagSet {
 	fs.BoolVar(&bf.saveHistory, "save-history", false, i18n.T("cli.flag.saveHistory"))
 	fs.StringVar(&bf.historyTag, "history-tag", "", i18n.T("cli.flag.historyTag"))
 	fs.BoolVar(&bf.quiet, "quiet", false, i18n.T("cli.flag.quiet"))
+	fs.BoolVar(&bf.autoSwap, "auto-swap", false, i18n.T("cli.flag.autoSwap"))
 	fs.StringVar(&bf.catalogSource, "node-catalog", bf.catalogSource, i18n.T("cli.flag.nodeCatalog"))
 	fs.StringVar(&bf.catalogRevision, "node-revision", "", i18n.T("cli.flag.nodeRevision"))
 	fs.StringVar(&bf.catalogCache, "node-cache", "", i18n.T("cli.flag.nodeCache"))
@@ -281,6 +285,7 @@ func (bf *benchmarkFlags) runHardwareOnly(filterRE *regexp.Regexp) int {
 		return 2
 	}
 	printHardwareToolPreflight(os.Stderr, runOptions.HardwareTools, filterRE)
+	defer maybeSetupTempSwap(bf, runOptions.HardwareTools, filterRE)()
 	report := vmbench.RunCore(context.Background(), runOptions)
 	if !bf.saveHistoryIfRequested(report) {
 		return 1
@@ -316,6 +321,7 @@ func (bf *benchmarkFlags) runCheckupSections(sections checkup.SectionSelector, r
 	}
 	if checkupOptions.Sections.Hardware {
 		printHardwareToolPreflight(os.Stderr, checkupOptions.HardwareTools, filterRE)
+		defer maybeSetupTempSwap(bf, checkupOptions.HardwareTools, filterRE)()
 	}
 	report := checkup.Run(context.Background(), checkupOptions)
 	if !bf.saveHistoryIfRequested(report) {
@@ -354,6 +360,14 @@ func (bf *benchmarkFlags) writeRunReport(report vmbench.Report) int {
 			return 1
 		}
 	}
+	if bf.markdownOut != "" {
+		if err := writeFile(bf.markdownOut, func(w io.Writer) error {
+			return gbreport.WriteMarkdown(w, report)
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.writingMarkdown", map[string]any{"Err": err.Error()}))
+			return 1
+		}
+	}
 	if err := gbreport.WriteConsole(os.Stdout, report); err != nil {
 		return 1
 	}
@@ -379,6 +393,14 @@ func (bf *benchmarkFlags) writeCheckupReport(report checkup.CheckupReport) int {
 			return checkup.WriteHTML(w, report)
 		}); err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.writingHTML", map[string]any{"Err": err.Error()}))
+			return 1
+		}
+	}
+	if bf.markdownOut != "" {
+		if err := writeFile(bf.markdownOut, func(w io.Writer) error {
+			return checkup.WriteMarkdown(w, report)
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.error.writingMarkdown", map[string]any{"Err": err.Error()}))
 			return 1
 		}
 	}

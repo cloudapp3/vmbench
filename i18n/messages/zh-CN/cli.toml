@@ -123,8 +123,14 @@ other = "将 JSON 报告写入文件"
 [cli.flag.html]
 other = "将 HTML 报告写入文件"
 
+[cli.flag.markdown]
+other = "将可贴论坛的 markdown 报告写入文件 (section 用代码块包裹, 流媒体折叠)"
+
 [cli.flag.quiet]
 other = "抑制进度输出"
+
+[cli.flag.autoSwap]
+other = "(Linux) 低内存跑 geekbench 时免确认为本轮创建临时 swapfile"
 
 [cli.flag.hardwareTool]
 other = "硬件测试工具 (逗号分隔: sysbench,openssl,fio,dd,stream,mbw,geekbench,winsat;all 表示全部适配器)"
@@ -276,6 +282,9 @@ other = "写入 JSON 失败: {{.Err}}"
 [cli.error.writingHTML]
 other = "写入 HTML 失败: {{.Err}}"
 
+[cli.error.writingMarkdown]
+other = "写入 markdown 失败: {{.Err}}"
+
 [cli.error.badIPVersion]
 other = "错误: --ip-version 必须是 v4、v6、dual 之一"
 
@@ -371,6 +380,30 @@ other = "提示: --redact none 会在报告中保留真实公网 IP，分享前�
 
 [cli.notice.missingHardwareTools]
 other = "提示: 缺少硬件测试工具: {{.Tools}};受影响的工作负载将记录为结构化错误"
+
+[cli.notice.lowMemoryGeekbench]
+other = "提示: geekbench 需要约 1.5 GiB 内存;本机 RAM {{.Mem}} + swap {{.Swap}}"
+
+[cli.prompt.tempSwap]
+other = "为本轮测试创建临时 swapfile (结束后移除)? [y/N] "
+
+[cli.notice.swapNeedsRoot]
+other = "提示: 创建 swapfile 需要 root;继续不使用"
+
+[cli.notice.swapEnabled]
+other = "提示: 已启用临时 swap: {{.Path}} ({{.Size}})"
+
+[cli.notice.swapRemoved]
+other = "提示: 临时 swap 已移除"
+
+[cli.error.swapSetup]
+other = "警告: 临时 swap 创建失败: {{.Err}}"
+
+[cli.error.swapNoLocation]
+other = "警告: 没有剩余空间足够的非 tmpfs 位置可放临时 swapfile;继续不使用"
+
+[cli.error.swapTeardown]
+other = "警告: 临时 swap 清理失败 ({{.Err}}),swapfile 保留在 {{.Path}} — 请手动执行 'swapoff {{.Path}}' 后删除"
 
 [cli.notice.installHint]
 other = "提示: Debian/Ubuntu 可执行 sudo apt-get install -y {{.Packages}}"

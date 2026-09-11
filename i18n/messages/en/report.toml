@@ -60,6 +60,27 @@ other = "Metric"
 [report.html.title]
 other = "VMBench Report"
 
+[report.markdown.title]
+other = "VMBench {{.Version}} — Benchmark Report"
+
+[report.markdown.checkupTitle]
+other = "VMBench {{.Version}} — Checkup Report"
+
+[report.markdown.system]
+other = "System"
+
+[report.markdown.duration]
+other = "duration: {{.Duration}}"
+
+[report.markdown.mediaTotals]
+other = "total: available {{.Available}} · restricted {{.Restricted}} · blocked {{.Blocked}} · unknown {{.Unknown}}"
+
+[report.markdown.mediaRegion]
+other = "{{.Region}}: {{.Available}}/{{.Total}} available"
+
+[report.markdown.mediaExceptions]
+other = "exceptions:"
+
 [report.compare.title]
 other = "VMBench Compare"
 

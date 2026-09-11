@@ -40,6 +40,7 @@ vmbench --hardware-tool sysbench,openssl,fio,dd
 # VPS 综合测评（preset 或 only/skip 选择 section）
 vmbench --preset quick
 vmbench --preset website --json checkup.json --html checkup.html
+vmbench --markdown checkup.md   # 论坛直贴 markdown（流媒体折叠、已脱敏）
 vmbench --only ping,mail
 vmbench --only hardware --hardware-tool dd,stream,mbw
 vmbench --node-catalog auto --node-revision 2026-07-13.1 --save-history
@@ -115,7 +116,9 @@ vmbench --redact ips|none
 
 网络节点来自版本化 catalog。`--node-catalog` 支持 `embedded`、`auto` 或 JSON 路径；`--node-revision` 固定精确 revision，不匹配时在 probe 前失败。`auto` 每次尝试自动拉取（HTTPS + 严格 schema 校验 + 镜像链，最多约 5 秒），任何失败静默回退已验证缓存→embedded，不产生 warning。`vmbench nodes verify/update` 使用调用方显式提供的 Ed25519 公钥和 detached signature；`nodes health` 进行有界可用性检查。
 
-报告默认脱敏：本机公网 IPv4/IPv6 会在全部出口（Console/JSON/HTML/历史/TUI/MCP）被一致替换为文档保留段占位地址（`203.0.113.x` / `2001:db8::x`），内嵌该地址的 BGP/CIDR 网段与反向 DNSBL 标签一并替换；内网 IP、hostname、路由 hop、远端节点 IP 保留。`--redact none` 可保留真实地址（CLI 会输出分享警告）；TUI 与 MCP 恒为脱敏。
+报告默认脱敏：本机公网 IPv4/IPv6 会在全部出口（Console/JSON/HTML/markdown/历史/TUI/MCP）被一致替换为文档保留段占位地址（`203.0.113.x` / `2001:db8::x`），内嵌该地址的 BGP/CIDR 网段与反向 DNSBL 标签一并替换；内网 IP、hostname、路由 hop、远端节点 IP 保留。`--redact none` 可保留真实地址（CLI 会输出分享警告）；TUI 与 MCP 恒为脱敏。
+
+`--markdown report.md` 导出论坛直贴版式：每个 section 一个 `##` 标题 + 围栏代码块内的 textgrid 等宽表格（CJK 对齐，任意渲染器不乱版式），流媒体折叠为每区域计数 + 仅异常项，头部引用行带版本/UTC 时间/catalog revision 溯源。与 JSON/HTML 同源同脱敏，不嵌评分。另：Linux 上 geekbench 低内存（RAM < 1 GiB 且 RAM+swap < 1.5 GiB）时 CLI 会提示为本轮创建临时 swapfile（`--auto-swap` 免确认），结束后自动移除。
 
 ## TUI
 
@@ -160,7 +163,7 @@ Dashboard 支持：
 - Go traceroute 依赖系统 `traceroute` / `tcptraceroute` / `tracepath` / `tracert`；逐目标保留解析地址、是否到达和状态，命令缺失或无有效 hop 会结构化报错，未到目标但有 hops 则为 `partial`。
 - IP Quality 只有在元数据、公网 IPv4、DNSBL 和 Port 25 探测均得到确定结论时才生成 0-100 风险 score，不确定时 fail-closed 并保留 error/detail。
 - 体检 JSON 使用 schema-v2 envelope，包含 report/app/system/time/config/catalog provenance，并保留旧 v1 字段；Route 包含 `resolved_target/destination_reached/status`，Ping 包含 `connection_state`。体检 HTML 展示硬件 workload、网络身份、完整 route hops、各网络 section 明细和 error。
-- CLI 的 `--json` / `--html` 使用同目录临时文件、fsync、rename 原子导出，Unix mode 为 `0600`。`--save-history [--history-tag TAG]` 可写入原子本地历史（Unix 目录 `0700`、文件 `0600`）；`history add/list/show/delete` 管理本地报告。
+- CLI 的 `--json` / `--html` / `--markdown` 使用同目录临时文件、fsync、rename 原子导出，Unix mode 为 `0600`。`--save-history [--history-tag TAG]` 可写入原子本地历史（Unix 目录 `0700`、文件 `0600`）；`history add/list/show/delete` 管理本地报告。
 
 ## 文档
 

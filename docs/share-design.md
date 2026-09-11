@@ -76,6 +76,8 @@
 
 ## 4. 分享物格式
 
+> **状态注记（2026-09-11）**：text 投影的第一块已随 `--markdown FILE` 落地为**本地导出**（论坛直贴版式：围栏代码块内的 textgrid 表格 + media 折叠 + 版本/catalog 溯源行），实现位于 `report/markdown.go` / `checkup/markdown.go`，与 console writer 共享每 section 的 body builder。`share` 子命令落地时，text 格式应从同一批 builder 派生而非另写渲染器；`--media summary|full` 的折叠语义即 `writeMediaFoldBody`。上传与 provider 仍未实现。
+
 ```
 --format text   # 默认。终端风格等宽文本，直接贴论坛/TG，目标 < 40 KiB
 --format json   # 脱敏后的完整 schema-v2 JSON（自动化消费者）

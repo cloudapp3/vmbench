@@ -13,6 +13,11 @@ func writeNetworkInfoConsole(w io.Writer, section NetworkInfoSection) error {
 	if _, err := writeSectionBanner(w, SectionNetworkInfo); err != nil {
 		return err
 	}
+	return writeNetworkInfoBody(w, section)
+}
+
+// writeNetworkInfoBody prints the network info section content.
+func writeNetworkInfoBody(w io.Writer, section NetworkInfoSection) error {
 	if err := writeSectionState(w, section.SectionState); err != nil {
 		return err
 	}
@@ -215,6 +220,11 @@ func writeReachabilityConsole(w io.Writer, section ReachabilitySection) error {
 	if _, err := writeSectionBanner(w, SectionReachability); err != nil {
 		return err
 	}
+	return writeReachabilityBody(w, section)
+}
+
+// writeReachabilityBody prints the reachability section content.
+func writeReachabilityBody(w io.Writer, section ReachabilitySection) error {
 	if err := writeSectionState(w, section.SectionState); err != nil {
 		return err
 	}

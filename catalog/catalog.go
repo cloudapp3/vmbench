@@ -315,6 +315,23 @@ func hardwareToolMatchesFilter(tool string, filter *regexp.Regexp) bool {
 	return false
 }
 
+// HardwareToolActiveForFilter reports whether tool belongs to the effective
+// selection (empty input meaning the defaults, like the runner) and at least
+// one of its workload definitions matches the same name/category filter used
+// by the runner — i.e. whether the tool will actually execute this run.
+func HardwareToolActiveForFilter(tools []string, tool string, filter *regexp.Regexp) bool {
+	selected := StandardizeHardwareTools(tools)
+	if len(selected) == 0 && len(tools) == 0 {
+		selected = DefaultHardwareTools()
+	}
+	for _, item := range selected {
+		if item == tool {
+			return hardwareToolMatchesFilter(item, filter)
+		}
+	}
+	return false
+}
+
 func hardwareToolAvailable(tool string) bool {
 	var err error
 	switch tool {

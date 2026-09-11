@@ -129,10 +129,15 @@ func uninstallKeptNote(entry uninstall.Kept) string {
 	return entry.Reason
 }
 
-// confirmUninstall prompts on w and reads an explicit yes from r; anything
-// else, including EOF, counts as "no".
+// confirmUninstall prompts on w and reads an explicit yes from r.
 func confirmUninstall(w io.Writer, r io.Reader) bool {
-	fmt.Fprint(w, i18n.T("cli.uninstall.confirm"))
+	return confirmPrompt(w, r, "cli.uninstall.confirm")
+}
+
+// confirmPrompt prints the localized messageKey on w and reads an explicit
+// yes from r; anything else, including EOF, counts as "no".
+func confirmPrompt(w io.Writer, r io.Reader, messageKey string) bool {
+	fmt.Fprint(w, i18n.T(messageKey))
 	line, err := bufio.NewReader(r).ReadString('\n')
 	if err != nil && line == "" {
 		return false

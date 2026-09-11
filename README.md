@@ -97,14 +97,17 @@ Downloads are SHA-256 verified against the release `checksums.txt`, then atomica
 | `--node-catalog` | embedded | `embedded`, `auto` (fetch each run, silent cache/embedded fallback), or a JSON path |
 | `--node-revision` | — | Pin an exact catalog revision; fails before probes start on mismatch |
 | `--iperf-host` | — | iperf3 server for the iperf3 speed provider |
-| `--json` / `--html` | — | Write JSON / HTML report to file |
+| `--json` / `--html` / `--markdown` | — | Write JSON / HTML / forum-pasteable markdown report to file |
 | `--quiet` | false | Suppress progress output |
+| `--auto-swap` | false | (Linux) low-memory geekbench runs: create a temporary swapfile without asking, remove it afterwards |
 | `--save-history` | false | Save the report to local history (`--history-tag` to label) |
 | `--lang` | auto | `en` or `zh-CN` (also `VMBENCH_LANG`) |
 
 Without `--preset` / `--only` / `--skip` the run is hardware-only; network sections are opt-in via a preset or explicit selection. When the effective selection is exactly the `hardware` section the output is a benchmark (run-kind) report — identical to pre-v0.8.0 `vmbench run` — otherwise a composite checkup report. Full flag tables: `vmbench --help` or the [capability reference](docs/capabilities.md).
 
-Reports are redacted by default: this machine's public IPv4/IPv6 addresses are consistently replaced with documentation-range placeholders (`203.0.113.x`, `2001:db8::x`) across every surface — console, JSON, HTML, history, TUI, and MCP — including BGP/CIDR prefixes and reverse DNSBL labels that embed the address. Internal IPs, hostnames, route hops, and remote node IPs are kept. `--redact none` opts out (the CLI prints a sharing warning); TUI and MCP always redact.
+Reports are redacted by default: this machine's public IPv4/IPv6 addresses are consistently replaced with documentation-range placeholders (`203.0.113.x`, `2001:db8::x`) across every surface — console, JSON, HTML, markdown, history, TUI, and MCP — including BGP/CIDR prefixes and reverse DNSBL labels that embed the address. Internal IPs, hostnames, route hops, and remote node IPs are kept. `--redact none` opts out (the CLI prints a sharing warning); TUI and MCP always redact.
+
+`--markdown report.md` exports a share-ready paste: one heading per section with textgrid-aligned tables inside fenced code blocks (CJK-safe in any renderer), the media section folded to per-region counts plus exception items, and a provenance line (version, UTC time, catalog revision). It derives from the same redacted report as JSON/HTML and embeds no scores.
 
 ## VPS Checkup
 

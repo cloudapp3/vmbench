@@ -153,7 +153,9 @@ v0.8.0 起 `run` / `suite` 子命令合并进根命令。报告种类规则：�
 | `--iperf-host` | （空） | iperf3 服务器地址（逗号分隔多个；`--speed-provider iperf3` 时必填） |
 | `--json` | （空） | 输出 JSON 报告到文件 |
 | `--html` | （空） | 输出 HTML 报告到文件 |
+| `--markdown` | （空） | 输出可贴论坛的 markdown 报告到文件（section 用代码块包裹、流媒体折叠；与 JSON/HTML 同源同脱敏） |
 | `--quiet` | `false` | 静默模式，抑制进度输出 |
+| `--auto-swap` | `false` | （Linux）geekbench 低内存预检（RAM < 1 GiB 且 RAM+swap < 1.5 GiB）时免确认为本轮创建临时 swapfile，结束后自动移除 |
 | `--save-history` | `false` | 原子保存到本地历史（Unix mode `0700/0600`） |
 | `--history-tag` | （空） | 可选历史标签，要求 `--save-history` |
 | `--lang` | 自动 | `en` / `zh-CN`（也可用 `VMBENCH_LANG`）；所有子命令通用 |
@@ -596,7 +598,17 @@ speed
 - 响应式布局
 - 体检 HTML 额外展示 app/catalog metadata、hardware workloads、network identity、完整 route hops、ping、speed group/provider、IP quality、reachability、mail/media 及 detail/error
 
-CLI 的 JSON/HTML 都先写入目标同目录的 mode `0600` 临时文件，写入完成后 fsync 并 rename 到目标路径，最终文件在 Unix 保持 `0600`；这样写入中途失败不会留下半份新报告。其他平台仍依赖系统 ACL。
+#### Markdown（`--markdown report.md`）
+
+论坛/TG 直贴版式，是 [share 设计](share-design.md) §4 "text 投影"的第一块落地（本地文件、不上传）：
+
+- 一级标题 + 引用行（状态/preset/版本/commit/UTC 时间/耗时/catalog source@revision 的溯源信息）
+- 每个 section 一个 `##` 标题，正文是围栏代码块内的 textgrid 等宽表格（CJK 对齐，任意 markdown 渲染器下版式不乱）
+- 流媒体 section 折叠：总计计数一行 + 每区域 `available/total` 一行 + 仅异常项（不可看/受限/未知）逐行列出；console 全列表输出不变
+- 不嵌 score 评估（share 设计"不出总分"底线）；报告不含 hostname
+- 与 JSON/HTML 同一报告数据源，天然共享同一份脱敏结果
+
+CLI 的 JSON/HTML/markdown 都先写入目标同目录的 mode `0600` 临时文件，写入完成后 fsync 并 rename 到目标路径，最终文件在 Unix 保持 `0600`；这样写入中途失败不会留下半份新报告。其他平台仍依赖系统 ACL。
 
 ### 报告对比（`compare`）
 

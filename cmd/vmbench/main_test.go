@@ -203,3 +203,11 @@ func TestWriteSysinfoConsoleOmitsUnknownMemoryAndDMI(t *testing.T) {
 		}
 	}
 }
+
+func TestAutoSwapFlagParses(t *testing.T) {
+	// The revision mismatch is intentional: it proves --auto-swap parses and
+	// the run reaches catalog preflight without executing probes.
+	if code := run([]string{"--only", "ping", "--auto-swap", "--node-revision", "missing-revision"}); code != 2 {
+		t.Fatalf("run(--auto-swap) = %d, want catalog preflight exit 2", code)
+	}
+}

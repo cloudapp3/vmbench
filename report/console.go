@@ -20,18 +20,8 @@ func WriteConsole(w io.Writer, doc Document) error {
 	if _, err := fmt.Fprintf(w, "%s\n  %s\n%s\n", line, i18n.Tf("report.console.title", map[string]any{"Version": doc.Version}), line); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(w, "  %s: %s (%dC/%dT)\n", i18n.PadCells(i18n.T("report.label.cpu"), 9), doc.System.CPU.Model, doc.System.CPU.PhysicalCores, doc.System.CPU.LogicalCores)
-	_, _ = fmt.Fprintf(w, "  %s: %.1f GB %s\n", i18n.PadCells(i18n.T("report.label.memory"), 9), float64(doc.System.Memory.TotalBytes)/(1024*1024*1024), doc.System.Memory.Type)
-	_, _ = fmt.Fprintf(w, "  %s: %s (%s)\n", i18n.PadCells(i18n.T("report.label.os"), 9), doc.System.OS.Name, doc.System.OS.Kernel)
-	_, _ = fmt.Fprintf(w, "  %s: %s\n", i18n.PadCells(i18n.T("report.label.go"), 9), doc.System.OS.GoVersion)
-	if cache := sysinfo.FormatCacheLine(doc.System.CPU.CacheSizes); cache != "" {
-		_, _ = fmt.Fprintf(w, "  %s: %s\n", i18n.PadCells(i18n.T("report.label.cache"), 9), cache)
-	}
-	if nic := doc.System.Network.PrimaryNIC(); nic != "" {
-		_, _ = fmt.Fprintf(w, "  %s: %s\n", i18n.PadCells(i18n.T("report.label.nic"), 9), nic)
-	}
-	if oversell := doc.System.Platform.OversellSignalsText(); oversell != "" {
-		_, _ = fmt.Fprintf(w, "  %s: %s\n", i18n.PadCells(i18n.T("report.label.oversell"), 9), oversell)
+	if err := writeSystemLines(w, doc); err != nil {
+		return err
 	}
 	_, _ = fmt.Fprintf(w, "%s\n\n", line)
 
@@ -49,11 +39,50 @@ func WriteConsole(w io.Writer, doc Document) error {
 	return nil
 }
 
+// writeSystemLines prints the indented key:value system summary shared by the
+// console header and the markdown system card.
+func writeSystemLines(w io.Writer, doc Document) error {
+	if _, err := fmt.Fprintf(w, "  %s: %s (%dC/%dT)\n", i18n.PadCells(i18n.T("report.label.cpu"), 9), doc.System.CPU.Model, doc.System.CPU.PhysicalCores, doc.System.CPU.LogicalCores); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "  %s: %.1f GB %s\n", i18n.PadCells(i18n.T("report.label.memory"), 9), float64(doc.System.Memory.TotalBytes)/(1024*1024*1024), doc.System.Memory.Type); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "  %s: %s (%s)\n", i18n.PadCells(i18n.T("report.label.os"), 9), doc.System.OS.Name, doc.System.OS.Kernel); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(w, "  %s: %s\n", i18n.PadCells(i18n.T("report.label.go"), 9), doc.System.OS.GoVersion); err != nil {
+		return err
+	}
+	if cache := sysinfo.FormatCacheLine(doc.System.CPU.CacheSizes); cache != "" {
+		if _, err := fmt.Fprintf(w, "  %s: %s\n", i18n.PadCells(i18n.T("report.label.cache"), 9), cache); err != nil {
+			return err
+		}
+	}
+	if nic := doc.System.Network.PrimaryNIC(); nic != "" {
+		if _, err := fmt.Fprintf(w, "  %s: %s\n", i18n.PadCells(i18n.T("report.label.nic"), 9), nic); err != nil {
+			return err
+		}
+	}
+	if oversell := doc.System.Platform.OversellSignalsText(); oversell != "" {
+		if _, err := fmt.Fprintf(w, "  %s: %s\n", i18n.PadCells(i18n.T("report.label.oversell"), 9), oversell); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func writeWorkloadTable(w io.Writer, title string, entries []WorkloadEntry, line string) {
 	if len(entries) == 0 {
 		return
 	}
 	_, _ = fmt.Fprintf(w, "%s\n  %s\n%s\n", line, title, line)
+	_, _ = fmt.Fprint(w, renderWorkloadGrid(entries))
+}
+
+// renderWorkloadGrid renders the workload results table without any banner,
+// for embedding in console sections and markdown fenced blocks.
+func renderWorkloadGrid(entries []WorkloadEntry) string {
 	headers := []string{
 		i18n.T("report.col.workload"),
 		i18n.T("report.col.category"),
@@ -73,7 +102,7 @@ func writeWorkloadTable(w io.Writer, title string, entries []WorkloadEntry, line
 			formatDetail(item.Result),
 		})
 	}
-	_, _ = fmt.Fprint(w, textgrid.Render(headers, rows, 2))
+	return textgrid.Render(headers, rows, 2)
 }
 
 func formatTime(result *ResultEntry) string {
