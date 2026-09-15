@@ -45,6 +45,7 @@ archives:
       - LICENSE
       - README.md
       - docs/README.zh-CN.md
+      - docs/README.en.md
       - docs/CHANGELOG.md
 
 checksum:
