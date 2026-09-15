@@ -120,6 +120,7 @@ vmbench list                                 # 列出可用 workload
 vmbench sysinfo [--json]                     # 显示系统信息
 vmbench compare <a.json> <b.json> [...]      # 自动识别并对比 benchmark/体检报告
 vmbench score <report.json|->                 # 按版本化基线生成确定性 assessment
+vmbench share <report.json|-> [flags]         # 投影已脱敏报告并上传到显式选择的 paste 服务
 vmbench history add|list|show|delete|compare # 本地报告历史
 vmbench nodes list|verify|update|health      # 版本化节点目录管理
 vmbench mcp serve [--transport stdio]        # 启动 MCP 服务器
@@ -173,6 +174,23 @@ v0.8.0 起 `run` / `suite` 子命令合并进根命令。报告种类规则：�
 | `history show ID` | 输出某条记录中的原始报告 |
 | `history delete ID` | 删除指定记录 |
 | `history compare --last N` | 比较最近 N 份同 report kind 的记录 |
+
+### `share` 子命令（显式分享）
+
+`vmbench share <report.json|->` 把保存的 run/体检报告投影成 paste payload 并上传，返回链接。上传只会由该子命令显式触发——基准、TUI、MCP 均不调用 share，零默认上传。
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--format` | `text` | `text` = markdown 投影 + 脱敏尾注；`json` = 脱敏后报告 JSON 本体（无尾注） |
+| `--redact` | `ips` | 复用报告层脱敏；`none` 保留真实地址并打印警告 |
+| `--media` | `summary` | text 格式流媒体呈现：`summary` 折叠 / `full` 全列 |
+| `--provider` | `dpaste` | 逗号序 fallback 链：`dpaste` / `0x0` / `paste_rs` / `custom` |
+| `--share-endpoint` | （空） | `custom` provider 的上传 URL（仅 https，必填） |
+| `--dry-run` | `false` | 只打印 payload 与脱敏清单，零网络 |
+| `--save-payload` | （空） | 以 0600 原子保存与上传字节完全一致的副本 |
+| `--lang` | 自动 | 所有子命令通用 |
+
+行为约束：脱敏在报告层 IP 掩码之上额外掩掉结构化 hostname；尾注只陈述实际发生的脱敏（计数，绝不回显原始地址）。fallback 仅在网络错误或 5xx 时进入下一家，4xx/解析失败为终止错误，同一 payload 最多成功上传一次。payload > 512 KiB 直接拒绝并给出收敛建议，不静默截断。MCP v1 不暴露 share 工具。
 
 节点选择公共参数是 `--node-catalog embedded|auto|PATH` 与 `--node-revision REV`；管理命令可用 `--node-cache PATH` 覆盖默认 cache。`embedded` 不访问网络；`auto` 每次尝试 HTTPS 拉取（共享 5s 超时、镜像链逐个尝试、严格 schema 校验），失败时静默回退 cache→embedded。`auto` 的信任根是 TLS + 严格 schema（与 ECS 融合怪同模式，不涉及签名密钥）；`nodes update` 仍要求显式提供 trust root，不内置可被远程替换的公钥。
 
@@ -1510,7 +1528,8 @@ vmbench/
 │   ├── tui-design.md               # TUI 设计文档
 │   ├── tui-redesign.md             # TUI 重设计
 │   ├── CHANGELOG.md                # 变更记录
-│   └── README.zh-CN.md             # 中文快速参考
+│   ├── README.zh-CN.md             # 中文快速参考
+│   └── README.en.md                # 英文版 README
 │
 ├── sh/                             # Shell 脚本
 │   └── (辅助脚本)
@@ -1531,7 +1550,7 @@ vmbench/
 ├── version.go                      # 版本号（构建时注入）
 ├── CONTRIBUTING.md                 # 贡献指南
 ├── LICENSE                         # MIT 许可证
-└── README.md                       # 项目主 README
+└── README.md                       # 项目主 README（中文）
 ```
 
 ---
@@ -1540,7 +1559,8 @@ vmbench/
 
 | 文档 | 说明 |
 |------|------|
-| [README.md](../README.md) | 项目主入口和快速开始 |
+| [README.md](../README.md) | 项目主入口和快速开始（中文） |
+| [docs/README.en.md](README.en.md) | 英文版 README |
 | [docs/product.md](product.md) | 产品规格说明 |
 | [docs/tech-stack.md](tech-stack.md) | 技术架构详解 |
 | [docs/current-state.md](current-state.md) | 最新实现状态 |

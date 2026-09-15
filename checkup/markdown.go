@@ -9,11 +9,25 @@ import (
 	"github.com/cloudapp3/vmbench/i18n"
 )
 
+// MarkdownOptions selects markdown projection variants. The zero value keeps
+// the default share-friendly layout.
+type MarkdownOptions struct {
+	// MediaFull lists every probed media service instead of the folded
+	// per-region counts + exception items view.
+	MediaFull bool
+}
+
 // WriteMarkdown writes a forum-pasteable markdown summary of a checkup run:
 // one heading per section with the section body inside a fenced code block,
 // and the media section folded to per-region counts plus exception items so
 // the paste stays readable with 200+ probed services.
 func WriteMarkdown(w io.Writer, report CheckupReport) error {
+	return WriteMarkdownWithOptions(w, report, MarkdownOptions{})
+}
+
+// WriteMarkdownWithOptions writes the markdown summary with the selected
+// projection variants.
+func WriteMarkdownWithOptions(w io.Writer, report CheckupReport, opts MarkdownOptions) error {
 	if w == nil {
 		w = io.Discard
 	}
@@ -81,8 +95,12 @@ func WriteMarkdown(w io.Writer, report CheckupReport) error {
 		}
 	}
 	if report.Media.Enabled {
+		mediaBody := writeMediaFoldBody
+		if opts.MediaFull {
+			mediaBody = writeMediaBody
+		}
 		if err := writeMarkdownSection(w, SectionMedia, func(w io.Writer) error {
-			return writeMediaFoldBody(w, report.Media)
+			return mediaBody(w, report.Media)
 		}); err != nil {
 			return err
 		}

@@ -1,5 +1,16 @@
 # VMBench Changelog
 
+## Unreleased
+
+### `vmbench share`：跑完即链接的分享子命令（P1a）
+
+- **背景**：对标 NodeQuality 的"结果上传→返回链接"体验，按 [share 设计](share-design.md)（2026-09-11 四项决策定稿）落地 P1a。三条底线不变：显式授权（仅该子命令触发上传，基准/TUI/MCP 零调用，MCP v1 无 share 工具）、不伪造内容（投影忠实、无总分、尾注只陈述实际发生的事）、走已脱敏报告（复用 `redact/` 包）。
+- **管道（`share/` 包，stdlib-only）**：`history.Inspect` 分型 run/checkup（含 legacy `suite`）→ `redact.Apply(v, nil)` 复用报告层脱敏（从报告自身收割本机公网地址、幂等）→ share 专属结构化 hostname 掩码（`hostname.redacted`，报告层不掩）→ 投影（`--format text` = markdown 投影 + 尾注，复用 `WriteMarkdown`；`--format json` = 脱敏 JSON 本体，无尾注）→ 512 KiB 体积护栏（`TooLargeError` + 收敛建议，拒绝而非截断）。`Inventory` 只记计数绝不回显原始地址；尾注与 stderr 共用同一 Summary。
+- **provider 与 fallback**：`dpaste`（默认）/`0x0`/`paste_rs`/`custom`（需 `--share-endpoint`，仅 https）；`--provider dpaste,0x0` 显式 fallback 链——仅网络错误或 5xx 进入下一家，4xx/解析失败/超限为终止错误，同一 payload 最多成功上传一次；单次 30s 超时、无 provider 内重试、响应体 1 MiB 上限、UA 带 repo 溯源。
+- **CLI**：`vmbench share <report.json|->`，flags `--format/--redact/--media/--provider/--share-endpoint/--dry-run/--save-payload/--lang`；`--dry-run` 零网络只打 payload 与脱敏清单；`--save-payload` 0600 原子保存与上传字节完全一致的副本；`--redact none` 沿用既有警告。参数错误（含无法识别的 JSON）exit 2，IO/上传失败 exit 1。
+- **checkup markdown 选项变体**：新增 `WriteMarkdownWithOptions(w, report, MarkdownOptions{MediaFull})`，`WriteMarkdown` 委托零值（`--markdown` 行为不变）；`--media full` 切换流媒体为全列表。
+- **测试**：`share/prepare_test.go`（分型含 legacy suite、占位符非真实 IP、hostname 掩码、幂等、none 模式、json 投影、超限、MediaFull、尾注与 inventory 一致）；`share/provider_test.go`（httptest 逐家协议形状、5xx/网络错 fallback、4xx 终止、成功即停、响应超限、http:// 拒绝、URL 解析、ParseProviders）；`cmd/vmbench/share_test.go`（exit code 表、dry-run 零网络、stdin `-`、custom+httptest 全流程含 save-payload 0600）。
+
 ## v0.14.0（2026-09-11）
 
 ### 论坛直贴 markdown 报告（`--markdown FILE`）

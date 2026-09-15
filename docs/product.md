@@ -145,7 +145,7 @@ vmbench nodes health --node-catalog auto --kind route --ip-family v6 --json
 
 更新流程要求显式 Ed25519 公钥，先验证 detached signature 和严格 schema，再原子替换缓存；Unix 文件 mode 为 `0600`。签名、revision 或 schema 不满足时 fail-closed，不启动探测也不覆盖旧缓存。
 
-`vmbench` 可用 `--save-history [--history-tag TAG]` 保存报告；也可用 `history add/list/show/delete` 管理已有 JSON，`history compare --last N` 比较最近 N 份同类型报告。CLI 的 `--json` / `--html` 导出和 history 都先写同目录临时文件、sync 后 rename；Unix 导出/历史文件 mode 为 `0600`，其他平台仍应依赖系统 ACL 保护。报告可能包含 hostname、公网 IP 和 route hops，任何未来 upload/share 都必须显式授权并支持脱敏。Route/Ping 报告区分 catalog protocol 与实际 `probe_protocol/probe_tool`；体检 Compare 只有在 unit、实际 protocol/IP family、provider/probe tool、target/node 以及需要时 catalog revision 全部兼容时才计算 delta。不兼容值仍展示，但明确给出 reason。Route 还必须显式为 `status=ok` 且 `destination_reached=true`，旧报告没有到达证据时不计算 delta。Mail 只比较 `status=open` 的成功连接延迟，拒绝、超时和错误耗时不参与 latency delta。
+`vmbench` 可用 `--save-history [--history-tag TAG]` 保存报告；也可用 `history add/list/show/delete` 管理已有 JSON，`history compare --last N` 比较最近 N 份同类型报告。CLI 的 `--json` / `--html` 导出和 history 都先写同目录临时文件、sync 后 rename；Unix 导出/历史文件 mode 为 `0600`，其他平台仍应依赖系统 ACL 保护。报告可能包含 hostname、公网 IP 和 route hops。`vmbench share <report.json|->` 是唯一的上传出口：显式授权（基准、TUI、MCP 均不触发，MCP v1 无 share 工具），payload 走与报告同源的脱敏并在其上额外掩掉结构化 hostname，尾注只陈述实际发生的脱敏；provider 与 fallback 链由用户显式选择，同一 payload 最多成功上传一次。Route/Ping 报告区分 catalog protocol 与实际 `probe_protocol/probe_tool`；体检 Compare 只有在 unit、实际 protocol/IP family、provider/probe tool、target/node 以及需要时 catalog revision 全部兼容时才计算 delta。不兼容值仍展示，但明确给出 reason。Route 还必须显式为 `status=ok` 且 `destination_reached=true`，旧报告没有到达证据时不计算 delta。Mail 只比较 `status=open` 的成功连接延迟，拒绝、超时和错误耗时不参与 latency delta。
 
 ## 自升级
 

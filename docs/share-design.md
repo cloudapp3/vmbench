@@ -1,6 +1,8 @@
 # vmbench 分享能力设计（share）
 
-> 状态：设计稿，未实现。本文是 `share` 能力的实现规范；实现时按 phase 更新本文状态，并同步 README / product / tech-stack / tui-design / CHANGELOG。
+> 状态：**P1a 已落地（2026-09-11）**——`share/` 包 + `vmbench share` 子命令（text/json、ips/none、四 provider、fallback 链、dry-run、save-payload、inventory 尾注）已实现并全量测试；P1b 的 `--share` 直通与 TUI `h` 键未做。本文仍是后续 phase 的实现规范；实现时按 phase 更新本文状态，并同步 README / product / tech-stack / tui-design / CHANGELOG。
+>
+> **v1 定稿（2026-09-11，四项决策）**：① `--format text` 即 markdown 投影（直调 `report.WriteMarkdown` / `checkup.WriteMarkdown`，不写第二渲染器）；② `strict` 档延后（v1 只有 `ips|none`，`redact.Parse` 继续拒绝 `strict`）；③ 默认 provider `dpaste` 单值，fallback 由用户显式加（`--provider dpaste,0x0`）；④ v1 只做子命令（P1a），`--share` 直通与 TUI `h` 键归后续版本。与原稿的差异：脱敏不新建 `share/redact.go`——直接复用 `redact/` 包（`Apply(doc, nil)` 从报告自身收割本机地址、已脱敏报告幂等；`Stats` 即 inventory 数据源）；输入 run/checkup 分型照 `history.detectKind` 先例（实现用其导出包装 `history.Inspect`）；hostname 掩码是 share 专属变换（报告层不掩，外发面掩为 `hostname.redacted` 并计入 inventory）；尾部脱敏声明由实际 Stats 生成，只声明实际发生的事。
 
 ## 1. 背景与目标
 
@@ -76,7 +78,7 @@
 
 ## 4. 分享物格式
 
-> **状态注记（2026-09-11）**：text 投影的第一块已随 `--markdown FILE` 落地为**本地导出**（论坛直贴版式：围栏代码块内的 textgrid 表格 + media 折叠 + 版本/catalog 溯源行），实现位于 `report/markdown.go` / `checkup/markdown.go`，与 console writer 共享每 section 的 body builder。`share` 子命令落地时，text 格式应从同一批 builder 派生而非另写渲染器；`--media summary|full` 的折叠语义即 `writeMediaFoldBody`。上传与 provider 仍未实现。
+> **状态注记（2026-09-11）**：text 投影的第一块已随 `--markdown FILE` 落地为**本地导出**（论坛直贴版式：围栏代码块内的 textgrid 表格 + media 折叠 + 版本/catalog 溯源行），实现位于 `report/markdown.go` / `checkup/markdown.go`，与 console writer 共享每 section 的 body builder。`share` 子命令（P1a）已按此结论落地：text 格式直调 `checkup.WriteMarkdownWithOptions`（`--media summary|full` 切换 `writeMediaFoldBody`/`writeMediaBody`），另加 `share` 尾注；上传与 provider 见 tech-stack 的 provider 表。
 
 ```
 --format text   # 默认。终端风格等宽文本，直接贴论坛/TG，目标 < 40 KiB
@@ -214,8 +216,8 @@ run/suite            # --share 等 flag 走 config_validation 归一化，与 CL
 
 | Phase | 内容 |
 |---|---|
-| P1a | `share` 子命令：redaction（ips/strict/none）+ text/json + dpaste + custom + dry-run + inventory |
-| P1b | 0x0/paste_rs 适配器；run/suite `--share` 直通；html 单文件分享；TUI `h` 键与确认弹窗 |
+| P1a ✅（2026-09-11） | `share` 子命令已落地：redaction（ips/none，`strict` 仍按 v1 定稿延后）+ text/json + **四个 provider 全部**（dpaste/0x0/paste_rs/custom）+ fallback 链 + dry-run + save-payload + inventory 尾注 + `--media summary\|full` |
+| P1b | run/suite `--share` 直通；html 单文件分享；TUI `h` 键与确认弹窗（0x0/paste_rs 适配器已提前随 P1a 交付） |
 | P2 | `--template forum`（论坛/中文模板，与"中文输出"P1 合并交付）；`vmbench history share <id>` |
 | P3 | MCP share tool（按 §8 前提重新评估）；端到端加密 provider（如 hemmelig 类） |
 

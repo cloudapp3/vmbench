@@ -33,6 +33,9 @@ other = "对比两份报告"
 [cli.usage.cmdScore]
 other = "按评分基线评估报告"
 
+[cli.usage.cmdShare]
+other = "把报告投影为可粘贴内容并上传"
+
 [cli.usage.cmdHistory]
 other = "管理本地报告历史"
 
@@ -81,6 +84,9 @@ other = "并排对比两份基准测试报告。"
 [cli.usage.scoreDetail]
 other = "使用确定性评分基线评估报告（不调用 LLM）。可用旗标：--json、--out、--baseline、--baseline-rev。"
 
+[cli.usage.shareDetail]
+other = "分享一份已保存的 run 或体检报告：先脱敏（默认掩蔽本机公网 IP 与主机名），再投影为 markdown 或 JSON，上传到 paste 服务。只有显式运行本命令才会上传。参数：--format text|json、--redact ips|none、--media summary|full、--provider dpaste,0x0,paste_rs,custom、--share-endpoint、--dry-run、--save-payload。"
+
 [cli.usage.updateDetail]
 other = "检查 GitHub Releases 是否有新版本并原地替换当前二进制 (按发布 checksums.txt 做 SHA-256 校验)。"
 
@@ -125,6 +131,24 @@ other = "将 HTML 报告写入文件"
 
 [cli.flag.markdown]
 other = "将可贴论坛的 markdown 报告写入文件 (section 用代码块包裹, 流媒体折叠)"
+
+[cli.flag.shareFormat]
+other = "分享投影格式：text（markdown，默认）或 json"
+
+[cli.flag.shareMedia]
+other = "text 投影的流媒体渲染：summary（折叠，默认）或 full"
+
+[cli.flag.shareProvider]
+other = "paste 提供商链，按 fallback 顺序（dpaste、0x0、paste_rs、custom）"
+
+[cli.flag.shareEndpoint]
+other = "custom 提供商的上传端点（仅 https）"
+
+[cli.flag.shareDryRun]
+other = "打印分享内容与脱敏清单，不上传"
+
+[cli.flag.savePayload]
+other = "保存脱敏后的分享副本到文件（0600）"
 
 [cli.flag.quiet]
 other = "抑制进度输出"
@@ -285,6 +309,15 @@ other = "写入 HTML 失败: {{.Err}}"
 [cli.error.writingMarkdown]
 other = "写入 markdown 失败: {{.Err}}"
 
+[cli.error.shareNeedsReport]
+other = "error: 需要恰好一个报告路径或 '-'（stdin）"
+
+[cli.error.shareUnknownMedia]
+other = 'error: --media 只接受 summary 或 full（收到 "{{.Value}}"）'
+
+[cli.error.shareTooLarge]
+other = "error：分享内容 {{.Size}} 超过 {{.Limit}} 上传上限；请改用 --format text 与折叠的流媒体视图后重试"
+
 [cli.error.badIPVersion]
 other = "错误: --ip-version 必须是 v4、v6、dual 之一"
 
@@ -371,6 +404,30 @@ other = "错误: history delete 只需要一个 ID"
 
 [cli.error.invalidStoredReport]
 other = "错误: 存储的报告无效: {{.Err}}"
+
+[cli.share.generatedBy]
+other = "由 vmbench share 生成"
+
+[cli.share.unredacted]
+other = "未脱敏（内容保留真实地址）"
+
+[cli.share.redactedNothing]
+other = "脱敏已启用：未发现需要掩蔽的本机地址或主机名"
+
+[cli.share.redacted]
+other = "已脱敏：ipv4×{{.IPv4}} ipv6×{{.IPv6}} hostname×{{.Hostname}}（{{.Sites}} 处替换）"
+
+[cli.share.uploaded]
+other = "已上传：{{.Format}} {{.Size}} 经 {{.Provider}}"
+
+[cli.share.providerFailed]
+other = "share：{{.Provider}} 失败：{{.Err}}"
+
+[cli.share.allFailed]
+other = "error：所有分享提供商均失败，未生成链接"
+
+[cli.share.dryRunHint]
+other = "提示：加 --dry-run 先审阅内容，或用 --save-payload 保留副本后自行分发"
 
 [cli.notice.historySaved]
 other = "历史: 已保存 {{.ID}}"

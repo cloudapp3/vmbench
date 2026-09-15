@@ -49,6 +49,11 @@ vmbench --quiet --json checkup.json
 # 派生评估（版本化基线，确定性评分）
 vmbench score report.json
 
+# 分享（显式触发：投影已脱敏报告并上传，返回链接）
+vmbench share report.json --dry-run    # 只看 payload 与脱敏清单，零网络
+vmbench share report.json              # 上传 dpaste（默认），打印 URL
+vmbench share report.json --provider dpaste,0x0   # 显式 fallback 链
+
 # 节点目录
 vmbench nodes list --node-catalog embedded
 vmbench nodes health --node-catalog auto --ip-family v6
@@ -66,7 +71,7 @@ curl -fsSL https://raw.githubusercontent.com/cloudapp3/vmbench/main/install.sh |
 
 已安装的二进制也可以自卸载：`vmbench uninstall` 先打印删除计划（历史报告条数、已获取的静态工具、TUI 偏好、数据目录与二进制本体），终端确认后按「目录 → 二进制」顺序删除；任一项失败即保留二进制，卸载可安全重跑。shell 启动文件与 systemd/launchd 服务的清理仍归 `install.sh --uninstall`——它探测到该子命令时会委托二进制卸载，再接管服务停止与 PATH 条目清理。参数：`--dry-run` 只打印计划，`--yes` 跳过确认，`--json` 输出结构化计划/结果。
 
-其他安装方式（固定版本、自定义目录、Windows、`go install`、源码构建）：源码方式可用 `go install github.com/cloudapp3/vmbench/cmd/vmbench@latest`，或本地构建 `go build -o vmbench ./cmd/vmbench`（项目验证脚本 `./sh/build.sh` 使用 CGO_ENABLED=0，输出到临时目录，可用 `VMBENCH_OUTPUT_DIR` 覆盖）；完整说明见英文 README 的 Install 一节。
+其他安装方式（固定版本、自定义目录、Windows、`go install`、源码构建）：源码方式可用 `go install github.com/cloudapp3/vmbench/cmd/vmbench@latest`，或本地构建 `go build -o vmbench ./cmd/vmbench`（项目验证脚本 `./sh/build.sh` 使用 CGO_ENABLED=0，输出到临时目录，可用 `VMBENCH_OUTPUT_DIR` 覆盖）；完整说明见[英文 README](README.en.md) 的 Install 一节。
 
 `vmbench` 一个命令同时覆盖硬件基准与 VPS 综合测评：不带 `--preset` / `--only` / `--skip` 时只编排外部工具硬件基准（等价 v0.7.0 的 `vmbench run`），preset 或 `--only` 选择网络 section 后走综合测评（原 `vmbench suite`）；路由、测速、IP 质量等网络诊断都在同一命令面上。workload 始终串行隔离执行，线程数与队列深度由外部工具参数定义。
 
@@ -119,6 +124,17 @@ vmbench --redact ips|none
 报告默认脱敏：本机公网 IPv4/IPv6 会在全部出口（Console/JSON/HTML/markdown/历史/TUI/MCP）被一致替换为文档保留段占位地址（`203.0.113.x` / `2001:db8::x`），内嵌该地址的 BGP/CIDR 网段与反向 DNSBL 标签一并替换；内网 IP、hostname、路由 hop、远端节点 IP 保留。`--redact none` 可保留真实地址（CLI 会输出分享警告）；TUI 与 MCP 恒为脱敏。
 
 `--markdown report.md` 导出论坛直贴版式：每个 section 一个 `##` 标题 + 围栏代码块内的 textgrid 等宽表格（CJK 对齐，任意渲染器不乱版式），流媒体折叠为每区域计数 + 仅异常项，头部引用行带版本/UTC 时间/catalog revision 溯源。与 JSON/HTML 同源同脱敏，不嵌评分。另：Linux 上 geekbench 低内存（RAM < 1 GiB 且 RAM+swap < 1.5 GiB）时 CLI 会提示为本轮创建临时 swapfile（`--auto-swap` 免确认），结束后自动移除。
+
+## 分享（share）
+
+`vmbench share <report.json|->` 把保存的 run/体检报告投影成可直贴的 payload，并且只有执行该子命令时才会上传、返回链接：
+
+- payload 复用 `--markdown` 投影（`--format json` 则是脱敏后报告 JSON 本体），尾部追加一行"由 vmbench share 生成 · 实际脱敏了什么"的尾注——只陈述真实发生的事，不伪造声明
+- 显式授权：基准运行、TUI、MCP 都不会调用 share，零默认上传
+- 脱敏在报告层 IP 掩码之上额外掩掉结构化 hostname（`--format json` 可见）；`--redact none` 保留真实地址并打印警告
+- `--dry-run` 只打印 payload 与脱敏清单，零网络；`--save-payload FILE` 以 0600 原子保存一份与上传字节完全一致的副本
+- provider：`dpaste`（默认）、`0x0`、`paste_rs`、`custom`（需 `--share-endpoint`，仅 https）；fallback 链用户显式指定（如 `--provider dpaste,0x0`），仅网络错误或 5xx 才试下一家，同一 payload 最多成功上传一次
+- payload 超过 512 KiB 直接拒绝并给出收敛建议（`--format text`、流媒体折叠），绝不静默截断
 
 ## TUI
 

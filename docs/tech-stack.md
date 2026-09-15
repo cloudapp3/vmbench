@@ -37,6 +37,7 @@ vmbench/
 ├── report/             # JSON/HTML/console/compare
 ├── checkup/            # VPS checkup（体检）+ section events
 ├── checkupcompare/     # checkup raw metric alignment + compatibility gate
+├── share/              # 报告分享管道（Prepare 投影/脱敏/inventory）+ paste provider 上传
 ├── sysinfo/            # 系统信息采集
 ├── tui/                # Bubble Tea TUI
 │   ├── theme/          # 8 主题 + AdaptiveColor
@@ -299,6 +300,22 @@ Benchmark Compare 会忽略带 `error` 的 metric；`ms avg` 按 latency 处理�
 Mail Compare 只比较 `status=open` 的成功连接延迟；`refused/timeout/error` 的耗时分别是拒绝响应、超时阈值或失败开销，不作为可比较 latency。
 
 `history/` 按平台 data directory 保存独立 JSON record，使用临时文件 + fsync + rename 原子落盘；Unix 目录 mode `0700`、文件 mode `0600`，其他平台依赖系统 ACL。`--save-history` 可从基准/体检直接写入，`--history-tag` 只作标签；`history compare --last N` 要求最近 N 份记录属于同一 report kind。
+
+## 分享（share/）
+
+`share/` 是唯一的上传出口，stdlib-only，两个面：
+
+- **管道（Prepare，纯函数无网络无 FS）**：`history.Inspect` 分型 run/checkup（含 legacy `suite`）→ 解码 typed struct → `redact.Apply` 复用报告层脱敏（幂等，从报告自身收割本机公网地址）+ share 特有的结构化 hostname 掩码 → 投影（`text` 复用两侧 `WriteMarkdown` + 尾注；`json` 为脱敏 JSON 本体）→ 512 KiB 体积护栏（`TooLargeError`，拒绝而非截断）。`Inventory` 记录实际脱敏计数（绝不回显原始地址），尾注与 stderr 用同一 Summary——只陈述真实发生的事。
+- **上传（Upload）**：provider 适配器 + fallback 链。仅 https、单次 30s 超时、无 provider 内重试、响应体 1 MiB 上限、UA `vmbench/<version> (+repo)`。
+
+| Provider | 协议 | 端点 |
+|----------|------|------|
+| `dpaste`（默认） | form POST（content/lexer=text/format=json/expiry_days=365），JSON 响应取 `url` | `https://dpaste.org/api/` |
+| `0x0` | multipart `file` 字段，响应体即 URL | `https://0x0.st` |
+| `paste_rs` | raw body POST，响应体即 URL | `https://paste.rs` |
+| `custom` | raw body POST，响应首行为 URL | `--share-endpoint`（仅 https，必填） |
+
+fallback 语义：成功即停（同一 payload 最多成功上传一次）；仅网络错误（`*url.Error`）或 HTTP ≥500 进入下一家；4xx、不可解析响应、超限响应为终止错误。逐家 `Attempt` 记录供 stderr 汇总。MCP v1 不暴露 share 工具。
 
 ## 构建一致性
 

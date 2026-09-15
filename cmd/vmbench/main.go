@@ -77,6 +77,8 @@ func run(args []string) int {
 		return unknownCommandExit(args[0])
 	case "score":
 		return runScore(args[1:])
+	case "share":
+		return runShare(args[1:])
 	case "history":
 		return runHistory(args[1:])
 	case "update":
@@ -127,6 +129,7 @@ func usageRows() []string {
 	}
 	return append(rows,
 		"  vmbench score     <report.json|->    "+i18n.T("cli.usage.cmdScore"),
+		"  vmbench share    <report.json|->    "+i18n.T("cli.usage.cmdShare"),
 		"  vmbench history   <command>           "+i18n.T("cli.usage.cmdHistory"),
 		"  vmbench update   [flags]              "+i18n.T("cli.usage.cmdUpdate"),
 		"  vmbench uninstall [flags]             "+i18n.T("cli.usage.cmdUninstall"),
