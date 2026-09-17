@@ -153,6 +153,10 @@ type Model struct {
 
 	helpFrom page
 
+	// langExplicit pins the UI language when the user cycles it in the TUI
+	// ("" = auto: follow VMBENCH_LANG / OS locale / default at startup).
+	langExplicit string
+
 	width  int
 	height int
 }
@@ -176,6 +180,14 @@ func NewModel(compareA, compareB string) Model {
 	}
 	return m
 }
+
+// SetLangPref pins the initial language preference ("" = auto) from the
+// config file or --lang flag; LangPref is read back at exit so only explicit
+// choices are persisted.
+func (m *Model) SetLangPref(pref string) { m.langExplicit = pref }
+
+// LangPref reports the explicit language choice, "" when following system.
+func (m Model) LangPref() string { return m.langExplicit }
 
 func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{loadSysinfo(), loadNetIdentity(), tickEvery(), m.spinner.Tick}

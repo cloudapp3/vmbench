@@ -9,8 +9,8 @@ import (
 )
 
 // updateMouse routes mouse events: the wheel scrolls every page; left clicks
-// activate Dashboard menu rows and the theme line. Other pages gain their own
-// click regions as they grow hit-testable geometry.
+// activate Dashboard menu rows, the theme line, and the language line. Other
+// pages gain their own click regions as they grow hit-testable geometry.
 func updateMouse(m Model, msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg.Button {
 	case tea.MouseButtonWheelUp, tea.MouseButtonWheelDown:
@@ -66,6 +66,10 @@ func dashboardClick(m Model, x, y int) (tea.Model, tea.Cmd) {
 		return updateDashboard(m, tea.KeyMsg{Type: tea.KeyEnter})
 	case row == count+1: // blank line then the theme line under the menu
 		theme.CycleTheme()
+		return m, nil
+	case row == count+2: // language line right below the theme line
+		m.langExplicit = cycleLangState(m.langExplicit)
+		applyLangState(m.langExplicit)
 		return m, nil
 	}
 	return m, nil

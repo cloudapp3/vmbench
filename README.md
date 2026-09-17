@@ -182,7 +182,7 @@ vmbench --node-catalog auto --save-history --history-tag weekly
 
 ## 界面语言
 
-CLI、TUI 与 console/HTML 报告标签支持简体中文和英文——用 `--lang`、`VMBENCH_LANG` 或 TUI 配置选择。JSON 字段名、状态枚举、section ID 与 workload 名称在任何语言下保持英文。
+CLI、TUI 与 console/HTML 报告标签支持简体中文和英文——默认跟随系统语言（`LC_ALL`/`LANG`），可用 `--lang` 或 `VMBENCH_LANG` 覆盖，也可在 TUI 首页按 `l`（或点语言行）三态循环：自动（跟随系统）→ English → 中文，显式选择写入 TUI 配置。JSON 字段名、状态枚举、section ID 与 workload 名称在任何语言下保持英文。
 
 ## 平台支持
 

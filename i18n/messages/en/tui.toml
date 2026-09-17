@@ -39,6 +39,15 @@ other = "theme"
 [tui.dashboard.themeCycle]
 other = "  press [t] to cycle"
 
+[tui.dashboard.lang]
+other = "language"
+
+[tui.dashboard.langCycle]
+other = "  press [l] to cycle"
+
+[tui.dashboard.langAuto]
+other = "auto (system)"
+
 [tui.header.loading]
 other = "loading..."
 
@@ -62,6 +71,9 @@ other = "select"
 
 [tui.hint.theme]
 other = "theme"
+
+[tui.hint.lang]
+other = "lang"
 
 [tui.hint.quit]
 other = "quit"

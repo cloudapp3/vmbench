@@ -33,11 +33,17 @@ func registerLangFlag(fs *flag.FlagSet) {
 	fs.Var(new(langValue), "lang", i18n.T("cli.flag.lang"))
 }
 
+// langFlagSeen records the last --lang value parsed on this invocation; the
+// tui command seeds its in-TUI language preference from it so the flag keeps
+// its historical persist-on-exit behavior.
+var langFlagSeen string
+
 type langValue struct{}
 
 func (l *langValue) String() string { return "" }
 
 func (l *langValue) Set(v string) error {
+	langFlagSeen = v
 	i18n.ApplyLang(v)
 	return nil
 }
@@ -415,7 +421,7 @@ func writeSysinfoConsole(w io.Writer, info sysinfo.SystemInfo, warnings []string
 	fmt.Fprintf(w, "  %s : %s (%s, %dC/%dT)\n", sysLabel("cpu"), firstNonEmpty(info.CPU.Model, "-"), firstNonEmpty(info.CPU.Arch, "-"), info.CPU.PhysicalCores, info.CPU.LogicalCores)
 	fmt.Fprintf(w, "  %s : %.1f GB %s\n", sysLabel("memory"), float64(info.Memory.TotalBytes)/(1024*1024*1024), strings.TrimSpace(strings.Join([]string{firstNonEmpty(info.Memory.Type, ""), memorySpeedText(info.Memory)}, " ")))
 	if info.Virtualization.System != "" || info.Virtualization.Role != "" {
-		fmt.Fprintf(w, "  %s : %s (%s)\n", sysLabel("virtual"), firstNonEmpty(info.Virtualization.System, i18n.Unknown()), firstNonEmpty(info.Virtualization.Role, i18n.Unknown()))
+		fmt.Fprintf(w, "  %s : %s (%s)\n", sysLabel("virtual"), firstNonEmpty(info.Virtualization.System, i18n.Unknown()), firstNonEmpty(info.Virtualization.RoleDisplay(), i18n.Unknown()))
 	}
 	if product := firstNonEmpty(info.DMI.ProductName, info.DMI.BoardName); product != "" {
 		fmt.Fprintf(w, "  %s : %s (%s)\n", sysLabel("dmi"), product, firstNonEmpty(info.DMI.SysVendor, info.DMI.BoardVendor, "-"))

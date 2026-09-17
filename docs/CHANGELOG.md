@@ -1,6 +1,19 @@
 # VMBench Changelog
 
-## Unreleased
+## v0.15.0（2026-09-17）
+
+### 展示文案：虚拟化角色 guest 显示为 vm
+
+- `sysinfo.VirtualizationInfo.RoleDisplay()` 只在展示层把 `guest` 映射为 `vm`（`host` 与未知值透传），TUI 系统卡、CLI `sysinfo`、HTML 报告三处统一从原始值改走该方法；JSON 数据字段仍写 `guest`，存量报告读取与新旧兼容不受影响。
+- 动机：`kvm (guest)` 里的 "guest" 是虚拟化行话，对非专业用户不直白；`kvm (vm)` 一眼可懂且与 `host` 凑成一对。
+
+### TUI 界面内语言切换 + 默认跟随系统
+
+- **背景**：语言此前只能靠 `--lang`/`VMBENCH_LANG`/手改配置文件，且 TUI 退出时把当次生效语言无条件写回配置（`cfg.Lang = i18n.Lang()`），"跟随系统"被固化成永久钉死——zh 系统用户跑过一次 `--lang en` 后系统语言再变也不跟随。
+- **交互**：首页主题行下新增语言行，`l` 键或鼠标点击三态循环：自动（跟随系统）→ English → 中文 → 自动。语言名用自称（English/中文，与界面语言无关），自动态附 `自动 (跟随系统)` / `auto (system)` 后缀；实际显示语言始终取 `i18n.Lang()`。
+- **持久化语义**：偏好存 `Model.langExplicit`（""=自动），退出只持久化显式选择——自动态下配置文件 `lang` 字段缺省，下次启动走 `Init` 的 `VMBENCH_LANG` → 系统 locale → 默认链；`--lang` 保持旧行为（当次生效并持久化），存量已钉死的配置尊重不动，用户可按 `l` 切回自动。
+- **实现**：i18n 层零改动（`SetLang` 原子换 localizer、`T()` 实时取词零缓存，`menuItems()`/help 均渲染期解析，切语言即刻生效不破版）；新增 `tui/lang.go`（循环环 = `["", ...i18n.Supported()]`，未来加语言自动进环）；`p.Run()` 最终模型取回读 `LangPref()`；新增词条 `tui.dashboard.lang/langCycle/langAuto` + `tui.hint.lang`（双语同步）。
+- **测试**：`tui/lang_test.go`（循环顺序、auto 经 `VMBENCH_LANG` 重解析、label 后缀、`l` 键三轮、语言行渲染于主题行正下方）；`mouse_test.go` 补语言行点击测试与 count+1/count+2 几何钉住（theme 行此前无测试覆盖，属补漏）。
 
 ### `vmbench share`：跑完即链接的分享子命令（P1a）
 

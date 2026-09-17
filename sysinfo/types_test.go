@@ -33,6 +33,15 @@ func TestVirtualizationInfoJSONFields(t *testing.T) {
 	}
 }
 
+func TestVirtualizationRoleDisplay(t *testing.T) {
+	cases := map[string]string{"guest": "vm", "host": "host", "": ""}
+	for role, want := range cases {
+		if got := (VirtualizationInfo{Role: role}).RoleDisplay(); got != want {
+			t.Fatalf("RoleDisplay(%q) = %q, want %q", role, got, want)
+		}
+	}
+}
+
 func TestCollectVirtualizationInfoMergesLocalFallback(t *testing.T) {
 	primary := func(context.Context) (string, string, error) {
 		return "", "guest", nil

@@ -184,7 +184,7 @@ Keys: `?` help · `↑↓` navigate · `Enter` select · `Tab` switch view · `d
 
 ## Languages
 
-CLI, TUI, and console/HTML report labels are localized in English and Simplified Chinese — select with `--lang`, `VMBENCH_LANG`, or the TUI config. JSON field names, status enums, section IDs, and workload names stay English in every locale.
+CLI, TUI, and console/HTML report labels are localized in English and Simplified Chinese — by default they follow the system locale (`LC_ALL`/`LANG`). Override with `--lang` or `VMBENCH_LANG`, or press `l` (or click the language line) on the TUI dashboard to cycle auto (system) → English → 中文; an explicit choice is saved to the TUI config. JSON field names, status enums, section IDs, and workload names stay English in every locale.
 
 ## Platform Support
 

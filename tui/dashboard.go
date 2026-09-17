@@ -56,6 +56,9 @@ func updateDashboard(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "t":
 		theme.CycleTheme()
+	case "l":
+		m.langExplicit = cycleLangState(m.langExplicit)
+		applyLangState(m.langExplicit)
 	case "q":
 		return m, tea.Quit
 	}
@@ -141,6 +144,11 @@ func dashboardMenu(m Model, width int) string {
 		lipgloss.NewStyle().Foreground(t.Secondary).Bold(true).Render(theme.Active.Name) +
 		lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.Tf("tui.dashboard.themeCycle", nil))
 	lines = append(lines, themeLine)
+
+	langLine := lipgloss.NewStyle().Foreground(t.Muted).Render("  "+i18n.T("tui.dashboard.lang")+": ") +
+		lipgloss.NewStyle().Foreground(t.Secondary).Bold(true).Render(langLineLabel(m.langExplicit)) +
+		lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.Tf("tui.dashboard.langCycle", nil))
+	lines = append(lines, langLine)
 
 	return strings.Join(lines, "\n")
 }
@@ -295,7 +303,7 @@ func sysVirtDetailCard(m Model, cardW int) string {
 	if sys.Virtualization.System != "" || sys.Virtualization.Role != "" {
 		platform := firstStr(sys.Virtualization.System, "?")
 		if sys.Virtualization.Role != "" {
-			platform += " (" + sys.Virtualization.Role + ")"
+			platform += " (" + sys.Virtualization.RoleDisplay() + ")"
 		}
 		rows = append(rows, comp.KV{Key: i18n.T("tui.sys.virt"), Value: platform})
 	}

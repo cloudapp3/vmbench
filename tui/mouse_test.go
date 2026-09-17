@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/cloudapp3/vmbench/i18n"
 )
 
 func wheelMsg(down bool) tea.MouseMsg {
@@ -74,6 +76,42 @@ func TestDashboardMenuRegionMatchesRender(t *testing.T) {
 				t.Fatalf("width %d: menu row %d (%q) does not contain label %q", width, i, rows[line], item.label)
 			}
 		}
+
+		// The theme and language lines must sit exactly where the click
+		// handler expects them (count+1 / count+2).
+		if row := top + count + 1; row >= len(rows) {
+			t.Fatalf("width %d: theme line row %d beyond rendered content", width, row)
+		} else if !strings.Contains(rows[row], i18n.T("tui.dashboard.theme")) {
+			t.Fatalf("width %d: theme line row %d (%q) misplaced", width, row, rows[row])
+		}
+		if row := top + count + 2; row >= len(rows) {
+			t.Fatalf("width %d: language line row %d beyond rendered content", width, row)
+		} else if !strings.Contains(rows[row], i18n.T("tui.dashboard.lang")) {
+			t.Fatalf("width %d: language line row %d (%q) misplaced", width, row, rows[row])
+		}
+	}
+}
+
+func TestDashboardClickCyclesLanguageLine(t *testing.T) {
+	t.Setenv("VMBENCH_LANG", "en") // pin auto resolution for the wrap-around
+	defer i18n.SetLang("en")
+	m := scrollTestModel(t, pageDashboard, nil)
+	top, count, _ := dashboardMenuRegion(m)
+
+	updated, _ := m.Update(clickMsg(5, contentOriginY(m)+top+count+2))
+	um, ok := updated.(Model)
+	if !ok {
+		t.Fatalf("Update returned %T, want Model", updated)
+	}
+	if um.langExplicit != "en" || i18n.Lang() != "en" {
+		t.Fatalf("language-line click: langExplicit = %q, active = %q, want en/en", um.langExplicit, i18n.Lang())
+	}
+
+	// Clicking the theme line one row above must not touch language state.
+	updated, _ = um.Update(clickMsg(5, contentOriginY(m)+top+count+1))
+	um = updated.(Model)
+	if um.langExplicit != "en" {
+		t.Fatalf("theme-line click should not change language state, langExplicit = %q", um.langExplicit)
 	}
 }
 

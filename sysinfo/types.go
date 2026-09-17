@@ -76,6 +76,16 @@ type VirtualizationInfo struct {
 	Role   string `json:"role,omitempty"`
 }
 
+// RoleDisplay returns Role as shown to users: the hypervisor jargon "guest"
+// renders as "vm", which reads clearer next to a system like "kvm". The JSON
+// field keeps the raw detector value so stored reports stay stable.
+func (v VirtualizationInfo) RoleDisplay() string {
+	if v.Role == "guest" {
+		return "vm"
+	}
+	return v.Role
+}
+
 // DMIInfo stores raw SMBIOS/DMI identity strings used to recognize the
 // platform (e.g. product_name "Alibaba Cloud ECS"). Fields stay empty when
 // the host exposes no DMI (containers, some hypervisors); renderers skip

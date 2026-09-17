@@ -128,7 +128,7 @@ func TestDashboardSysExpandedShowsAllEvidenceCards(t *testing.T) {
 	m := Model{sysInfo: expandedSysInfo()}
 	view := dashboardSysExpanded(m, 120)
 	for _, want := range []string{
-		"Alibaba Cloud ECS", "kvm (guest)", "vmx", // virtualization
+		"Alibaba Cloud ECS", "kvm (vm)", "vmx", // virtualization
 		"DDR4 2666 MT/s ×2", "20%", "12.0 GiB", // memory
 		"vda", "ext4", "/", // storage
 		"enabled (!)", "1234 pages", // oversell detail

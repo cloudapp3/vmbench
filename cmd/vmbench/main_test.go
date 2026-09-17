@@ -183,7 +183,7 @@ func TestWriteSysinfoConsoleShowsDMIAndMemorySpec(t *testing.T) {
 	writeSysinfoConsole(&out, info, nil)
 	text := out.String()
 	for _, want := range []string{
-		"kvm (guest)",
+		"kvm (vm)",
 		"Alibaba Cloud ECS (Alibaba Cloud)",
 		"16.0 GB DDR4 2666 MT/s ×2",
 	} {

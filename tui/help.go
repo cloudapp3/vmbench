@@ -41,6 +41,7 @@ func helpFor(p page) []helpEntry {
 			{keys: "↑↓/jk", descKey: "tui.hint.nav", short: true},
 			{keys: "↵", descKey: "tui.hint.select", short: true},
 			{keys: "t", descKey: "tui.hint.theme", short: true},
+			{keys: "l", descKey: "tui.hint.lang", short: true},
 			{keys: "q", descKey: "tui.hint.quit", short: true},
 		}
 	case pageRunning:

@@ -39,6 +39,15 @@ other = "主题"
 [tui.dashboard.themeCycle]
 other = "  按 [t] 切换"
 
+[tui.dashboard.lang]
+other = "语言"
+
+[tui.dashboard.langCycle]
+other = "  按 [l] 切换"
+
+[tui.dashboard.langAuto]
+other = "自动 (跟随系统)"
+
 [tui.header.loading]
 other = "加载中..."
 
@@ -62,6 +71,9 @@ other = "选择"
 
 [tui.hint.theme]
 other = "主题"
+
+[tui.hint.lang]
+other = "语言"
 
 [tui.hint.quit]
 other = "退出"

@@ -37,17 +37,30 @@ func runTUI(args []string) int {
 	cfg := tui.LoadConfig()
 	theme.InitThemeFromEnv(cfg.Theme)
 
-	p := tea.NewProgram(tui.NewModel(compareA, compareB),
+	model := tui.NewModel(compareA, compareB)
+	// An explicit --lang seeds the preference (and keeps persisting on exit,
+	// as it always has); otherwise the config file's choice carries over and
+	// "" stays auto: follow VMBENCH_LANG / system locale / default.
+	pref := cfg.Lang
+	if langFlagSeen != "" {
+		pref = i18n.Lang() // ApplyLang already ran during flag parsing
+	}
+	model.SetLangPref(pref)
+
+	p := tea.NewProgram(model,
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)
-	if _, err := p.Run(); err != nil {
+	final, err := p.Run()
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 		return 1
 	}
 
 	cfg.Theme = theme.Active.Name
-	cfg.Lang = i18n.Lang()
+	if m, ok := final.(tui.Model); ok {
+		cfg.Lang = m.LangPref() // "" (auto) omits the field via omitempty
+	}
 	_ = tui.SaveConfig(cfg)
 	return 0
 }
