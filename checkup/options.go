@@ -67,6 +67,11 @@ const (
 	EventSectionFail  EventKind = "section.fail"
 	EventSectionSkip  EventKind = "section.skip"
 	EventCheckupDone  EventKind = "checkup.done"
+	// Item events report progress inside one section (e.g. one speed
+	// provider) so long sections do not look silent between start and done.
+	EventItemStart EventKind = "item.start"
+	EventItemDone  EventKind = "item.done"
+	EventItemFail  EventKind = "item.fail"
 )
 
 type Event struct {
@@ -74,10 +79,28 @@ type Event struct {
 	Section SectionID
 	Status  string
 	Message string
-	Time    time.Time
+	// Item names the sub-unit an item event is about (e.g. "cloudflare");
+	// empty for section- and checkup-level events.
+	Item string
+	Time time.Time
 }
 
 type EventHandler func(Event)
+
+// emitItem reports sub-section progress to the handler; a no-op when no
+// handler is installed. status follows the same tokens as section states.
+func emitItem(on EventHandler, sec SectionID, item, status, msg string) {
+	if on == nil {
+		return
+	}
+	kind := EventItemDone
+	if status == "running" {
+		kind = EventItemStart
+	} else if status == "error" {
+		kind = EventItemFail
+	}
+	on(Event{Kind: kind, Section: sec, Status: status, Message: msg, Item: item, Time: time.Now()})
+}
 
 type RoutePresetSpec struct {
 	ID          string `json:"id"`

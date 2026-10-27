@@ -15,6 +15,9 @@ other = "Warnings"
 [report.console.ok]
 other = "ok"
 
+[report.console.failures]
+other = "{{.Failed}}/{{.Total}} workloads failed (see the ERR rows above)"
+
 [report.label.cpu]
 other = "CPU"
 

@@ -173,6 +173,36 @@ func TestUploadFallsBackOn5xx(t *testing.T) {
 	}
 }
 
+// TestUploadFallsBackOn403 mirrors the observed dpaste behavior on datacenter
+// IP ranges: a 403 must move on to the next provider like a 5xx would.
+func TestUploadFallsBackOn403(t *testing.T) {
+	var secondHits atomic.Int32
+	blocked, client := newTLSServer(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "blocked", http.StatusForbidden)
+	})
+	alive, _ := newTLSServer(t, func(w http.ResponseWriter, r *http.Request) {
+		secondHits.Add(1)
+		io.WriteString(w, "https://example.com/ok")
+	})
+	pasteURL, attempts, err := Upload(context.Background(), []byte("payload"), UploadOptions{
+		Providers: []string{ProviderDpaste, ProviderZerox0},
+		Client:    client,
+		Endpoints: map[string]string{ProviderDpaste: blocked.URL, ProviderZerox0: alive.URL},
+	})
+	if err != nil {
+		t.Fatalf("403 fallback upload failed: %v (attempts %+v)", err, attempts)
+	}
+	if pasteURL != "https://example.com/ok" {
+		t.Fatalf("pasteURL = %q", pasteURL)
+	}
+	if len(attempts) != 1 || attempts[0].Provider != ProviderDpaste {
+		t.Fatalf("attempts = %+v, want one failed dpaste try", attempts)
+	}
+	if secondHits.Load() != 1 {
+		t.Fatalf("second provider hits = %d, want 1", secondHits.Load())
+	}
+}
+
 func TestUploadFallsBackOnNetworkError(t *testing.T) {
 	// Reserve then release a port: dialing it is a genuine connection error.
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -309,8 +339,8 @@ func TestParsePasteURL(t *testing.T) {
 }
 
 func TestParseProviders(t *testing.T) {
-	if got, err := ParseProviders("", ""); err != nil || len(got) != 1 || got[0] != DefaultProviders {
-		t.Fatalf("ParseProviders(\"\") = %v, %v; want [dpaste]", got, err)
+	if got, err := ParseProviders("", ""); err != nil || strings.Join(got, ",") != DefaultProviders {
+		t.Fatalf("ParseProviders(\"\") = %v, %v; want default chain %s", got, err, DefaultProviders)
 	}
 	got, err := ParseProviders(" dpaste , 0X0 ,", "")
 	if err != nil {
@@ -335,7 +365,8 @@ func TestParseProviders(t *testing.T) {
 }
 
 // TestFallbackableClassification pins the fallback contract at the unit level:
-// only network errors and 5xx responses move on to the next provider.
+// network errors, 5xx responses, and 403/429 rejections move on to the next
+// provider.
 func TestFallbackableClassification(t *testing.T) {
 	networkErr := &url.Error{Op: "Post", URL: "https://paste.example/", Err: &net.OpError{Op: "dial", Err: errors.New("refused")}}
 	if !fallbackable(networkErr) {
@@ -344,8 +375,11 @@ func TestFallbackableClassification(t *testing.T) {
 	if !fallbackable(&httpError{Status: 500, Body: "boom"}) || !fallbackable(&httpError{Status: 503}) {
 		t.Fatal("5xx must be fallbackable")
 	}
-	if fallbackable(&httpError{Status: 404}) || fallbackable(&httpError{Status: 429}) {
-		t.Fatal("4xx must be terminal")
+	if !fallbackable(&httpError{Status: 403}) || !fallbackable(&httpError{Status: 429}) {
+		t.Fatal("403 (range block) and 429 (rate limit) must be fallbackable")
+	}
+	if fallbackable(&httpError{Status: 404}) || fallbackable(&httpError{Status: 400}) {
+		t.Fatal("other 4xx must be terminal")
 	}
 	if fallbackable(errors.New("share: decoding response")) {
 		t.Fatal("unparseable response must be terminal")

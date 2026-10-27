@@ -44,6 +44,12 @@ func (l *langValue) String() string { return "" }
 
 func (l *langValue) Set(v string) error {
 	langFlagSeen = v
+	if v == "auto" {
+		// Auto re-runs detection (env > OS locale > default), matching the
+		// TUI's three-state cycle where the unset value means auto.
+		i18n.Init("", "")
+		return nil
+	}
 	i18n.ApplyLang(v)
 	return nil
 }
@@ -94,7 +100,13 @@ func run(args []string) int {
 	case "version", "--version", "-v":
 		fmt.Printf("vmbench %s\n", vmbench.Version)
 		return 0
-	case "-h", "--help", "help":
+	case "-h", "--help":
+		printRootHelp(os.Stdout)
+		return 0
+	case "help":
+		if len(args) > 1 {
+			return helpTopic(args[1])
+		}
 		printRootHelp(os.Stdout)
 		return 0
 	case "run", "suite":
@@ -114,32 +126,49 @@ func run(args []string) int {
 // (FeatureCompare=false) reuse this so they look absent, not disabled.
 func unknownCommandExit(name string) int {
 	fmt.Fprintf(os.Stderr, "%s\n\n", i18n.Tf("cli.error.unknownCommand", map[string]any{"Command": name}))
+	if name == "compare" && !vmbench.FeatureCompare {
+		fmt.Fprintln(os.Stderr, i18n.T("cli.notice.compareUnavailable"))
+	}
 	printUsage(os.Stderr)
 	return 2
+}
+
+// helpTopic forwards `vmbench help <command>` to that command's own help so
+// the topic argument is not silently swallowed by the root help.
+func helpTopic(topic string) int {
+	switch topic {
+	case "tui", "mcp", "list", "nodes", "tools", "sysinfo", "compare", "score",
+		"share", "history", "update", "uninstall":
+		return run([]string{topic, "--help"})
+	default:
+		return unknownCommandExit(topic)
+	}
 }
 
 // usageRows renders the command list shared by the short usage and the full
 // root help. The first row is the merged root benchmark surface.
 func usageRows() []string {
+	row := func(cmd, desc string) string { return fmt.Sprintf("  %-38s %s", cmd, desc) }
 	rows := []string{
-		"  vmbench [flags]                      " + i18n.T("cli.usage.cmdBench"),
-		"  vmbench tui                          " + i18n.T("cli.usage.cmdTui"),
-		"  vmbench mcp serve [flags]            " + i18n.T("cli.usage.cmdMcp"),
-		"  vmbench list                          " + i18n.T("cli.usage.cmdList"),
-		"  vmbench nodes     <command> [flags]   " + i18n.T("cli.usage.cmdNodes"),
-		"  vmbench tools    <command> [flags]   " + i18n.T("cli.usage.cmdTools"),
-		"  vmbench sysinfo   [--json]            " + i18n.T("cli.usage.cmdSysinfo"),
+		row("vmbench", i18n.T("cli.usage.cmdNoArgs")),
+		row("vmbench [flags]", i18n.T("cli.usage.cmdBench")),
+		row("vmbench tui", i18n.T("cli.usage.cmdTui")),
+		row("vmbench mcp serve [flags]", i18n.T("cli.usage.cmdMcp")),
+		row("vmbench list", i18n.T("cli.usage.cmdList")),
+		row("vmbench nodes <command> [flags]", i18n.T("cli.usage.cmdNodes")),
+		row("vmbench tools <command> [flags]", i18n.T("cli.usage.cmdTools")),
+		row("vmbench sysinfo [--json]", i18n.T("cli.usage.cmdSysinfo")),
 	}
 	if vmbench.FeatureCompare {
-		rows = append(rows, "  vmbench compare   <a.json> <b.json>   "+i18n.T("cli.usage.cmdCompare"))
+		rows = append(rows, row("vmbench compare <a.json> <b.json>", i18n.T("cli.usage.cmdCompare")))
 	}
 	return append(rows,
-		"  vmbench score     <report.json|->    "+i18n.T("cli.usage.cmdScore"),
-		"  vmbench share    <report.json|->    "+i18n.T("cli.usage.cmdShare"),
-		"  vmbench history   <command>           "+i18n.T("cli.usage.cmdHistory"),
-		"  vmbench update   [flags]              "+i18n.T("cli.usage.cmdUpdate"),
-		"  vmbench uninstall [flags]             "+i18n.T("cli.usage.cmdUninstall"),
-		"  vmbench version                       "+i18n.T("cli.usage.cmdVersion"),
+		row("vmbench score <report.json|->", i18n.T("cli.usage.cmdScore")),
+		row("vmbench share <report.json|->", i18n.T("cli.usage.cmdShare")),
+		row("vmbench history <command>", i18n.T("cli.usage.cmdHistory")),
+		row("vmbench update [flags]", i18n.T("cli.usage.cmdUpdate")),
+		row("vmbench uninstall [flags]", i18n.T("cli.usage.cmdUninstall")),
+		row("vmbench version", i18n.T("cli.usage.cmdVersion")),
 	)
 }
 
@@ -150,18 +179,22 @@ func printUsage(w io.Writer) {
 		i18n.T("cli.usage.header"),
 		strings.Join(usageRows(), "\n"),
 		"",
+		i18n.T("cli.usage.examples"),
+		"",
 		i18n.T("cli.usage.detailHint"),
 	}, "\n"))
 }
 
-// printRootHelp is the full root help: usage, benchmark detail, reference
-// blocks, and every benchmark flag.
+// printRootHelp is the full root help: usage, examples, benchmark detail,
+// reference blocks, and every benchmark flag.
 func printRootHelp(w io.Writer) {
 	fmt.Fprintln(w, strings.Join([]string{
 		i18n.T("cli.usage.tagline"),
 		"",
 		i18n.T("cli.usage.header"),
 		strings.Join(usageRows(), "\n"),
+		"",
+		i18n.T("cli.usage.examples"),
 		"",
 		i18n.T("cli.usage.benchDetail"),
 		"",
@@ -170,14 +203,14 @@ func printRootHelp(w io.Writer) {
 }
 
 // printBenchUsage backs the benchmark FlagSet's own --help output.
-func printBenchUsage(fs *flag.FlagSet) {
-	fmt.Fprintln(os.Stderr, strings.Join([]string{
+func printBenchUsage(w io.Writer, fs *flag.FlagSet) {
+	fmt.Fprintln(w, strings.Join([]string{
 		"Usage: vmbench [flags]",
 		"",
 		i18n.T("cli.usage.benchDetail"),
 		"",
 	}, "\n"))
-	printBenchDetails(os.Stderr, fs)
+	printBenchDetails(w, fs)
 }
 
 // printBenchDetails writes the benchmark reference blocks (presets, speed
@@ -282,6 +315,10 @@ func checkupProgressPrinterTo(w io.Writer, enabled bool) checkup.EventHandler {
 			fmt.Fprintf(w, "  [checkup] %s %s\n", i18n.PadCells(section, 16), i18n.T("cli.progress.running"))
 		case checkup.EventSectionDone, checkup.EventSectionFail:
 			fmt.Fprintf(w, "  [checkup] %s %s %s\n", i18n.PadCells(section, 16), i18n.PadCells(status, 7), strings.TrimSpace(event.Message))
+		case checkup.EventItemStart:
+			fmt.Fprintf(w, "      %s %s\n", i18n.PadCells(event.Item, 24), i18n.T("cli.progress.running"))
+		case checkup.EventItemDone, checkup.EventItemFail:
+			fmt.Fprintf(w, "      %s %s %s\n", i18n.PadCells(event.Item, 24), i18n.PadCells(status, 7), strings.TrimSpace(event.Message))
 		case checkup.EventCheckupDone:
 			fmt.Fprintf(w, "  [checkup] %s %s %s\n", i18n.PadCells(i18n.T("cli.progress.complete"), 16), i18n.PadCells(status, 7), strings.TrimSpace(event.Message))
 		}
@@ -351,19 +388,48 @@ func linuxHardwarePackages(tools []string) []string {
 
 func runList(args []string) int {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
+	var asJSON bool
+	fs.BoolVar(&asJSON, "json", false, i18n.T("cli.flag.jsonList"))
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: vmbench list\n\n"+i18n.T("cli.usage.listDetail"))
+		fmt.Fprintln(fs.Output(), "Usage: vmbench list [--json]\n\n"+i18n.T("cli.usage.listDetail"))
 	}
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 
 	defs := catalog.DefaultDefinitions()
+	if asJSON {
+		type workload struct {
+			Name        string `json:"name"`
+			Category    string `json:"category"`
+			Description string `json:"description"`
+		}
+		out := make([]workload, 0, len(defs))
+		for _, def := range defs {
+			out = append(out, workload{
+				Name:        strings.TrimSpace(def.Name),
+				Category:    strings.TrimSpace(def.Category),
+				Description: strings.TrimSpace(def.Description),
+			})
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(out); err != nil {
+			printErr(err)
+			return 1
+		}
+		return 0
+	}
 	tw := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
 	fmt.Fprintln(tw, strings.Join([]string{i18n.T("cli.list.workload"), i18n.T("cli.list.category"), i18n.T("cli.list.description")}, "\t"))
 	for _, def := range defs {
@@ -375,13 +441,13 @@ func runList(args []string) int {
 
 func runSysinfo(args []string) int {
 	fs := flag.NewFlagSet("sysinfo", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
 
 	var asJSON bool
 	fs.BoolVar(&asJSON, "json", false, i18n.T("cli.flag.jsonSysinfo"))
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, strings.Join([]string{
+		fmt.Fprintln(fs.Output(), strings.Join([]string{
 			"Usage: vmbench sysinfo [--json]",
 			"",
 			i18n.T("cli.usage.sysinfoDetail"),
@@ -390,8 +456,13 @@ func runSysinfo(args []string) int {
 
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 
@@ -448,7 +519,7 @@ func writeSysinfoConsole(w io.Writer, info sysinfo.SystemInfo, warnings []string
 			fmt.Fprintf(w, "  %s : %s\n", sysLabel("timezone"), platform.Timezone)
 		}
 		if platform.SwapTotalBytes > 0 {
-			fmt.Fprintf(w, "  %s : %s\n", sysLabel("swap"), i18n.Tf("cli.sysinfo.swapUsed", map[string]any{"Used": formatBytes(platform.SwapUsedBytes), "Total": formatBytes(platform.SwapTotalBytes)}))
+			fmt.Fprintf(w, "  %s : %s\n", sysLabel("swap"), i18n.Tf("cli.sysinfo.swapUsed", map[string]any{"Used": formatBytesAmount(platform.SwapUsedBytes), "Total": formatBytes(platform.SwapTotalBytes)}))
 		}
 		if platform.VirtioBalloon != "" {
 			fmt.Fprintf(w, "  %s : %s\n", sysLabel("balloon"), platform.VirtioBalloon)
@@ -508,15 +579,20 @@ func writeSysinfoConsole(w io.Writer, info sysinfo.SystemInfo, warnings []string
 
 func runCompare(args []string) int {
 	fs := flag.NewFlagSet("compare", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: vmbench compare <report1.json> <report2.json>\n\n"+i18n.T("cli.usage.compareDetail"))
+		fmt.Fprintln(fs.Output(), "Usage: vmbench compare <report1.json> <report2.json>\n\n"+i18n.T("cli.usage.compareDetail"))
 	}
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 	if fs.NArg() < 2 {
@@ -662,6 +738,15 @@ func formatBytesInt64(value int64) string {
 		return "-"
 	}
 	return formatBytes(uint64(value))
+}
+
+// formatBytesAmount renders an amount inside a known total: zero stays "0 B"
+// instead of the "-" that standalone unknown-value formatting uses.
+func formatBytesAmount(value uint64) string {
+	if value == 0 {
+		return "0 B"
+	}
+	return formatBytes(value)
 }
 
 // formatDuration renders an uptime in days/hours/minutes.

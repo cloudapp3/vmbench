@@ -37,14 +37,14 @@ func updateDashboard(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "compare":
 			m.page = pageComparePicker
-			if m.picker.records == nil && !m.picker.loading && m.picker.err == nil {
+			if pickerNeedsLoad(m.picker) {
 				m.picker.loading = true
 				return m, loadHistoryCmd()
 			}
 			return m, nil
 		case "history":
 			m.page = pageHistory
-			if m.history.records == nil && !m.history.loading && m.history.err == nil {
+			if historyNeedsLoad(m.history) {
 				m.history.loading = true
 				return m, loadHistoryCmd()
 			}
@@ -54,11 +54,6 @@ func updateDashboard(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "quit":
 			return m, tea.Quit
 		}
-	case "t":
-		theme.CycleTheme()
-	case "l":
-		m.langExplicit = cycleLangState(m.langExplicit)
-		applyLangState(m.langExplicit)
 	case "q":
 		return m, tea.Quit
 	}

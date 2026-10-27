@@ -58,13 +58,18 @@ func toolsStatusRows() []catalog.HardwareToolSpec {
 
 func runToolsStatus(args []string) int {
 	fs := flag.NewFlagSet("tools status", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
-	fs.Usage = func() { fmt.Fprintln(os.Stderr, "Usage: vmbench tools status") }
+	fs.Usage = func() { fmt.Fprintln(fs.Output(), "Usage: vmbench tools status") }
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 
@@ -93,7 +98,7 @@ func runToolsStatus(args []string) int {
 
 func runToolsFetch(args []string) int {
 	fs := flag.NewFlagSet("tools fetch", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
 	var (
 		all     bool
@@ -104,9 +109,9 @@ func runToolsFetch(args []string) int {
 	fs.BoolVar(&all, "all", false, i18n.T("cli.flag.toolsAll"))
 	fs.StringVar(&dest, "dest", "", i18n.T("cli.flag.toolsDest"))
 	fs.StringVar(&base, "url", "", i18n.T("cli.flag.toolsURL"))
-	fs.DurationVar(&timeout, "timeout", 120*time.Second, i18n.T("cli.flag.toolsTimeout"))
+	fs.DurationVar(&timeout, "timeout", 120*time.Second, "overall timeout for the whole fetch, all selected tools combined (default 2m)")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, strings.Join([]string{
+		fmt.Fprintln(fs.Output(), strings.Join([]string{
 			"Usage: vmbench tools fetch [tool ...] [flags]",
 			"",
 			i18n.T("cli.usage.toolsFetchDetail"),
@@ -114,8 +119,13 @@ func runToolsFetch(args []string) int {
 	}
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 	if timeout <= 0 {

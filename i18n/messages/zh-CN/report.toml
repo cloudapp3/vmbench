@@ -15,6 +15,9 @@ other = "警告"
 [report.console.ok]
 other = "正常"
 
+[report.console.failures]
+other = "{{.Failed}}/{{.Total}} 个 workload 失败（见上方 ERR 行）"
+
 [report.label.cpu]
 other = "CPU"
 

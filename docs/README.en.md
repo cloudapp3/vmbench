@@ -34,7 +34,7 @@ VMBENCH_BIN_DIR="$(
 )" && export PATH="$VMBENCH_BIN_DIR:$PATH"
 
 vmbench                          # interactive TUI: tick the tests you want, press Enter
-vmbench --json report.json       # plain hardware benchmark (the default run)
+vmbench --json-out report.json       # plain hardware benchmark (the default run)
 vmbench --preset quick           # first-five-minutes check: hardware + network info + speed + IP quality
 vmbench --preset proxy           # the proxy-box question: route, ping, speed, IP quality, unlock, reachability
 vmbench --markdown report.md     # forum-pasteable report — public IP already masked
@@ -90,7 +90,7 @@ Downloads are SHA-256 verified against the release `checksums.txt`, then atomica
 | `vmbench mcp serve [--transport stdio]` | Expose vmbench tools to LLM clients via MCP stdio |
 | `vmbench list` | List available workloads |
 | `vmbench sysinfo [--json]` | Show system information |
-| `vmbench score <report.json\|->` | Derive a deterministic assessment from a report against the versioned scoring baseline |
+| `vmbench score <report.json\|->` | Derive a deterministic assessment from a report against the versioned scoring baseline (coverage / confidence percentages plus a source backlink; uncalibrated baselines are explicitly marked provisional) |
 | `vmbench share <report.json\|->` | Project a saved report into a redacted paste and upload it to an explicitly chosen provider |
 | `vmbench history <command>` | Add / list / show / delete local reports |
 | `vmbench update [--check] [--version TAG]` | Self-update from GitHub Releases (SHA-256 verified) |
@@ -113,13 +113,15 @@ Downloads are SHA-256 verified against the release `checksums.txt`, then atomica
 | `--node-catalog` | embedded | `embedded`, `auto` (fetch each run, silent cache/embedded fallback), or a JSON path |
 | `--node-revision` | — | Pin an exact catalog revision; fails before probes start on mismatch |
 | `--iperf-host` | — | iperf3 server for the iperf3 speed provider |
-| `--json` / `--html` / `--markdown` | — | Write JSON / HTML / forum-pasteable markdown report to file |
+| `--json-out` / `--html` / `--markdown` | — | Write JSON / HTML / forum-pasteable markdown report to file (the legacy spelling `--json PATH` still works and prints a deprecation notice) |
 | `--quiet` | false | Suppress progress output |
 | `--auto-swap` | false | (Linux) low-memory geekbench runs: create a temporary swapfile without asking, remove it afterwards |
 | `--save-history` | false | Save the report to local history (`--history-tag` to label) |
 | `--lang` | auto | `en` or `zh-CN` (also `VMBENCH_LANG`) |
 
 Without `--preset` / `--only` / `--skip` the run is hardware-only; network sections are opt-in via a preset or explicit selection. When the effective selection is exactly the `hardware` section the output is a benchmark (run-kind) report — identical to pre-v0.8.0 `vmbench run` — otherwise a composite checkup report. Full flag tables: `vmbench --help` or the [capability reference](capabilities.md).
+
+Exit codes: `0` all succeeded · `1` no usable report produced · `2` usage / flag error · `3` report written but some workloads failed · `130` interrupted by Ctrl+C / SIGTERM (any report already written is kept).
 
 Reports are redacted by default: this machine's public IPv4/IPv6 addresses are consistently replaced with documentation-range placeholders (`203.0.113.x`, `2001:db8::x`) across every surface — console, JSON, HTML, markdown, history, TUI, and MCP — including BGP/CIDR prefixes and reverse DNSBL labels that embed the address. Internal IPs, hostnames, route hops, and remote node IPs are kept. `--redact none` opts out (the CLI prints a sharing warning); TUI and MCP always redact.
 
@@ -131,13 +133,13 @@ Reports are redacted by default: this machine's public IPv4/IPv6 addresses are c
 
 ```bash
 vmbench share report.json --dry-run           # print the payload + redaction inventory, zero network
-vmbench share report.json                     # upload to dpaste (default), print the URL
-vmbench share report.json --provider dpaste,0x0   # explicit fallback chain
+vmbench share report.json                     # default chain dpaste,0x0,paste_rs with fallback
+vmbench share report.json --provider 0x0      # explicit provider or fallback chain
 vmbench share report.json --format json       # upload the redacted report JSON instead of markdown
 vmbench share report.json --save-payload out.md    # keep a copy of exactly what was uploaded
 ```
 
-The payload reuses the `--markdown` projection (or `--format json` for the redacted report verbatim) and appends a footer that states what was actually redacted. Sharing is explicit-only: nothing else in vmbench — benchmark, TUI, or MCP — uploads anything. Beyond the report-layer IP masking, share additionally masks the structured hostname. `--redact none` keeps real addresses and prints a warning; `--media full` lists every media service instead of the folded view. Providers: `dpaste` (default), `0x0`, `paste_rs`, and `custom` (requires `--share-endpoint`, https only). Fallback tries the next provider only on network errors or 5xx responses — a payload is uploaded successfully at most once. Payloads above 512 KiB are rejected with convergence advice instead of being truncated.
+The payload reuses the `--markdown` projection (or `--format json` for the redacted report verbatim) and appends a footer that states what was actually redacted. Sharing is explicit-only: nothing else in vmbench — benchmark, TUI, or MCP — uploads anything. Before anything leaves the machine, the redaction inventory (which addresses and the hostname were masked) is printed to stderr so you can check it first. Beyond the report-layer IP masking, share additionally masks the structured hostname. `--redact none` keeps real addresses and prints a warning; `--media full` lists every media service instead of the folded view. Providers: `dpaste`, `0x0`, `paste_rs`, and `custom` (requires `--share-endpoint`, https only); the default chain is `dpaste,0x0,paste_rs`. Fallback moves to the next provider on network errors, 5xx responses, and 403/429 rejections (range blocks / rate limiting — no paste was created in those cases, so retrying elsewhere is safe); any other 4xx is terminal, and a payload is uploaded successfully at most once. Payloads above 512 KiB are rejected with convergence advice instead of being truncated.
 
 ## VPS Checkup
 
@@ -175,12 +177,12 @@ Launch with `vmbench` (no arguments):
 
 - **Dashboard** with benchmark / history / sysinfo entry points; mouse clicks and wheel scrolling everywhere. The System card shows the machine's public IPv4/IPv6 with ASN org (probed async at startup, silent when offline; System Info expands to country and ISP)
 - **Config**: one page for the same normalized fields as CLI/MCP — preset pills lead with Hardware Only (the CLI default) plus Custom and the checkup presets; section toggles reveal tool, filter, speed, route, media, and IP-source cards on demand, with a live planned-duration summary, missing-tool preflight, and `1-9` section jumps
-- **Running**: one progress page for both kinds — workload grid for hardware runs, section grid for checkup runs, cancel modal included
-- **Results**: cards / grouped / flat views; `d` opens per-workload detail with metrics, samples, errors, and raw tool output
-- **History**: browse reports saved with `--save-history` (time, kind, tag, ID); `Enter` reopens a run in Results or a checkup in the checkup page, `Esc` returns
-- **Themes**: press `t` on Dashboard to cycle; the choice is saved locally
+- **Running**: one progress page for both kinds — workload grid for hardware runs, section grid for checkup runs; `q` / `Esc` / `Ctrl+C` all open the cancel modal first, and the completed parts are saved to history automatically after a confirmed cancel
+- **Results**: cards / grouped / flat views; `d` opens per-workload detail with metrics, samples, errors, and raw tool output; finished runs are saved to history automatically, `s` writes an extra file
+- **History**: browse saved reports (time, kind, tag, ID); `Enter` reopens a run in Results or a checkup in the checkup page, `r` reloads, `d` deletes (with confirmation), `Esc` returns
+- **Themes / language**: press `t` anywhere to cycle themes and `l` to cycle the language (auto → English → 中文); the choices are saved locally
 
-Keys: `?` help · `↑↓` navigate · `Enter` select · `Tab` switch view · `d` detail · `s` save · `Esc` back · `q` or `Ctrl+C` quit. Every page scrolls with `PgUp/PgDn`, `Home/End`, and the mouse wheel; fits an 80x24 terminal.
+Keys: `?` help · `↑↓` navigate · `Enter` select · `Tab` switch view · `d` detail · `s` save · `Esc` back · `q` or `Ctrl+C` quit (confirm-first on the running page). Every page scrolls with `PgUp/PgDn`, `Home/End`, and the mouse wheel; fits an 80x24 terminal.
 
 ## Languages
 

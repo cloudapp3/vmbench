@@ -25,6 +25,8 @@ type helpEntry struct {
 func globalHelpEntries() []helpEntry {
 	return []helpEntry{
 		{keys: "?", descKey: "tui.hint.help", short: true},
+		{keys: "t", descKey: "tui.hint.theme", short: true},
+		{keys: "l", descKey: "tui.hint.lang", short: true},
 		{keys: "Ctrl+C", descKey: "tui.hint.quit", short: false},
 		{keys: "PgUp/PgDn", descKey: "tui.hint.pageUp", short: false},
 		{keys: "Home/End", descKey: "tui.hint.top", short: false},
@@ -33,22 +35,21 @@ func globalHelpEntries() []helpEntry {
 }
 
 // helpFor is the single source of truth for per-page keybindings, consumed
-// by both the footer and the help page.
+// by both the footer and the help page. On subpages q mirrors esc (back);
+// only the dashboard keeps q = quit.
 func helpFor(p page) []helpEntry {
 	switch p {
 	case pageDashboard:
 		return []helpEntry{
 			{keys: "↑↓/jk", descKey: "tui.hint.nav", short: true},
 			{keys: "↵", descKey: "tui.hint.select", short: true},
-			{keys: "t", descKey: "tui.hint.theme", short: true},
-			{keys: "l", descKey: "tui.hint.lang", short: true},
 			{keys: "q", descKey: "tui.hint.quit", short: true},
 		}
 	case pageRunning:
 		return []helpEntry{
-			{keys: "esc", descKey: "tui.hint.cancel", short: true},
+			{keys: "esc/q", descKey: "tui.hint.cancel", short: true},
 			{keys: "tab", descKey: "tui.hint.log", short: true},
-			{keys: "q", descKey: "tui.hint.quit", short: true},
+			{keys: "y/n", descKey: "tui.hint.confirm", short: false},
 		}
 	case pageResults:
 		return []helpEntry{
@@ -57,19 +58,16 @@ func helpFor(p page) []helpEntry {
 			{keys: "↵", descKey: "tui.hint.expand", short: true},
 			{keys: "d", descKey: "tui.hint.detail", short: true},
 			{keys: "s", descKey: "tui.hint.save", short: true},
-			{keys: "esc", descKey: "tui.hint.back", short: true},
-			{keys: "q", descKey: "tui.hint.quit", short: true},
+			{keys: "esc/q", descKey: "tui.hint.back", short: true},
 		}
 	case pageResultDetail:
 		return []helpEntry{
-			{keys: "esc", descKey: "tui.hint.back", short: true},
-			{keys: "q", descKey: "tui.hint.quit", short: true},
+			{keys: "esc/↵", descKey: "tui.hint.back", short: true},
 		}
 	case pageCompare:
 		return []helpEntry{
 			{keys: "r", descKey: "tui.hint.repick", short: false},
-			{keys: "esc", descKey: "tui.hint.back", short: true},
-			{keys: "q", descKey: "tui.hint.quit", short: true},
+			{keys: "esc/q", descKey: "tui.hint.back", short: true},
 		}
 	case pageConfig:
 		return []helpEntry{
@@ -78,28 +76,30 @@ func helpFor(p page) []helpEntry {
 			{keys: "1-9", descKey: "tui.hint.digits", short: false},
 			{keys: "↵", descKey: "tui.hint.start", short: true},
 			{keys: "←→", descKey: "tui.hint.choose", short: true},
-			{keys: "esc", descKey: "tui.hint.back", short: true},
+			{keys: "esc/q", descKey: "tui.hint.back", short: true},
 		}
 	case pageCheckupResults:
 		return []helpEntry{
-			{keys: "esc", descKey: "tui.hint.back", short: true},
-			{keys: "q", descKey: "tui.hint.quit", short: true},
+			{keys: "esc/q", descKey: "tui.hint.back", short: true},
 		}
 	case pageHistory:
 		return []helpEntry{
 			{keys: "↑↓/jk", descKey: "tui.hint.nav", short: true},
 			{keys: "↵/v", descKey: "tui.hint.viewRecord", short: true},
-			{keys: "esc", descKey: "tui.hint.back", short: true},
-			{keys: "q", descKey: "tui.hint.quit", short: true},
+			{keys: "r", descKey: "tui.hint.refresh", short: true},
+			{keys: "d", descKey: "tui.hint.delete", short: true},
+			{keys: "y/n", descKey: "tui.hint.confirm", short: false},
+			{keys: "esc/q", descKey: "tui.hint.back", short: true},
 		}
 	case pageComparePicker:
 		return []helpEntry{
 			{keys: "↑↓", descKey: "tui.hint.nav", short: true},
 			{keys: "spc", descKey: "tui.hint.pick", short: true},
 			{keys: "c", descKey: "tui.hint.compareSel", short: true},
+			{keys: "r", descKey: "tui.hint.refresh", short: true},
 			{keys: "v", descKey: "tui.hint.viewRecord", short: false},
 			{keys: "m", descKey: "tui.hint.manual", short: false},
-			{keys: "esc", descKey: "tui.hint.back", short: true},
+			{keys: "esc/q", descKey: "tui.hint.back", short: true},
 		}
 	}
 	return nil
@@ -226,17 +226,35 @@ func helpRows(entries []helpEntry) string {
 	return strings.Join(lines, "\n")
 }
 
-func helpFooterHints(p page) []comp.Hint {
+// helpFooterHints collects the short hints for the footer. Hints whose key
+// is inert in the current state (e.g. the results page's tab-scoped keys)
+// are filtered out by footerHintApplies.
+func helpFooterHints(m Model) []comp.Hint {
 	var hints []comp.Hint
-	for _, e := range helpFor(p) {
-		if e.short {
+	for _, e := range helpFor(m.page) {
+		if e.short && footerHintApplies(m, e) {
 			hints = append(hints, comp.Hint{Key: e.keys, Desc: i18n.T(e.descKey)})
 		}
 	}
 	for _, e := range globalHelpEntries() {
-		if e.short {
+		if e.short && footerHintApplies(m, e) {
 			hints = append(hints, comp.Hint{Key: e.keys, Desc: i18n.T(e.descKey)})
 		}
 	}
 	return hints
+}
+
+// footerHintApplies hides hints whose binding does nothing right now: the
+// results page's expand key only acts on the grouped tab and detail only on
+// the flat tab.
+func footerHintApplies(m Model, e helpEntry) bool {
+	if m.page == pageResults {
+		switch e.descKey {
+		case "tui.hint.expand":
+			return m.resultsTab == 1
+		case "tui.hint.detail":
+			return m.resultsTab == 2
+		}
+	}
+	return true
 }

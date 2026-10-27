@@ -18,14 +18,14 @@ import (
 // prompt, matching the installer's own non-interactive fallback.
 func runUninstall(args []string) int {
 	fs := flag.NewFlagSet("uninstall", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
 	var dryRun, yes, asJSON bool
 	fs.BoolVar(&dryRun, "dry-run", false, i18n.T("cli.uninstall.flag.dryRun"))
 	fs.BoolVar(&yes, "yes", false, i18n.T("cli.uninstall.flag.yes"))
 	fs.BoolVar(&asJSON, "json", false, i18n.T("cli.flag.jsonOutput"))
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, strings.Join([]string{
+		fmt.Fprintln(fs.Output(), strings.Join([]string{
 			"Usage: vmbench uninstall [flags]",
 			"",
 			i18n.T("cli.usage.uninstallDetail"),
@@ -34,8 +34,13 @@ func runUninstall(args []string) int {
 	}
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 	if fs.NArg() != 0 {

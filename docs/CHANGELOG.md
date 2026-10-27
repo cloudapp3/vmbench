@@ -1,5 +1,55 @@
 # VMBench Changelog
 
+## v0.16.0（2026-10-28）
+
+一批用户层面体验修复（2026-10 UX 审查产出的全部条目），按主题汇总。
+
+### CLI：退出码与中断语义
+
+- **优雅中断**：CLI 两条执行路径接入 `signal.NotifyContext`（SIGINT/SIGTERM）——中断不再丢掉已完成部分：报告照常写出（含 `--json-out`/`--html`/`--markdown`），打印中断提示并以退出码 `130` 结束。
+- **退出码分级**：`0` 全部成功 · `1` 没有产出可用报告 · `2` 用法/参数错误 · `3` 报告已写出但存在失败 workload / section（新增，此前一律 1，"报告写好了但有失败"与"什么都没产出"不再同格）· `130` 中断。设置了 `--json-out` 且部分失败时额外打印 score 提示行。
+- **`--json-out`**：新规范拼法（`--json` 旧含义"输出 JSON 报告到文件"迁移过来）；旧拼写 `--json PATH` 仍可用但打印弃用提示，`--json` 与 `--json-out` 同用报错。文档全量改用新拼法。
+- **`--timeout` 友好化**：非法时长给出格式说明错误；各子命令 timeout flag help 全部标注作用域（whole fetch / per-node / signature download only 等）。
+- **preset/only 冲突**：`--preset` 与 `--only` 同时出现直接报错并解释（此前静默取一边）。
+- **help 一致化**：根命令与全部子命令 `--help` 输出到 stdout（parse 错误仍走 stderr）；根 usage 增加 examples 块与无参数行为说明；`vmbench help <topic>` 直接转发对应命令的 `--help`；`vmbench list --json` 机器可读输出；filter/lang flag help 措辞修正（filter 只作用于硬件 workload；`--lang auto` 显式支持）。
+
+### TUI：可用性
+
+- **自动保存历史**：跑完自动写入本地历史（CLI `--save-history` 语义对齐）；用户取消后离开运行页时，补完的部分报告也入历史并 toast「部分结果已保存」。
+- **取消确认统一**：运行页 `q` / `Esc` / `Ctrl+C` 一律先弹确认框（`y` 确认 / `n` 继续），三键语义一致。
+- **历史页**：`r` 重新加载（失败态保留错误可重试）、`d` 删除记录（`y`/`n` 确认）；列表计数含截断提示。
+- **进度可见性**：speed section 逐 provider（china_isp 下逐 carrier）发射 `item.start/done/fail` 子事件——CLI 进度逐项打印，TUI 事件日志同步展示，长 section 不再无输出。
+- **全局键**：主题 `t` / 语言 `l` 从 Dashboard 提升为全局键（除文本输入态），注册进 help 注册表。
+- **配置页**：全部取消勾选后回车直接 toast「至少选择一个 section」（此前静默无动作）。
+- **小屏与窄屏**：低于 `50x16` 提示终端过小；<40 行紧凑视图覆盖 run 与体检两种形态（取消确认内联）；<100 列分组窄列布局。
+- **细节**：`s` 保存文件名带时间戳（`vmbench-report-YYYYMMDD-HHMMSS.json`）；toast 移到共享 View 层 footer 上方（不受页面滚动影响）；无 TTY（docker exec / CI / 管道）启动 TUI 直接给出 CLI 替代命令提示，不再喷 raw "could not open a new TTY"。
+
+### share：默认链与回退
+
+- **默认 fallback 链**：省略 `--provider` 时改为 `dpaste,0x0,paste_rs` 链式尝试——dpaste 对数据中心 IP 段返回 403 的场景自动落到下一家。
+- **回退规则扩展**：403（封段）/ 429（限流）加入可回退集合（与网络错误、5xx 并列；这些情况下 paste 一定未创建，换家重试安全）；其余 4xx 仍为终态，同一 payload 最多成功上传一次。
+- **上传前清单**：脱敏清单（掩掉哪些地址/hostname）在上传前打印到 stderr，而不是只在上传后。
+- **失败提示**：全部 provider 失败时提示可用 `--provider 0x0,paste_rs` 换链重试。
+- **help 一致化**：`--help` 到 stdout、flag 描述 i18n（en/zh-CN）。
+
+### score：披露与回链
+
+- **置信度以百分比展示**：console 覆盖率/置信度行与维度表统一 `xx%`（此前 `0.85` 小数与覆盖率百分比混排）；表下附一行图例说明公式（覆盖率 × 迭代系数）。JSON 保持 0-1 小数不变。
+- **provisional 基线标记**：内嵌基线 JSON 标记 `"provisional": true`（锚点占位待校准），透传到 assessment 的 `baseline.provisional` 字段；console 基线行追加「基线为占位值，尚未校准」。
+- **source 回链**：`source` 新增 `version` / `timestamp` / `sha256`（输入摘要前 8 位）三字段——全部取自输入报告本身与输入字节，不引入本地时钟，确定性底线不变（同输入同基线字节级相同输出）。
+- **help 一致化**：`--help` 到 stdout、flag 描述 i18n。
+
+### report：console 可读性
+
+- **时间自适应单位**：中位耗时 ≥10s 时以 `xx.xx s` 展示（此前五位数毫秒）。
+- **失败汇总行**：表格下输出 `N/M workloads failed`（i18n，en/zh-CN），一眼看到失败规模。
+- **窄终端收窄**：console run 表按 `textgrid.StdoutWidth` 探测宽度，窄终端先丢 category 列、再丢 time/latency 列（ping 表已有同款逻辑：先 city/carrier，再 ip/probe）；markdown / 重定向输出不受影响（探测宽度 0 = 全列）。
+
+### 安装与文档
+
+- **install.sh**：curl 下载显示进度条；GitHub API 限流时提示可设 `GITHUB_TOKEN`/`GH_TOKEN`。
+- **文档**：README（中）与 docs/README.en.md（英）同步退出码、`--json-out`、share 默认链、TUI 按键、score 披露；docs/capabilities.md、docs/product.md、docs/tech-stack.md、docs/tui-design.md、docs/score-design.md 对应更新。
+
 ## v0.15.0（2026-09-17）
 
 ### 展示文案：虚拟化角色 guest 显示为 vm

@@ -270,18 +270,16 @@ func configToast(m Model, text string) (tea.Model, tea.Cmd) {
 func updateConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	s := &m.config
 	switch msg.String() {
-	case "esc":
+	case "esc", "q":
 		m.page = pageDashboard
 		return m, nil
-	case "q":
-		return m, tea.Quit
 	case "up", "k", "shift+tab":
 		s.stepCursor(-1)
 		return followFocus(m), nil
 	case "down", "j", "tab":
 		s.stepCursor(1)
 		return followFocus(m), nil
-	case "left", "h":
+	case "left":
 		switch s.currentRow().kind {
 		case rowAdvanced:
 			if s.advancedOpen {
@@ -291,7 +289,7 @@ func updateConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			s.cycleSetting(-1)
 		}
 		return m, nil
-	case "right", "l":
+	case "right":
 		switch s.currentRow().kind {
 		case rowAdvanced:
 			if !s.advancedOpen {
@@ -337,7 +335,8 @@ func updateConfig(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func configStart(m Model) (tea.Model, tea.Cmd) {
 	s := m.config
 	if !s.sections.AnyEnabled() {
-		return m, nil
+		// Silent no-ops are invisible; tell the user what to fix.
+		return configToast(m, i18n.T("tui.config.needOneSection"))
 	}
 	if s.sections.HardwareOnly() {
 		opts, err := vmbench.NormalizeOptions(s.buildRunOptions())
@@ -370,9 +369,6 @@ func viewConfig(m Model) string {
 		for j := 0; j < advCount; j++ {
 			lines = append(lines, configAdvSettingRow(s, j, cur))
 		}
-	}
-	if m.toast.Active() {
-		lines = append(lines, "", m.toast.Render(m.width-4))
 	}
 	return strings.Join(lines, "\n")
 }

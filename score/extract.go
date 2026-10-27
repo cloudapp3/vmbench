@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/cloudapp3/vmbench/history"
 )
@@ -24,6 +25,11 @@ type input struct {
 	Tools      []string
 	Workloads  map[string]workloadRow
 	Checkup    checkupEvidence
+
+	// ReportVersion and ReportTimestamp backlink the assessment to its
+	// source document (read from the report itself, never the clock).
+	ReportVersion   string
+	ReportTimestamp string
 }
 
 // workloadRow is one report workload entry reduced to score-relevant fields.
@@ -50,7 +56,9 @@ type checkupEvidence struct {
 
 // rawRunShape mirrors the report.Document JSON that score needs.
 type rawRunShape struct {
-	System struct {
+	Version   string    `json:"version"`
+	Timestamp time.Time `json:"timestamp"`
+	System    struct {
 		OS struct {
 			Name   string `json:"name"`
 			Kernel string `json:"kernel"`
@@ -85,7 +93,11 @@ type rawRowShape struct {
 
 // rawCheckupShape mirrors the CheckupReport JSON that score needs.
 type rawCheckupShape struct {
-	System struct {
+	App struct {
+		Version string `json:"version"`
+	} `json:"app"`
+	StartedAt time.Time `json:"started_at"`
+	System    struct {
 		OS struct {
 			Name   string `json:"name"`
 			Kernel string `json:"kernel"`
@@ -150,6 +162,10 @@ func extractRun(data []byte) (input, error) {
 		Tools:      doc.Config.HardwareTools,
 		Workloads:  map[string]workloadRow{},
 	}
+	in.ReportVersion = doc.Version
+	if !doc.Timestamp.IsZero() {
+		in.ReportTimestamp = doc.Timestamp.Format(time.RFC3339)
+	}
 	in.addWorkloads(doc.Results.Workloads)
 	in.addWorkloads(doc.Extensions.Workloads)
 	return in, nil
@@ -166,6 +182,10 @@ func extractCheckup(data []byte) (input, error) {
 		Iterations: doc.Config.Iterations,
 		Tools:      doc.Config.HardwareTools,
 		Workloads:  map[string]workloadRow{},
+	}
+	in.ReportVersion = doc.App.Version
+	if !doc.StartedAt.IsZero() {
+		in.ReportTimestamp = doc.StartedAt.Format(time.RFC3339)
 	}
 	if doc.Hardware.Report != nil {
 		if in.Iterations == 0 {

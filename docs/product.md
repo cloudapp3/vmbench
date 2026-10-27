@@ -69,14 +69,14 @@ CLI / TUI / 报告标签支持英文与简体中文（`--lang`、`VMBENCH_LANG`�
 ## 使用方式
 
 ```bash
-vmbench --json report.json
+vmbench --json-out report.json
 vmbench --filter 'sysbench|fio|OpenSSL'
 vmbench --hardware-tool sysbench,openssl,fio,dd
 vmbench --preset quick
 vmbench --preset website
 vmbench --only ping,mail
 vmbench --ip-version dual
-vmbench --quiet --json checkup.json
+vmbench --quiet --json-out checkup.json
 vmbench --node-catalog auto --node-revision 2026-07-13.1 --save-history
 vmbench mcp serve --transport stdio
 vmbench compare a.json b.json
@@ -145,7 +145,7 @@ vmbench nodes health --node-catalog auto --kind route --ip-family v6 --json
 
 更新流程要求显式 Ed25519 公钥，先验证 detached signature 和严格 schema，再原子替换缓存；Unix 文件 mode 为 `0600`。签名、revision 或 schema 不满足时 fail-closed，不启动探测也不覆盖旧缓存。
 
-`vmbench` 可用 `--save-history [--history-tag TAG]` 保存报告；也可用 `history add/list/show/delete` 管理已有 JSON，`history compare --last N` 比较最近 N 份同类型报告。CLI 的 `--json` / `--html` 导出和 history 都先写同目录临时文件、sync 后 rename；Unix 导出/历史文件 mode 为 `0600`，其他平台仍应依赖系统 ACL 保护。报告可能包含 hostname、公网 IP 和 route hops。`vmbench share <report.json|->` 是唯一的上传出口：显式授权（基准、TUI、MCP 均不触发，MCP v1 无 share 工具），payload 走与报告同源的脱敏并在其上额外掩掉结构化 hostname，尾注只陈述实际发生的脱敏；provider 与 fallback 链由用户显式选择，同一 payload 最多成功上传一次。Route/Ping 报告区分 catalog protocol 与实际 `probe_protocol/probe_tool`；体检 Compare 只有在 unit、实际 protocol/IP family、provider/probe tool、target/node 以及需要时 catalog revision 全部兼容时才计算 delta。不兼容值仍展示，但明确给出 reason。Route 还必须显式为 `status=ok` 且 `destination_reached=true`，旧报告没有到达证据时不计算 delta。Mail 只比较 `status=open` 的成功连接延迟，拒绝、超时和错误耗时不参与 latency delta。
+`vmbench` 可用 `--save-history [--history-tag TAG]` 保存报告（TUI 跑完自动保存）；也可用 `history add/list/show/delete` 管理已有 JSON，`history compare --last N` 比较最近 N 份同类型报告。CLI 的 `--json-out` / `--html` 导出和 history 都先写同目录临时文件、sync 后 rename（`--json PATH` 旧拼写仍接受但打印弃用提示）；Unix 导出/历史文件 mode 为 `0600`，其他平台仍应依赖系统 ACL 保护。报告可能包含 hostname、公网 IP 和 route hops。`vmbench share <report.json|->` 是唯一的上传出口：显式授权（基准、TUI、MCP 均不触发，MCP v1 无 share 工具），payload 走与报告同源的脱敏并在其上额外掩掉结构化 hostname，上传前先在 stderr 打印脱敏清单，尾注只陈述实际发生的脱敏；provider 默认链 `dpaste,0x0,paste_rs`（可用 `--provider` 覆盖），网络错误 / 5xx / 403 / 429 时依次回退，其余 4xx 终态，同一 payload 最多成功上传一次。Route/Ping 报告区分 catalog protocol 与实际 `probe_protocol/probe_tool`；体检 Compare 只有在 unit、实际 protocol/IP family、provider/probe tool、target/node 以及需要时 catalog revision 全部兼容时才计算 delta。不兼容值仍展示，但明确给出 reason。Route 还必须显式为 `status=ok` 且 `destination_reached=true`，旧报告没有到达证据时不计算 delta。Mail 只比较 `status=open` 的成功连接延迟，拒绝、超时和错误耗时不参与 latency delta。
 
 ## 自升级
 

@@ -33,18 +33,18 @@ VMBENCH_BIN_DIR="$(
 vmbench
 
 # CLI 硬件测评（不带 preset/only/skip 时只跑 hardware）
-vmbench --json report.json --html report.html
+vmbench --json-out report.json --html report.html
 vmbench --filter 'sysbench|fio|OpenSSL'
 vmbench --hardware-tool sysbench,openssl,fio,dd
 
 # VPS 综合测评（preset 或 only/skip 选择 section）
 vmbench --preset quick
-vmbench --preset website --json checkup.json --html checkup.html
+vmbench --preset website --json-out checkup.json --html checkup.html
 vmbench --markdown checkup.md   # 论坛直贴 markdown（流媒体折叠、已脱敏）
 vmbench --only ping,mail
 vmbench --only hardware --hardware-tool dd,stream,mbw
 vmbench --node-catalog auto --node-revision 2026-07-13.1 --save-history
-vmbench --quiet --json checkup.json
+vmbench --quiet --json-out checkup.json
 
 # 派生评估（版本化基线，确定性评分）
 vmbench score report.json

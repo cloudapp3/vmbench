@@ -141,9 +141,11 @@ func TestSectionAliasesAcceptedThroughRootFlags(t *testing.T) {
 	}
 }
 
-func TestRunIperfWithoutHostExitsNonZero(t *testing.T) {
-	if code := run([]string{"--only", "speed", "--speed-provider", "iperf3"}); code != 1 {
-		t.Fatalf("run(iperf3 without host) = %d, want 1", code)
+func TestRunIperfWithoutHostExitsPartialFailure(t *testing.T) {
+	// Exit 3: the checkup report is written and usable, but the section
+	// failed (no --iperf-host); 1 is reserved for no usable report.
+	if code := run([]string{"--only", "speed", "--speed-provider", "iperf3"}); code != 3 {
+		t.Fatalf("run(iperf3 without host) = %d, want 3", code)
 	}
 }
 

@@ -14,11 +14,9 @@ import (
 
 func updateResultDetail(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "enter", "d":
+	case "esc", "enter", "d", "q":
 		m.page = pageResults
 		return m, nil
-	case "q":
-		return m, tea.Quit
 	}
 	return m, nil
 }

@@ -114,8 +114,8 @@ func TestMarkdownFlagWritesRunReport(t *testing.T) {
 	_, code := captureStdout(t, func() int {
 		return run([]string{"--only", "hardware", "--markdown", path, "--iterations", "1", "--quiet"})
 	})
-	if code != 1 {
-		t.Fatalf("run with missing tools = %d, want 1", code)
+	if code != 3 {
+		t.Fatalf("run with missing tools = %d, want 3 (report written, workloads failed)", code)
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -138,8 +138,8 @@ func TestMarkdownFlagWritesCheckupReport(t *testing.T) {
 	_, code := captureStdout(t, func() int {
 		return run([]string{"--only", "speed", "--speed-provider", "iperf3", "--markdown", path, "--quiet"})
 	})
-	if code != 1 {
-		t.Fatalf("run(iperf3 without host) = %d, want 1", code)
+	if code != 3 {
+		t.Fatalf("run(iperf3 without host) = %d, want 3", code)
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {

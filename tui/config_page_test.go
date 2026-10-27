@@ -204,12 +204,15 @@ func TestConfigStartDisabledWithoutSections(t *testing.T) {
 		m = updated.(Model)
 	}
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if cmd != nil {
-		t.Fatal("enter with no sections must not start anything")
+	if cmd == nil {
+		t.Fatal("enter with no sections should surface the inline error toast")
 	}
 	um, ok := updated.(Model)
 	if !ok {
 		t.Fatalf("update returned %T", updated)
+	}
+	if !um.toast.Active() || !strings.Contains(um.toast.Message, i18n.T("tui.config.needOneSection")) {
+		t.Fatalf("toast should explain the empty checklist, got %+v", um.toast)
 	}
 	if view := um.View(); !strings.Contains(view, i18n.T("tui.config.startDisabled")) {
 		t.Fatalf("start row should render disabled:\n%s", view)

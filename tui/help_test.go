@@ -7,20 +7,69 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/cloudapp3/vmbench/i18n"
+	"github.com/cloudapp3/vmbench/tui/comp"
 )
 
 func TestFooterMatchesRegistry(t *testing.T) {
 	for _, p := range helpPageOrder {
-		view := scrollTestModel(t, p, nil).View()
-		for _, e := range helpFor(p) {
-			if !e.short {
-				continue
-			}
-			if !strings.Contains(view, i18n.T(e.descKey)) {
-				t.Fatalf("page %d footer missing short hint %q (%s)", p, e.keys, e.descKey)
+		// The results page filters its tab-scoped hints, so walk all tabs.
+		tabs := []int{0}
+		if p == pageResults {
+			tabs = []int{0, 1, 2}
+		}
+		for _, tab := range tabs {
+			m := scrollTestModel(t, p, nil)
+			m.resultsTab = tab
+			view := m.View()
+			for _, e := range helpFor(p) {
+				if !e.short || !footerHintApplies(m, e) {
+					continue
+				}
+				if !strings.Contains(view, i18n.T(e.descKey)) {
+					t.Fatalf("page %d tab %d footer missing short hint %q (%s)", p, tab, e.keys, e.descKey)
+				}
 			}
 		}
 	}
+}
+
+// TestResultsFooterHintsFilterByTab pins the tab-scoped footer filtering:
+// expand only shows on the grouped tab, detail only on the flat tab.
+func TestResultsFooterHintsFilterByTab(t *testing.T) {
+	m := scrollTestModel(t, pageResults, nil)
+
+	m.resultsTab = 0
+	hints := helpFooterHints(m)
+	if hintTouched(hints, i18n.T("tui.hint.expand")) || hintTouched(hints, i18n.T("tui.hint.detail")) {
+		t.Fatalf("cards tab should hide expand/detail hints: %v", hints)
+	}
+
+	m.resultsTab = 1
+	hints = helpFooterHints(m)
+	if !hintTouched(hints, i18n.T("tui.hint.expand")) {
+		t.Fatalf("grouped tab should show the expand hint: %v", hints)
+	}
+	if hintTouched(hints, i18n.T("tui.hint.detail")) {
+		t.Fatalf("grouped tab should hide the detail hint: %v", hints)
+	}
+
+	m.resultsTab = 2
+	hints = helpFooterHints(m)
+	if !hintTouched(hints, i18n.T("tui.hint.detail")) {
+		t.Fatalf("flat tab should show the detail hint: %v", hints)
+	}
+	if hintTouched(hints, i18n.T("tui.hint.expand")) {
+		t.Fatalf("flat tab should hide the expand hint: %v", hints)
+	}
+}
+
+func hintTouched(hints []comp.Hint, desc string) bool {
+	for _, h := range hints {
+		if h.Desc == desc {
+			return true
+		}
+	}
+	return false
 }
 
 func TestHelpToggleRoundTrip(t *testing.T) {

@@ -16,7 +16,7 @@ other = "Compare two JSON reports"
 other = "Report History"
 
 [tui.menu.historyDesc]
-other = "Browse reports saved with --save-history"
+other = "Browse saved benchmark reports"
 
 [tui.menu.sysinfo]
 other = "System Info"
@@ -52,7 +52,7 @@ other = "auto (system)"
 other = "loading..."
 
 [tui.tooSmall]
-other = "Terminal too small (need ≥60x18, got {{.Width}}x{{.Height}})"
+other = "Terminal too small (need ≥50x16, got {{.Width}}x{{.Height}})"
 
 [tui.tooSmallHint]
 other = "Resize or zoom out."
@@ -62,6 +62,15 @@ other = "save failed: {{.Err}}"
 
 [tui.toast.saved]
 other = "saved → {{.Path}}"
+
+[tui.toast.saveExists]
+other = "{{.Path}} already exists, not overwritten"
+
+[tui.toast.historySaveFailed]
+other = "history save failed: {{.Err}}"
+
+[tui.toast.partialSaved]
+other = "Partial results saved to history"
 
 [tui.hint.nav]
 other = "nav"
@@ -95,6 +104,18 @@ other = "save"
 
 [tui.hint.back]
 other = "back"
+
+[tui.hint.refresh]
+other = "refresh"
+
+[tui.hint.delete]
+other = "delete"
+
+[tui.hint.confirm]
+other = "confirm (y/n)"
+
+[tui.hint.retryHint]
+other = "press r to retry"
 
 [tui.hint.field]
 other = "field"
@@ -336,7 +357,7 @@ other = "pick two records first"
 other = "cannot compare a run report with a checkup report"
 
 [tui.compare.noHistory]
-other = "No history records yet. Run a benchmark with --save-history or vmbench history add."
+other = "No history records yet — run a test and they appear here."
 
 [tui.compare.historyError]
 other = "history error: {{.Err}}"
@@ -360,10 +381,22 @@ other = "history error: {{.Err}}"
 other = "No saved reports yet."
 
 [tui.history.emptyHint]
-other = "Run a benchmark with --save-history, or use vmbench history add."
+other = "Records appear here after you run a test."
 
 [tui.history.count]
 other = "{{.Count}} reports"
+
+[tui.history.countTruncated]
+other = "latest {{.Shown}} of {{.Total}} reports"
+
+[tui.history.deletePrompt]
+other = "Delete {{.ID}}?  y confirm · n cancel"
+
+[tui.history.deleted]
+other = "deleted {{.ID}}"
+
+[tui.history.deleteFailed]
+other = "delete failed: {{.Err}}"
 
 [tui.history.col.time]
 other = "Time"

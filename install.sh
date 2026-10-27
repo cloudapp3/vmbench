@@ -964,7 +964,17 @@ curl_text() {
 curl_download() {
   local url="$1"
   local output="$2"
-  curl "${DOWNLOAD_CURL_ARGS[@]}" -o "$output" "$url"
+  # Strip the silent flag and show a progress bar instead, so a multi-MiB
+  # download is not quiet; -S stays so failures still reach the caller's die.
+  local args=() a
+  for a in "${DOWNLOAD_CURL_ARGS[@]}"; do
+    case "$a" in
+      -fsSL) a="-fSL" ;;
+      -s|--silent) a="" ;;
+    esac
+    [ -n "$a" ] && args+=("$a")
+  done
+  curl "${args[@]}" -# -o "$output" "$url"
 }
 
 if [ -z "$VERSION" ]; then
@@ -976,7 +986,13 @@ if [ -z "$VERSION" ]; then
   )"; then
     die "failed to query latest release from ${REPO}"
   fi
-  [ -n "$VERSION" ] || die "failed to resolve latest release tag"
+  if [ -z "$VERSION" ]; then
+    # An empty parse after a 200 usually means an API rate-limit message body.
+    if [ -z "$TOKEN" ]; then
+      die "failed to resolve latest release tag (GitHub API rate limit? set GITHUB_TOKEN or GH_TOKEN)"
+    fi
+    die "failed to resolve latest release tag (rate-limited despite token; retry later)"
+  fi
 fi
 
 case "$VERSION" in

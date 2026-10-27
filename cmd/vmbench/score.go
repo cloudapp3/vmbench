@@ -18,20 +18,25 @@ import (
 // deterministically against the baseline set and renders the assessment.
 func runScore(args []string) int {
 	fs := flag.NewFlagSet("score", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
-	asJSON := fs.Bool("json", false, "print the assessment as JSON")
-	outPath := fs.String("out", "", "write the assessment JSON to a file")
-	baselinePath := fs.String("baseline", "", "use a baseline JSON file instead of the embedded set")
-	requireRevision := fs.String("baseline-rev", "", "fail unless the baseline revision matches")
+	asJSON := fs.Bool("json", false, i18n.T("cli.flag.scoreJson"))
+	outPath := fs.String("out", "", i18n.T("cli.flag.scoreOut"))
+	baselinePath := fs.String("baseline", "", i18n.T("cli.flag.scoreBaseline"))
+	requireRevision := fs.String("baseline-rev", "", i18n.T("cli.flag.scoreBaselineRev"))
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: vmbench score <report.json|-> [flags]\n\n"+i18n.T("cli.usage.scoreDetail"))
+		fmt.Fprintln(fs.Output(), "Usage: vmbench score <report.json|-> [flags]\n\n"+i18n.T("cli.usage.scoreDetail"))
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 	if fs.NArg() != 1 {
@@ -99,7 +104,26 @@ func writeAssessmentJSON(w io.Writer, assessment score.Assessment) error {
 // renderAssessment prints the human-readable console view. Labels are
 // localized; metric ids, workload names, and state values stay English.
 func renderAssessment(w io.Writer, assessment score.Assessment) {
-	fmt.Fprintf(w, "%s: %s (%s)\n", i18n.T("cli.score.baseline"), assessment.Baseline.Revision, assessment.Baseline.Source)
+	baselineLine := fmt.Sprintf("%s: %s (%s)", i18n.T("cli.score.baseline"), assessment.Baseline.Revision, assessment.Baseline.Source)
+	if assessment.Baseline.Provisional {
+		baselineLine += "  [" + i18n.T("cli.score.baselineProvisional") + "]"
+	}
+	fmt.Fprintln(w, baselineLine)
+	// Source backlink: report kind plus whichever identity fields the report
+	// carried (app version, run timestamp, input digest).
+	var sourceParts []string
+	if assessment.Source.Version != "" {
+		sourceParts = append(sourceParts, "v"+assessment.Source.Version)
+	}
+	if assessment.Source.Timestamp != "" {
+		sourceParts = append(sourceParts, assessment.Source.Timestamp)
+	}
+	if assessment.Source.SHA256 != "" {
+		sourceParts = append(sourceParts, "sha256:"+assessment.Source.SHA256)
+	}
+	if len(sourceParts) > 0 {
+		fmt.Fprintf(w, "%s: %s %s\n", i18n.T("cli.score.source"), assessment.Source.Kind, strings.Join(sourceParts, " · "))
+	}
 	if assessment.Composite != nil {
 		composite := assessment.Composite
 		line := fmt.Sprintf("%s: %.1f (%s) [%s]", i18n.T("cli.score.composite"), composite.Index, composite.Rating, composite.Status)
@@ -113,7 +137,8 @@ func renderAssessment(w io.Writer, assessment score.Assessment) {
 	} else {
 		fmt.Fprintf(w, "%s: %s\n", i18n.T("cli.score.composite"), i18n.T("cli.score.compositeWithheld"))
 	}
-	fmt.Fprintf(w, "%s: %.1f%%  %s: %.2f\n\n", i18n.T("cli.score.coverage"), assessment.Coverage.MetricPct, i18n.T("cli.score.confidence"), assessment.Coverage.Confidence)
+	fmt.Fprintf(w, "%s: %.1f%%  %s: %.0f%%\n", i18n.T("cli.score.coverage"), assessment.Coverage.MetricPct, i18n.T("cli.score.confidence"), assessment.Coverage.Confidence*100)
+	fmt.Fprintf(w, "%s\n\n", i18n.T("cli.score.confidenceLegend"))
 
 	tw := tabwriter.NewWriter(w, 0, 2, 2, ' ', 0)
 	fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
@@ -129,7 +154,7 @@ func renderAssessment(w io.Writer, assessment score.Assessment) {
 			formatIndex(dimension.Index),
 			dimension.Rating,
 			strconv.FormatFloat(dimension.CoveragePct, 'f', 0, 64)+"%",
-			strconv.FormatFloat(dimension.Confidence, 'f', 2, 64))
+			strconv.FormatFloat(dimension.Confidence*100, 'f', 0, 64)+"%")
 	}
 	fmt.Fprintf(tw, "\n%s\t%s\t%s\t%s\t%s\t%s\n",
 		i18n.T("cli.score.dimension"), i18n.T("cli.score.metric"), i18n.T("cli.score.value"),

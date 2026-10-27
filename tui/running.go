@@ -195,11 +195,12 @@ func updateWorkloadEvent(m Model, ev vmbench.Event) (tea.Model, tea.Cmd) {
 	return m, waitForEvent(m.eventCh)
 }
 
-// updateRunning handles keys for both run kinds; cancel (esc), the event log
-// toggle (tab), and quit (q) mean the same thing either way.
+// updateRunning handles keys for both run kinds; cancel (esc/q/ctrl+c), the
+// event log toggle (tab), and the y/n confirmation mean the same thing either
+// way.
 func updateRunning(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc":
+	case "esc", "q":
 		if !m.confirm {
 			m.confirm = true
 			return m, nil
@@ -208,11 +209,6 @@ func updateRunning(m Model, msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "tab":
 		m.showLog = !m.showLog
 		return m, nil
-	case "q":
-		if m.cancel != nil {
-			m.cancel()
-		}
-		return m, tea.Quit
 	}
 	return m, nil
 }
@@ -333,8 +329,26 @@ func updateCheckupEvent(m Model, ev checkup.Event) (tea.Model, tea.Cmd) {
 		clearSectionStartedAt(&m, ev.Section)
 	case checkup.EventCheckupDone:
 		addLog("● " + i18n.T("tui.checkupRunning.complete") + "  " + ev.Message)
+	default:
+		// Unknown kinds (item.* sub-events today, anything new tomorrow)
+		// still land in the event log instead of being dropped.
+		addLog("· " + checkupEventLogLine(ev))
 	}
 	return m, waitForCheckupEvent(m.checkupEventCh)
+}
+
+// checkupEventLogLine renders an unrecognized event for the log tab: kind
+// first, then whichever of section / item / message is present.
+func checkupEventLogLine(ev checkup.Event) string {
+	var b strings.Builder
+	b.WriteString(string(ev.Kind))
+	for _, part := range []string{string(ev.Section), ev.Item, ev.Message} {
+		if part != "" {
+			b.WriteString("  ")
+			b.WriteString(part)
+		}
+	}
+	return b.String()
 }
 
 // clearSectionStartedAt stops the elapsed timer for a finished section.
@@ -473,6 +487,10 @@ func viewWorkloadProgress(m Model) string {
 	progressLine := comp.ProgressLine(barWidth, ratio, i18n.T("tui.running.overall"), t.Primary) +
 		lipgloss.NewStyle().Foreground(t.Muted).Render(fmt.Sprintf("  %d/%d  ✗%d", done, total, failed))
 
+	if m.height < 40 {
+		return viewWorkloadProgressCompact(m, headLine, progressLine)
+	}
+
 	groups := groupWorkloads(m.workloads)
 	cardW := width - 4
 	if width >= 120 {
@@ -497,6 +515,78 @@ func viewWorkloadProgress(m Model) string {
 	}
 	view := strings.Join(parts, "\n")
 	return viewWithCancelModal(m, view, width)
+}
+
+// viewWorkloadProgressCompact is the short-terminal variant of the hardware
+// run view, mirroring the checkup compact mode: one line per workload and the
+// cancel confirmation inline so it stays inside the viewport.
+func viewWorkloadProgressCompact(m Model, header, progressLine string) string {
+	t := theme.Active
+	lineWidth := m.width - 4
+	parts := []string{header, progressLine, ""}
+	for _, w := range m.workloads {
+		parts = append(parts, workloadCompactLine(m, w, lineWidth))
+	}
+
+	if m.showLog && len(m.eventLog) > 0 {
+		logLines := m.eventLog
+		if len(logLines) > 2 {
+			logLines = logLines[len(logLines)-2:]
+		}
+		parts = append(parts, "", lipgloss.NewStyle().Bold(true).Foreground(t.Accent).Render(i18n.T("tui.checkupRunning.recentEvents")))
+		for _, line := range logLines {
+			parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(truncStr(line, lineWidth)))
+		}
+	}
+	if m.confirm {
+		prompt := lipgloss.NewStyle().Bold(true).Foreground(t.Danger).Render(i18n.T("tui.modal.cancelBenchmark")) +
+			lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.T("tui.modal.cancelCheckupCompact"))
+		parts = append(parts, "", prompt)
+	}
+	return strings.Join(parts, "\n")
+}
+
+// workloadCompactLine renders "name status" on one line. The name column is
+// capped so the status half (spinner, iteration counter, elapsed) keeps
+// enough room even on the narrowest terminals.
+func workloadCompactLine(m Model, w workloadState, width int) string {
+	nameW := 28
+	if width-nameW-1 < 17 {
+		nameW = width - 18
+	}
+	if nameW < 12 {
+		nameW = 12
+	}
+	name := lipgloss.NewStyle().Bold(true).Foreground(theme.Active.Fg).Width(nameW).
+		Render(truncStr(w.name, nameW))
+	return name + " " + workloadCompactStatus(m, w, width-nameW-1)
+}
+
+func workloadCompactStatus(m Model, w workloadState, maxWidth int) string {
+	t := theme.Active
+	if maxWidth < 8 {
+		maxWidth = 8
+	}
+	switch w.status {
+	case "done":
+		return comp.StatusPill(comp.StatusDone, truncStr(w.metric, maxWidth-2))
+	case "running":
+		status := m.spinner.View() + " " + lipgloss.NewStyle().Foreground(t.Warning).Render(i18n.StatusLabel("running"))
+		if w.iterTotal > 0 {
+			status += " " + fmt.Sprintf("%d/%d", w.iterCur, w.iterTotal)
+		}
+		if !w.startedAt.IsZero() {
+			status += " " + lipgloss.NewStyle().Foreground(t.Subtle).Render(
+				time.Since(w.startedAt).Truncate(time.Second).String())
+		}
+		return status
+	case "fail":
+		return comp.StatusPill(comp.StatusFail, truncStr(w.metric, maxWidth-2))
+	case "skip":
+		return comp.StatusPill(comp.StatusSkip, i18n.StatusLabel("skipped"))
+	default:
+		return comp.StatusPill(comp.StatusWaiting, i18n.StatusLabel("waiting"))
+	}
 }
 
 // viewCheckupProgress renders the per-section grid for a checkup run.

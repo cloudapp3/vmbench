@@ -32,7 +32,7 @@ VMBENCH_BIN_DIR="$(
 )" && export PATH="$VMBENCH_BIN_DIR:$PATH"
 
 vmbench                          # 交互式 TUI：勾选要测的项目，回车开跑
-vmbench --json report.json       # 纯硬件跑分（默认行为）
+vmbench --json-out report.json       # 纯硬件跑分（默认行为）
 vmbench --preset quick           # 快速概览：硬件 + 网络信息 + 测速 + IP 质量
 vmbench --preset proxy           # 代理 / 解锁场景：线路、延迟、速度、IP 质量、解锁、可达性
 vmbench --markdown report.md     # 论坛直贴报告 — 公网 IP 已脱敏
@@ -88,7 +88,7 @@ vmbench update --check --json    # 供脚本使用的结构化状态
 | `vmbench mcp serve [--transport stdio]` | 以 MCP stdio 把 vmbench 工具暴露给 LLM 客户端 |
 | `vmbench list` | 列出可用 workload |
 | `vmbench sysinfo [--json]` | 查看系统信息 |
-| `vmbench score <report.json\|->` | 基于版本化评分基线，从报告派生确定性评估 |
+| `vmbench score <report.json\|->` | 基于版本化评分基线，从报告派生确定性评估（输出覆盖率 / 置信度百分比与来源回链；基线未校准时明确标注 provisional） |
 | `vmbench share <report.json\|->` | 把已保存报告投影成脱敏 paste 并上传到显式选择的 provider |
 | `vmbench history <command>` | 增加 / 列出 / 查看 / 删除本地报告 |
 | `vmbench update [--check] [--version TAG]` | 从 GitHub Releases 自更新（SHA-256 校验） |
@@ -111,13 +111,15 @@ vmbench update --check --json    # 供脚本使用的结构化状态
 | `--node-catalog` | embedded | `embedded`、`auto`（每次拉取，静默回退缓存/embedded）或 JSON 路径 |
 | `--node-revision` | — | 固定精确 catalog revision；不匹配时在探测前失败 |
 | `--iperf-host` | — | iperf3 speed provider 的服务器 |
-| `--json` / `--html` / `--markdown` | — | 导出 JSON / HTML / 论坛直贴 markdown 报告到文件 |
+| `--json-out` / `--html` / `--markdown` | — | 导出 JSON / HTML / 论坛直贴 markdown 报告到文件（旧拼写 `--json PATH` 仍可用，会打印弃用提示） |
 | `--quiet` | false | 关闭进度输出 |
 | `--auto-swap` | false | （Linux）geekbench 低内存运行：免确认创建临时 swapfile，结束后移除 |
 | `--save-history` | false | 报告存入本地历史（`--history-tag` 打标签） |
 | `--lang` | auto | `en` 或 `zh-CN`（也支持 `VMBENCH_LANG`） |
 
 不带 `--preset` / `--only` / `--skip` 时只跑硬件；网络 section 通过 preset 或显式选择启用。生效选择恰好只有 `hardware` section 时产出 benchmark（run）报告——等价 v0.8.0 之前的 `vmbench run`——否则产出综合体检报告。完整参数表：`vmbench --help` 或[能力全览](docs/capabilities.md)。
+
+退出码：`0` 全部成功 · `1` 没有产出可用报告 · `2` 用法 / 参数错误 · `3` 报告已写出但部分 workload 失败 · `130` Ctrl+C / SIGTERM 中断（已写出的部分报告保留）。
 
 报告默认脱敏：本机公网 IPv4/IPv6 在所有出口（console、JSON、HTML、markdown、历史、TUI、MCP）被一致替换为文档保留段占位地址（`203.0.113.x`、`2001:db8::x`），内嵌该地址的 BGP/CIDR 网段与反向 DNSBL 标签一并替换；内网 IP、hostname、路由 hop、远端节点 IP 保留。`--redact none` 退出脱敏（CLI 会打印分享警告）；TUI 与 MCP 恒为脱敏。
 
@@ -129,13 +131,13 @@ vmbench update --check --json    # 供脚本使用的结构化状态
 
 ```bash
 vmbench share report.json --dry-run           # 打印 payload 与脱敏清单，零网络
-vmbench share report.json                     # 上传 dpaste（默认），打印 URL
-vmbench share report.json --provider dpaste,0x0   # 显式 fallback 链
+vmbench share report.json                     # 默认链 dpaste,0x0,paste_rs 自动回退
+vmbench share report.json --provider 0x0      # 显式指定 provider 或 fallback 链
 vmbench share report.json --format json       # 改传脱敏后的报告 JSON
 vmbench share report.json --save-payload out.md    # 保存一份与上传字节完全一致的副本
 ```
 
-payload 复用 `--markdown` 投影（`--format json` 则是脱敏报告本体）并追加一行说明实际脱敏内容的尾注。分享是显式授权：vmbench 的其他部分——基准、TUI、MCP——都不上传任何东西。脱敏在报告层 IP 掩码之上额外掩掉结构化 hostname。`--redact none` 保留真实地址并打印警告；`--media full` 列出全部流媒体服务而不是折叠视图。provider：`dpaste`（默认）、`0x0`、`paste_rs`、`custom`（需 `--share-endpoint`，仅 https）。fallback 仅在网络错误或 5xx 时尝试下一家——同一 payload 最多成功上传一次。超过 512 KiB 的 payload 直接拒绝并给出收敛建议，不做静默截断。
+payload 复用 `--markdown` 投影（`--format json` 则是脱敏报告本体）并追加一行说明实际脱敏内容的尾注。分享是显式授权：vmbench 的其他部分——基准、TUI、MCP——都不上传任何东西。上传前会先在 stderr 打印脱敏清单（掩掉了哪些地址、hostname），让你在数据离开本机前看一眼。脱敏在报告层 IP 掩码之上额外掩掉结构化 hostname。`--redact none` 保留真实地址并打印警告；`--media full` 列出全部流媒体服务而不是折叠视图。provider：`dpaste`、`0x0`、`paste_rs`、`custom`（需 `--share-endpoint`，仅 https），默认链 `dpaste,0x0,paste_rs`。fallback 发生在网络错误、5xx 或 403/429（封段 / 限流）时——这些情况下 paste 一定没有创建，换下一家重试安全；其余 4xx 视为终态，同一 payload 最多成功上传一次。超过 512 KiB 的 payload 直接拒绝并给出收敛建议，不做静默截断。
 
 ## VPS 体检
 
@@ -173,12 +175,12 @@ vmbench --node-catalog auto --save-history --history-tag weekly
 
 - **Dashboard**：测评 / 历史 / 系统信息入口，全程支持鼠标点击与滚轮。System 卡片显示本机公网 IPv4/IPv6 与 ASN 归属（启动异步探测，离线静默；展开系统信息另见国家与运营商）
 - **Config**：一页搞定与 CLI/MCP 相同的规范化字段——preset 以 Hardware Only（CLI 默认）打头，外加 Custom 与各体检预设；section 开关按需展开工具、filter、speed、route、media、IP 来源卡片，实时显示预估时长、缺失工具预检，`1-9` 数字键跳转 section
-- **Running**：两种形态共用一个进度页——硬件跑分显示 workload 网格，体检显示 section 网格，带取消确认框
-- **Results**：卡片 / 分组 / 平铺三视图；`d` 进单 workload 详情（指标、采样、错误、原始工具输出）
-- **History**：浏览 `--save-history` 保存的报告（时间、类型、标签、ID）；`Enter` 在结果页或体检页重新打开，`Esc` 逐级返回
-- **Themes**：Dashboard 按 `t` 循环切换主题，选择本地持久化
+- **Running**：两种形态共用一个进度页——硬件跑分显示 workload 网格，体检显示 section 网格；`q` / `Esc` / `Ctrl+C` 都先弹取消确认框，确认后已完成部分自动存入历史
+- **Results**：卡片 / 分组 / 平铺三视图；`d` 进单 workload 详情（指标、采样、错误、原始工具输出）；跑完自动保存进历史，`s` 另存文件
+- **History**：浏览保存的报告（时间、类型、标签、ID）；`Enter` 在结果页或体检页重新打开，`r` 重新加载，`d` 删除（带确认），`Esc` 逐级返回
+- **Themes / 语言**：任意页面按 `t` 循环主题、`l` 三态循环语言（自动 → English → 中文），选择本地持久化
 
-按键：`?` 帮助 · `↑↓` 导航 · `Enter` 选择 · `Tab` 切换视图 · `d` 详情 · `s` 保存 · `Esc` 返回 · `q` 或 `Ctrl+C` 退出。所有页面支持 `PgUp/PgDn`、`Home/End` 和鼠标滚轮滚动；80x24 终端可完整操作。
+按键：`?` 帮助 · `↑↓` 导航 · `Enter` 选择 · `Tab` 切换视图 · `d` 详情 · `s` 保存 · `Esc` 返回 · `q` 或 `Ctrl+C` 退出（运行页为先确认）。所有页面支持 `PgUp/PgDn`、`Home/End` 和鼠标滚轮滚动；80x24 终端可完整操作。
 
 ## 界面语言
 

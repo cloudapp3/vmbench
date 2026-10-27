@@ -22,7 +22,8 @@ v0.8.0 起 run/suite 合并为单一配置页与单一运行页：启动时按�
 所有页面共享一组全局按键，注册表在 `tui/help.go`（footer 提示与帮助页同源）：
 
 - `?`：打开/关闭帮助页（文本输入聚焦时抑制）
-- `Ctrl+C`：立即退出（任意页面、包括确认弹窗内；运行中先取消再退出，等价运行页的 `q`。注意 raw mode 清掉了 ISIG，^C 不会产生 SIGINT，必须由程序自己处理）
+- `t` / `l`：任意页面循环切换主题 / 界面语言（自动 → English → 中文）；仅显式选择会持久化，文本输入聚焦时抑制
+- `Ctrl+C`：运行页先弹取消确认框（与 `q`/`Esc` 一致；确认后取消运行、已完成部分自动存历史）；其他页面与确认弹窗内立即退出，退出前取消在飞运行。注意 raw mode 清掉了 ISIG，^C 不会产生 SIGINT，必须由程序自己处理
 - `PgUp` / `PgDn`：按视口高度翻页
 - `Home` / `End`：跳到顶部/底部
 - 鼠标滚轮：上下滚动 3 行
@@ -95,7 +96,7 @@ run 路径（硬件基准）展示：
 
 Go runner 始终串行执行 workload；进度总数按各 workload 的实际迭代次数计算。硬件 workload 使用配置的迭代数，网络 workload 限制为一次真实探测。旧的 `multi/all` mode 不会产生第二轮结果或并发不同 workload。
 
-体检路径展示 9 个 section 的卡片网格（start/done/fail/skip/partial 状态与已耗时），事件写入共享的 event log viewport。两种路径共用取消 modal（文案按 runKind 选择）。
+体检路径展示 9 个 section 的卡片网格（start/done/fail/skip/partial 状态与已耗时），事件写入共享的 event log viewport；speed section 的逐 provider（china_isp 下逐 carrier）`item.start/done/fail` 子事件同样落入事件日志，长时间 section 不再无输出。两种路径共用取消 modal（文案按 runKind 选择）。运行结束（含取消后补完的部分报告）自动写入本地历史：用户已离开运行页时 toast 提示「部分结果已保存」。
 
 Go TUI 使用 spinner、progress bar、event log viewport 和取消 modal 展示执行状态。
 
@@ -110,9 +111,8 @@ Go TUI 使用 spinner、progress bar、event log viewport 和取消 modal 展示
 
 按键：
 
-- `Esc`：取消确认
+- `Esc` / `q` / `Ctrl+C`：取消确认（`y` 确认取消、`n`/`Esc` 继续运行）
 - `Tab`：切换 event log 显示
-- `q`：退出
 
 ## Results
 
@@ -142,7 +142,7 @@ Go TUI 支持交互式视图切换：
 - `↑↓` / `j k`：移动光标（grouped/flat）
 - `Enter`：grouped 下展开/折叠 category
 - `d`：flat 下打开光标行的 ResultDetail
-- `s`：保存 JSON
+- `s`：保存 JSON（文件名带时间戳 `vmbench-report-YYYYMMDD-HHMMSS.json`；toast 在共享 View 层渲染于 footer 上方，不受页面滚动影响）
 - `Esc`：返回 Dashboard（从 ComparePicker 查看进入时返回 picker）
 
 ## ResultDetail
@@ -162,7 +162,7 @@ Go TUI 支持交互式视图切换：
 
 ## CheckupResults
 
-Go TUI 在终端低于 40 行时使用紧凑布局：Config 只展开当前聚焦字段，Running 与 CheckupResults 对每个 section 使用单行状态摘要；在 `80x24` 下页面宽高均受终端边界约束，字段导航、启动和取消仍可操作。更高终端继续显示完整卡片与详细结果。
+Go TUI 在终端低于 40 行时使用紧凑布局：Config 只展开当前聚焦字段，Running（run 与体检两种形态）对每个 workload/section 使用单行状态摘要、取消确认内联；宽度低于 100 列时分组窄列布局。在 `80x24` 下页面宽高均受终端边界约束，字段导航、启动和取消仍可操作；低于 `50x16` 直接提示终端过小。更高终端继续显示完整卡片与详细结果。
 
 Go 主线覆盖 `hardware / network_info / route / ping / speed / ip_quality / reachability / mail / media` 九个 section。Network Info 展示虚拟化、公网 IP、ASN/provider 和 NAT 证据；Reachability 展示 website/Telegram 的 protocol/latency/status/error。所有这些状态都不会折算为 benchmark 总分。体检只有所有 enabled section 都是 `ok` 时成功；enabled 的空状态、`skipped`、`partial`、`error` 均表示失败，disabled section 才只发 skip event。Running 页保留 `PARTIAL` 独立样式但将它计入终态非成功数量，不伪装成 `ERROR` 或成功；网络 section timeout/cancel 也会显示为结构化 `error` message。
 
@@ -201,9 +201,10 @@ Compare/ComparePicker 按键：`Esc` 返回上一级（Compare -> Picker -> Dash
 
 Dashboard 菜单「报告历史」进入（`tui/history.go`）：
 
-- 历史列表与 ComparePicker 共用同一加载链路（`loadHistoryCmd`/`historyListMsg`，最新在前、重验证每条记录、上限 50 条），按当前页面分流结果；列为 time/kind/tag/id，表下有计数行；懒加载一次，会话内复用
+- 历史列表与 ComparePicker 共用同一加载链路（`loadHistoryCmd`/`historyListMsg`，最新在前、重验证每条记录、上限 50 条），按当前页面分流结果；列为 time/kind/tag/id，表下有计数行（超出上限时提示截断）；首次进入懒加载，失败保留错误可 `r` 重试，会话内复用
 - `↑↓/jk` 移动，`↵`/`v` 打开当前记录：run -> Results 页、体检 -> CheckupResults 页（复用 `viewRecordCmd`/`recordViewMsg`，`reportFrom` 记录来源页）
-- `Esc` 逐级返回（报告页 -> History -> Dashboard），`q` 退出；空态提示 `--save-history` 与 `vmbench history add`，加载失败显示结构化错误
+- `r` 重新加载历史，`d` 删除当前记录（`y`/`n` 确认）
+- `Esc` 逐级返回（报告页 -> History -> Dashboard），`q` 退出；空态提示 `--save-history` 与 `vmbench history add`
 - 与 ComparePicker 的区别：无 A/B 选择与手动路径模式，纯浏览查看
 
 ## 样式原则

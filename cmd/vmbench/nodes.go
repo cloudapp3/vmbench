@@ -38,7 +38,7 @@ func runNodes(args []string) int {
 		printNodesUsage(os.Stdout)
 		return 0
 	default:
-		fmt.Fprintf(os.Stderr, "unknown nodes command: %s\n\n", args[0])
+		fmt.Fprintf(os.Stderr, "%s\n\n", i18n.Tf("cli.error.unknownNodesCommand", map[string]any{"Command": args[0]}))
 		printNodesUsage(os.Stderr)
 		return 2
 	}
@@ -82,7 +82,7 @@ func (values nodeLoadFlags) load() (nodecatalog.Loaded, error) {
 
 func runNodesList(args []string) int {
 	fs := flag.NewFlagSet("nodes list", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
 	var loadFlags nodeLoadFlags
 	var asJSON bool
@@ -94,11 +94,16 @@ func runNodesList(args []string) int {
 	fs.StringVar(&region, "region", "", i18n.T("cli.flag.nodesRegion"))
 	fs.StringVar(&city, "city", "", i18n.T("cli.flag.nodesCity"))
 	fs.StringVar(&carrier, "carrier", "", i18n.T("cli.flag.nodesCarrier"))
-	fs.Usage = func() { fmt.Fprintln(os.Stderr, "Usage: vmbench nodes list [flags]") }
+	fs.Usage = func() { fmt.Fprintln(fs.Output(), "Usage: vmbench nodes list [flags]") }
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 	if fs.NArg() != 0 {
@@ -160,7 +165,7 @@ func runNodesList(args []string) int {
 
 func runNodesVerify(args []string) int {
 	fs := flag.NewFlagSet("nodes verify", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
 	var loadFlags nodeLoadFlags
 	var signatureRef, publicKeyFile, publicKeyValue string
@@ -170,13 +175,18 @@ func runNodesVerify(args []string) int {
 	fs.StringVar(&signatureRef, "signature", "", i18n.T("cli.flag.signature"))
 	fs.StringVar(&publicKeyFile, "public-key", "", i18n.T("cli.flag.publicKey"))
 	fs.StringVar(&publicKeyValue, "public-key-value", "", i18n.T("cli.flag.publicKeyValue"))
-	fs.DurationVar(&timeout, "timeout", 15*time.Second, i18n.T("cli.flag.signatureTimeout"))
+	fs.DurationVar(&timeout, "timeout", 15*time.Second, "timeout for the signature download only, a single HTTP request (default 15s)")
 	fs.BoolVar(&asJSON, "json", false, i18n.T("cli.flag.jsonOutput"))
-	fs.Usage = func() { fmt.Fprintln(os.Stderr, "Usage: vmbench nodes verify [flags]") }
+	fs.Usage = func() { fmt.Fprintln(fs.Output(), "Usage: vmbench nodes verify [flags]") }
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 	if fs.NArg() != 0 || timeout <= 0 {
@@ -233,7 +243,7 @@ func runNodesVerify(args []string) int {
 
 func runNodesUpdate(args []string) int {
 	fs := flag.NewFlagSet("nodes update", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
 	var manifestURL, signatureRef, publicKeyFile, publicKeyValue, destination string
 	var timeout time.Duration
@@ -243,15 +253,20 @@ func runNodesUpdate(args []string) int {
 	fs.StringVar(&publicKeyFile, "public-key", "", i18n.T("cli.flag.publicKey"))
 	fs.StringVar(&publicKeyValue, "public-key-value", "", i18n.T("cli.flag.publicKeyValue"))
 	fs.StringVar(&destination, "cache", "", i18n.T("cli.flag.updateCache"))
-	fs.DurationVar(&timeout, "timeout", 30*time.Second, i18n.T("cli.flag.updateTimeout"))
+	fs.DurationVar(&timeout, "timeout", 30*time.Second, "overall timeout for the whole catalog update, manifest and signature downloads included (default 30s)")
 	fs.BoolVar(&asJSON, "json", false, i18n.T("cli.flag.jsonOutput"))
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: vmbench nodes update --url URL --signature PATH|URL (--public-key PATH|--public-key-value KEY) [flags]")
+		fmt.Fprintln(fs.Output(), "Usage: vmbench nodes update --url URL --signature PATH|URL (--public-key PATH|--public-key-value KEY) [flags]")
 	}
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 	if fs.NArg() != 0 || strings.TrimSpace(manifestURL) == "" || strings.TrimSpace(signatureRef) == "" || timeout <= 0 {
@@ -301,7 +316,7 @@ func runNodesUpdate(args []string) int {
 
 func runNodesHealth(args []string) int {
 	fs := flag.NewFlagSet("nodes health", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
 	var loadFlags nodeLoadFlags
 	var asJSON bool
@@ -315,13 +330,18 @@ func runNodesHealth(args []string) int {
 	fs.StringVar(&region, "region", "", i18n.T("cli.flag.nodesRegion"))
 	fs.StringVar(&city, "city", "", i18n.T("cli.flag.nodesCity"))
 	fs.StringVar(&carrier, "carrier", "", i18n.T("cli.flag.nodesCarrier"))
-	fs.DurationVar(&timeout, "timeout", 5*time.Second, i18n.T("cli.flag.healthTimeout"))
+	fs.DurationVar(&timeout, "timeout", 5*time.Second, "per-node health check timeout (default 5s)")
 	fs.IntVar(&concurrency, "concurrency", 8, i18n.T("cli.flag.healthConcurrency"))
-	fs.Usage = func() { fmt.Fprintln(os.Stderr, "Usage: vmbench nodes health [flags]") }
+	fs.Usage = func() { fmt.Fprintln(fs.Output(), "Usage: vmbench nodes health [flags]") }
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 	if fs.NArg() != 0 || timeout <= 0 || concurrency < 1 || concurrency > 32 {

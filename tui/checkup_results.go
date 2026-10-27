@@ -18,7 +18,7 @@ func updateCheckupResults(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "esc":
+		case "esc", "q":
 			if m.reportFrom != pageDashboard {
 				from := m.reportFrom
 				m.reportFrom = pageDashboard
@@ -28,14 +28,7 @@ func updateCheckupResults(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.page = pageDashboard
 			m.checkupReport = nil
 			return m, nil
-		case "q":
-			return m, tea.Quit
 		}
-	case comp.ToastExpireMsg:
-		if msg.Stamp == m.toast.Until {
-			m.toast = comp.Toast{}
-		}
-		return m, nil
 	}
 	return m, nil
 }
@@ -96,9 +89,6 @@ func viewCheckupResults(m Model) string {
 	body := strings.Join(cards, "\n")
 	parts := []string{headerTitle, statusLine, "", body}
 
-	if m.toast.Active() {
-		parts = append(parts, "", m.toast.Render(width))
-	}
 	return strings.Join(parts, "\n")
 }
 
@@ -121,9 +111,6 @@ func viewCheckupResultsCompact(
 	}
 	if len(parts) == 3 {
 		parts = append(parts, lipgloss.NewStyle().Foreground(t.Muted).Render(i18n.T("tui.checkupResults.noSections")))
-	}
-	if m.toast.Active() {
-		parts = append(parts, "", m.toast.Render(lineWidth))
 	}
 	return strings.Join(parts, "\n")
 }

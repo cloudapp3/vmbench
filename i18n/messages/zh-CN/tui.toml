@@ -16,7 +16,7 @@ other = "对比两份 JSON 报告"
 other = "报告历史"
 
 [tui.menu.historyDesc]
-other = "浏览 --save-history 保存的报告"
+other = "浏览已保存的测评报告"
 
 [tui.menu.sysinfo]
 other = "系统信息"
@@ -52,7 +52,7 @@ other = "自动 (跟随系统)"
 other = "加载中..."
 
 [tui.tooSmall]
-other = "终端尺寸过小 (需要 ≥60x18,当前 {{.Width}}x{{.Height}})"
+other = "终端尺寸过小 (需要 ≥50x16,当前 {{.Width}}x{{.Height}})"
 
 [tui.tooSmallHint]
 other = "请调整终端大小。"
@@ -62,6 +62,15 @@ other = "保存失败: {{.Err}}"
 
 [tui.toast.saved]
 other = "已保存 → {{.Path}}"
+
+[tui.toast.saveExists]
+other = "{{.Path}} 已存在，未覆盖"
+
+[tui.toast.historySaveFailed]
+other = "历史保存失败: {{.Err}}"
+
+[tui.toast.partialSaved]
+other = "部分结果已保存到历史"
 
 [tui.hint.nav]
 other = "移动"
@@ -95,6 +104,18 @@ other = "保存"
 
 [tui.hint.back]
 other = "返回"
+
+[tui.hint.refresh]
+other = "刷新"
+
+[tui.hint.delete]
+other = "删除"
+
+[tui.hint.confirm]
+other = "确认 (y/n)"
+
+[tui.hint.retryHint]
+other = "按 r 重试"
 
 [tui.hint.field]
 other = "字段"
@@ -336,7 +357,7 @@ other = "请先选择两条记录"
 other = "跑分报告与体检报告无法互相对比"
 
 [tui.compare.noHistory]
-other = "暂无历史记录。可用 --save-history 跑分或 vmbench history add 添加。"
+other = "暂无历史记录，跑一次测试后这里会出现。"
 
 [tui.compare.historyError]
 other = "历史记录错误: {{.Err}}"
@@ -360,10 +381,22 @@ other = "历史记录错误: {{.Err}}"
 other = "暂无已保存的报告。"
 
 [tui.history.emptyHint]
-other = "跑分时加 --save-history,或用 vmbench history add 添加。"
+other = "跑一次测试后这里会出现记录。"
 
 [tui.history.count]
 other = "{{.Count}} 份报告"
+
+[tui.history.countTruncated]
+other = "最近 {{.Shown}} / 共 {{.Total}} 份报告"
+
+[tui.history.deletePrompt]
+other = "删除 {{.ID}}?  y 确认 · n 取消"
+
+[tui.history.deleted]
+other = "已删除 {{.ID}}"
+
+[tui.history.deleteFailed]
+other = "删除失败: {{.Err}}"
 
 [tui.history.col.time]
 other = "时间"

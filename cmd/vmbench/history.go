@@ -195,17 +195,22 @@ func runHistoryDelete(args []string) int {
 
 func runHistoryCompare(args []string) int {
 	fs := flag.NewFlagSet("history compare", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
 	last := 2
 	fs.IntVar(&last, "last", 2, i18n.T("cli.flag.historyLast"))
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: vmbench history compare --last N")
+		fmt.Fprintln(fs.Output(), "Usage: vmbench history compare --last N")
 	}
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 	if fs.NArg() != 0 {

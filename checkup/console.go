@@ -162,7 +162,9 @@ func writeRouteBody(w io.Writer, section RouteSection) error {
 	return writeGrid(w, headers, rows)
 }
 
-// writePingBody prints the ping section content.
+// writePingBody prints the ping section content. Narrow terminals drop the
+// descriptive columns first (city/carrier, then ip/probe); latency, loss, and
+// status always stay.
 func writePingBody(w io.Writer, section PingSection) error {
 	if err := writeSectionState(w, section.SectionState); err != nil {
 		return err
@@ -170,19 +172,29 @@ func writePingBody(w io.Writer, section PingSection) error {
 	if len(section.Results) == 0 {
 		return nil
 	}
-	headers := []string{
+	width := textgrid.StdoutWidth(w)
+	// Column indexes: 0 target, 1 city, 2 carrier, 3 ip, 4 probe, 5 connection,
+	// 6 avg, 7 jitter, 8 loss, 9 status.
+	var omitted []int
+	if width > 0 && width < 110 {
+		omitted = append(omitted, 1, 2)
+	}
+	if width > 0 && width < 90 {
+		omitted = append(omitted, 3, 4)
+	}
+	headers := dropGridColumns([]string{
 		i18n.T("report.checkup.col.target"), i18n.T("report.checkup.col.city"), i18n.T("report.checkup.col.carrier"),
 		i18n.T("report.checkup.col.ip"), i18n.T("report.checkup.col.probe"), i18n.T("report.checkup.col.connection"),
 		i18n.T("report.checkup.col.avg"), i18n.T("report.checkup.col.jitter"), i18n.T("report.checkup.col.loss"),
 		i18n.T("report.checkup.col.status"),
-	}
+	}, omitted)
 	rows := make([][]string, 0, len(section.Results))
 	for _, item := range section.Results {
 		status := defaultText(item.Status, "unknown")
 		if item.Status != "ok" && item.Message != "" {
 			status = item.Message
 		}
-		rows = append(rows, []string{
+		rows = append(rows, dropGridColumns([]string{
 			defaultText(item.Name, "-"),
 			defaultText(item.City, "-"),
 			defaultText(item.Carrier, "-"),
@@ -193,9 +205,30 @@ func writePingBody(w io.Writer, section PingSection) error {
 			formatMaybeFloat(item.JitterMs, "ms"),
 			fmt.Sprintf("%.0f%%", item.PacketLoss),
 			status,
-		})
+		}, omitted))
 	}
 	return writeGrid(w, headers, rows)
+}
+
+// dropGridColumns removes the given column indexes (sorted) from one row.
+func dropGridColumns(row []string, omitted []int) []string {
+	if len(omitted) == 0 {
+		return row
+	}
+	out := make([]string, 0, len(row)-len(omitted))
+	for i, cell := range row {
+		dropped := false
+		for _, o := range omitted {
+			if i == o {
+				dropped = true
+				break
+			}
+		}
+		if !dropped {
+			out = append(out, cell)
+		}
+	}
+	return out
 }
 
 // writeSpeedBody prints the speed section content.

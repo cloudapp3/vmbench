@@ -36,14 +36,20 @@ func printMCPUsage(w io.Writer) {
 
 func runMCPServe(args []string) int {
 	fs := flag.NewFlagSet("mcp serve", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
+	registerLangFlag(fs)
 	var transport string
 	fs.StringVar(&transport, "transport", "stdio", "MCP transport: stdio")
-	fs.Usage = func() { printMCPUsage(os.Stderr) }
+	fs.Usage = func() { printMCPUsage(fs.Output()) }
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 	if strings.ToLower(strings.TrimSpace(transport)) != "stdio" {

@@ -156,8 +156,8 @@ func TestRunHardwareOnlyOmitsCatalogAndNetworkProvenance(t *testing.T) {
 			"--json", path,
 		})
 	})
-	if code != 1 {
-		t.Fatalf("hardware-only empty run exit = %d, want 1 for no workloads", code)
+	if code != 3 {
+		t.Fatalf("hardware-only empty run exit = %d, want 3 for no matching workloads", code)
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {

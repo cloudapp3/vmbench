@@ -118,7 +118,7 @@ vmbench                                      # 启动 TUI（默认行为）
 vmbench [flags]                              # 运行基准测试：默认仅 hardware，preset/only/skip 选择网络 section
 vmbench list                                 # 列出可用 workload
 vmbench sysinfo [--json]                     # 显示系统信息
-vmbench compare <a.json> <b.json> [...]      # 自动识别并对比 benchmark/体检报告
+vmbench compare <a.json> <b.json> [...]      # 自动识别并对比 benchmark/体检报告（当前发布版本未启用；可分别对报告运行 vmbench score 对比评估）
 vmbench score <report.json|->                 # 按版本化基线生成确定性 assessment
 vmbench share <report.json|-> [flags]         # 投影已脱敏报告并上传到显式选择的 paste 服务
 vmbench history add|list|show|delete|compare # 本地报告历史
@@ -152,7 +152,7 @@ v0.8.0 起 `run` / `suite` 子命令合并进根命令。报告种类规则：�
 | `--node-revision` | （空） | pin 精确 catalog revision，不匹配时不启动 probe |
 | `--node-cache` | 用户 cache | `auto` source 的 cache path override |
 | `--iperf-host` | （空） | iperf3 服务器地址（逗号分隔多个；`--speed-provider iperf3` 时必填） |
-| `--json` | （空） | 输出 JSON 报告到文件 |
+| `--json-out` | （空） | 输出 JSON 报告到文件（旧拼写 `--json PATH` 仍接受，打印弃用提示） |
 | `--html` | （空） | 输出 HTML 报告到文件 |
 | `--markdown` | （空） | 输出可贴论坛的 markdown 报告到文件（section 用代码块包裹、流媒体折叠；与 JSON/HTML 同源同脱敏） |
 | `--quiet` | `false` | 静默模式，抑制进度输出 |
@@ -212,7 +212,7 @@ v0.8.0 起 `run` / `suite` 子命令合并进根命令。报告种类规则：�
 
 ```bash
 # 基础硬件测试（默认 3 次迭代，工具集按平台选择；不带 section 参数 = 仅 hardware）
-vmbench --json report.json
+vmbench --json-out report.json
 
 # 只跑 CPU 相关的 workload
 vmbench --filter 'sysbench|OpenSSL'
@@ -221,7 +221,7 @@ vmbench --filter 'sysbench|OpenSSL'
 vmbench --hardware-tool sysbench,openssl,fio,dd,stream,mbw
 
 # 快速测评（1 次迭代）并输出 JSON + HTML
-vmbench --iterations 1 --json report.json --html report.html
+vmbench --iterations 1 --json-out report.json --html report.html
 
 # 快速场景预设
 vmbench --preset quick
@@ -242,6 +242,7 @@ vmbench --speed-provider cloudflare,speedtest_net
 vmbench --speed-provider iperf3 --iperf-host 1.2.3.4
 
 # 对比 benchmark 或体检报告，以及最近 N 份同类型历史
+# （compare 在当前发布版本未启用；可分别对报告运行 vmbench score 对比评估）
 vmbench compare report-a.json report-b.json report-c.json
 vmbench history compare --last 3
 
@@ -255,7 +256,7 @@ vmbench sysinfo
 vmbench sysinfo --json
 ```
 
-不带 `--preset` / `--only` / `--skip` 时只做硬件基准；网络诊断通过 preset 或 `--only` 在同一命令面上选择。非法 regex/iteration/tool 返回退出码 2，没有 workload 命中或任一 workload 失败返回退出码 1（run 报告路径）。硬件测评在执行前按 Definition Name/Category filter 检查本次实际涉及的外部命令，缺失时先写 stderr 提示，Linux 同时给出已知 Debian/Ubuntu 安装命令；受影响 workload 仍执行失败并写入结构化 error，不会静默跳过。
+不带 `--preset` / `--only` / `--skip` 时只做硬件基准；网络诊断通过 preset 或 `--only` 在同一命令面上选择。非法 regex/iteration/tool 返回退出码 2，没有可用报告产出返回退出码 1，报告已写出但存在失败 workload / section 时返回 3，Ctrl+C / SIGTERM 中断返回 130（已写出的部分报告保留）。硬件测评在执行前按 Definition Name/Category filter 检查本次实际涉及的外部命令，缺失时先写 stderr 提示，Linux 同时给出已知 Debian/Ubuntu 安装命令；受影响 workload 仍执行失败并写入结构化 error，不会静默跳过。
 
 ### 自升级（`vmbench update`）
 
@@ -551,7 +552,7 @@ speed
 
 默认只启用 `cloudflare`。同时选择多个 provider 时，顶层 summary 会写入 `aggregation: "best_per_metric"`；下载、上传与延迟可能分别来自不同 provider。选择 `iperf3` 但没有可用 host 时直接返回 provider/section error。
 
-体检只有所有 enabled section 都为 `status=ok` 才成功。enabled 的空状态、`skipped`、`partial`、`error` 都使总体失败、发 `section.fail` 并让 CLI 返回退出码 1；disabled section 才发 `section.skip`。默认 timeout 为 5 分钟：hardware 按 workload 应用，其他网络 section 各自派生 section context，deadline/cancel 写入结构化 error。CLI 默认把 section start/完成/失败和体检完成状态实时写到 stderr，`--quiet` 可关闭进度。Ping 全目标失败会保留逐目标 results 并返回聚合 error。
+体检只有所有 enabled section 都为 `status=ok` 才成功。enabled 的空状态、`skipped`、`partial`、`error` 都使总体失败、发 `section.fail`；报告仍会写出，CLI 返回退出码 3（报告已写出但存在失败）。disabled section 才发 `section.skip`。默认 timeout 为 5 分钟：hardware 按 workload 应用，其他网络 section 各自派生 section context，deadline/cancel 写入结构化 error。CLI 默认把 section start/完成/失败实时写到 stderr，`--quiet` 可关闭进度；speed section 额外发逐 provider（china_isp 下逐 carrier）的 `item.start` / `item.done` / `item.fail` 子事件，CLI 进度与 TUI 事件日志都会展示。Ping 全目标失败会保留逐目标 results 并返回聚合 error。Ctrl+C / SIGTERM 触发优雅取消：已完成部分照常写入报告，CLI 退出码 130。
 
 ---
 
@@ -565,7 +566,7 @@ speed
 - 列：Workload / Category / Time / Throughput / Latency / Detail / Error
 - 自动适配终端宽度
 
-#### JSON（`--json report.json`）
+#### JSON（`--json-out report.json`）
 
 以下为 Linux 默认工具集的 schema v2 示例；macOS/Windows 的 `hardware_tools` 默认值不同。config 记录规范化后的工具选择；`scope` 固定为 `hardware`，`mode`/`iperf_hosts`/catalog provenance 字段不再输出（结构体字段保留用于解析旧报告）。
 
@@ -648,7 +649,7 @@ vmbench history compare --last 3
 
 ```bash
 vmbench score report.json                 # 控制台评估视图
-vmbench score --json report.json          # 输出 assessment JSON
+vmbench score report.json --json        # 输出 assessment JSON
 vmbench score --baseline my.json --baseline-rev 2026-09.1 report.json
 ```
 

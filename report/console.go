@@ -77,32 +77,83 @@ func writeWorkloadTable(w io.Writer, title string, entries []WorkloadEntry, line
 		return
 	}
 	_, _ = fmt.Fprintf(w, "%s\n  %s\n%s\n", line, title, line)
-	_, _ = fmt.Fprint(w, renderWorkloadGrid(entries))
+	// Narrow terminals drop the descriptive columns first (category, then
+	// time/latency); the markdown projection keeps the full layout because
+	// StdoutWidth of a file writer is 0.
+	_, _ = fmt.Fprint(w, renderWorkloadGridFor(entries, textgrid.StdoutWidth(w)))
+	failed := 0
+	for _, item := range entries {
+		if item.Result == nil || strings.TrimSpace(item.Result.Error) != "" {
+			failed++
+		}
+	}
+	if failed > 0 {
+		_, _ = fmt.Fprintf(w, "\n  %s\n", i18n.Tf("report.console.failures", map[string]any{
+			"Failed": failed,
+			"Total":  len(entries),
+		}))
+	}
 }
 
 // renderWorkloadGrid renders the workload results table without any banner,
 // for embedding in console sections and markdown fenced blocks.
 func renderWorkloadGrid(entries []WorkloadEntry) string {
-	headers := []string{
+	return renderWorkloadGridFor(entries, 0)
+}
+
+// renderWorkloadGridFor renders the table, omitting columns when width is
+// positive but too narrow (0 = no terminal, keep every column).
+func renderWorkloadGridFor(entries []WorkloadEntry, width int) string {
+	// Column indexes: 0 workload, 1 category, 2 time, 3 throughput,
+	// 4 latency, 5 result.
+	var omitted []int
+	if width > 0 && width < 110 {
+		omitted = append(omitted, 1)
+	}
+	if width > 0 && width < 80 {
+		omitted = append(omitted, 2, 4)
+	}
+	headers := dropGridColumns([]string{
 		i18n.T("report.col.workload"),
 		i18n.T("report.col.category"),
 		i18n.T("report.col.time"),
 		i18n.T("report.col.throughput"),
 		i18n.T("report.col.latency"),
 		i18n.T("report.col.result"),
-	}
+	}, omitted)
 	rows := make([][]string, 0, len(entries))
 	for _, item := range entries {
-		rows = append(rows, []string{
+		rows = append(rows, dropGridColumns([]string{
 			item.Name,
 			item.Category,
 			formatTime(item.Result),
 			formatThroughput(item.Result),
 			formatLatency(item.Result),
 			formatDetail(item.Result),
-		})
+		}, omitted))
 	}
 	return textgrid.Render(headers, rows, 2)
+}
+
+// dropGridColumns removes the given column indexes from one row.
+func dropGridColumns(row []string, omitted []int) []string {
+	if len(omitted) == 0 {
+		return row
+	}
+	out := make([]string, 0, len(row)-len(omitted))
+	for i, cell := range row {
+		dropped := false
+		for _, o := range omitted {
+			if i == o {
+				dropped = true
+				break
+			}
+		}
+		if !dropped {
+			out = append(out, cell)
+		}
+	}
+	return out
 }
 
 func formatTime(result *ResultEntry) string {
@@ -111,6 +162,11 @@ func formatTime(result *ResultEntry) string {
 	}
 	if result.Error != "" && result.MedianMS == 0 {
 		return "ERR"
+	}
+	// Long runs read better in seconds; short ones keep millisecond
+	// precision.
+	if result.MedianMS >= 10000 {
+		return fmt.Sprintf("%.2f s", result.MedianMS/1000)
 	}
 	return fmt.Sprintf("%.1fms", result.MedianMS)
 }

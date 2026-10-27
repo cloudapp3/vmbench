@@ -255,9 +255,14 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		// ctrl+c: raw mode clears ISIG, so ^C arrives here as a plain key
-		// instead of SIGINT. No page binds it, so quit globally — like "q"
-		// on the running page, cancel any in-flight run first.
+		// instead of SIGINT. On the running page it opens the cancel
+		// confirmation like esc/q; everywhere else (and while a confirm
+		// modal is already up) it quits, cancelling any in-flight run first.
 		if msg.String() == "ctrl+c" {
+			if !m.confirm && m.page == pageRunning && m.cancel != nil {
+				m.confirm = true
+				return m, nil
+			}
 			if m.cancel != nil {
 				m.cancel()
 			}
@@ -269,6 +274,19 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "?" && !textEntryActive(m) {
 			toggled, _ := toggleHelp(m)
 			return toggled, nil
+		}
+		// Theme (t) and language (l) cycle from every page, mirroring the
+		// dashboard's lines; only raw-text entry is exempt.
+		if !textEntryActive(m) {
+			switch msg.String() {
+			case "t":
+				theme.CycleTheme()
+				return m, nil
+			case "l":
+				m.langExplicit = cycleLangState(m.langExplicit)
+				applyLangState(m.langExplicit)
+				return m, nil
+			}
 		}
 		if scrolled, ok := handleScrollKeys(m, msg); ok {
 			return scrolled, nil
@@ -318,8 +336,15 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case benchmarkDoneMsg:
 		m.report = &msg.report
+		m.cancel = nil
+		if m.page != pageRunning {
+			// The user already cancelled back to the dashboard; keep the
+			// (partial) report in history and say so instead of yanking
+			// them onto the results page.
+			return finishRunAway(m, saveHistoryCmd(msg.report))
+		}
 		m.page = pageResults
-		return m, nil
+		return m, saveHistoryCmd(msg.report)
 
 	case checkupStartMsg:
 		return startCheckup(m, msg.opts)
@@ -329,8 +354,12 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case checkupDoneMsg:
 		m.checkupReport = &msg.report
+		m.cancel = nil
+		if m.page != pageRunning {
+			return finishRunAway(m, saveHistoryCmd(msg.report))
+		}
 		m.page = pageCheckupResults
-		return m, nil
+		return m, saveHistoryCmd(msg.report)
 
 	case compareLoadedMsg:
 		m.compareLoading = false
@@ -355,6 +384,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.history.err = nil
 				m.history.records = msg.records
+				m.history.total = msg.total
 				if m.history.cursor >= len(msg.records) {
 					m.history.cursor = len(msg.records) - 1
 				}
@@ -379,6 +409,19 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return followFocus(m), nil
+
+	case historySavedMsg:
+		if msg.err == nil {
+			return m, nil
+		}
+		var cmd tea.Cmd
+		m.toast, cmd = comp.ShowToast(
+			i18n.Tf("tui.toast.historySaveFailed", map[string]any{"Err": msg.err.Error()}),
+			comp.ToastError, 4*time.Second)
+		return m, cmd
+
+	case historyDeletedMsg:
+		return historyDeleted(m, msg)
 
 	case checkupCompareMsg:
 		m.compareLoading = false
@@ -435,7 +478,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	if m.width < 60 || m.height < 18 {
+	if m.width < 50 || m.height < 16 {
 		return lipgloss.NewStyle().
 			Foreground(theme.Active.Warning).
 			Render(fmt.Sprintf("\n  %s\n  %s", i18n.Tf("tui.tooSmall", map[string]any{"Width": m.width, "Height": m.height}), i18n.T("tui.tooSmallHint")))
@@ -476,17 +519,71 @@ func renderHeader(m Model) string {
 }
 
 func renderFooter(m Model, pos scrollPos) string {
-	hints := helpFooterHints(m.page)
+	hints := helpFooterHints(m)
+	footer := comp.Footer(m.width, hints)
 	if pos.scrollable {
 		scrollHint := comp.Hint{
 			Key:  fmt.Sprintf("%d/%d", pos.line, pos.total),
 			Desc: i18n.T("tui.hint.scroll"),
 		}
 		// The position hint is dropped first when space runs out.
-		footer := comp.Footer(m.width, append(hints, scrollHint))
-		if line := strings.Split(footer, "\n")[1]; i18n.StyledWidth(line) <= m.width {
-			return footer
+		withPos := comp.Footer(m.width, append(hints, scrollHint))
+		if line := strings.Split(withPos, "\n")[1]; i18n.StyledWidth(line) <= m.width {
+			footer = withPos
 		}
 	}
-	return comp.Footer(m.width, hints)
+	// The toast is rendered by the shared View layer directly above the
+	// footer so it stays in the viewport whatever the page scrolled to.
+	if m.toast.Active() {
+		toastLine := m.toast.Render(m.width - 4)
+		if w := i18n.StyledWidth(toastLine); w > m.width {
+			toastLine = i18n.TruncateStyled(toastLine, m.width)
+		}
+		footer = toastLine + "\n" + footer
+	}
+	return footer
+}
+
+// finishRunAway pairs the history-save cmd with the "partial results saved"
+// toast shown when a cancelled run's report lands after the user left the
+// running page. The toast must land on the model this function returns, not
+// on a copy that gets discarded.
+func finishRunAway(m Model, save tea.Cmd) (Model, tea.Cmd) {
+	var toastCmd tea.Cmd
+	m.toast, toastCmd = comp.ShowToast(i18n.T("tui.toast.partialSaved"), comp.ToastInfo, 4*time.Second)
+	return m, tea.Batch(save, toastCmd)
+}
+
+// historyDeleted applies a delete result: drop the record locally, clamp the
+// cursor, and toast the outcome.
+func historyDeleted(m Model, msg historyDeletedMsg) (tea.Model, tea.Cmd) {
+	m.history.confirmDelete = false
+	if msg.err != nil {
+		var cmd tea.Cmd
+		m.toast, cmd = comp.ShowToast(
+			i18n.Tf("tui.history.deleteFailed", map[string]any{"Err": msg.err.Error()}),
+			comp.ToastError, 4*time.Second)
+		return m, cmd
+	}
+	records := make([]history.Record, 0, len(m.history.records))
+	for _, rec := range m.history.records {
+		if rec.ID != msg.id {
+			records = append(records, rec)
+		}
+	}
+	m.history.records = records
+	if m.history.total > 0 {
+		m.history.total--
+	}
+	if m.history.cursor >= len(records) {
+		m.history.cursor = len(records) - 1
+	}
+	if m.history.cursor < 0 {
+		m.history.cursor = 0
+	}
+	var cmd tea.Cmd
+	m.toast, cmd = comp.ShowToast(
+		i18n.Tf("tui.history.deleted", map[string]any{"ID": msg.id}),
+		comp.ToastSuccess, 3*time.Second)
+	return followFocus(m), cmd
 }

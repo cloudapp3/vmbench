@@ -33,6 +33,9 @@ func TestRunIperfWithoutHostFailsConsistently(t *testing.T) {
 
 	relevantEvents := make([]Event, 0, 3)
 	for _, event := range events {
+		if event.Item != "" {
+			continue // item-level progress events are covered separately
+		}
 		if event.Section == SectionSpeed || event.Kind == EventCheckupDone {
 			relevantEvents = append(relevantEvents, event)
 		}
@@ -52,6 +55,32 @@ func TestRunIperfWithoutHostFailsConsistently(t *testing.T) {
 		if relevantEvents[i].Kind != want.kind || relevantEvents[i].Status != want.status {
 			t.Fatalf("relevant events[%d] = %+v, want kind=%q status=%q", i, relevantEvents[i], want.kind, want.status)
 		}
+	}
+}
+
+// TestRunEmitsSpeedItemEvents pins the sub-section progress contract: one
+// item.start plus one terminal item event per speed provider.
+func TestRunEmitsSpeedItemEvents(t *testing.T) {
+	events := make([]Event, 0, 6)
+	Run(context.Background(), Options{
+		Sections:       SectionSelector{Speed: true},
+		SpeedProviders: []string{SpeedProviderIperf3},
+		Timeout:        time.Second,
+		OnEvent: func(event Event) {
+			events = append(events, event)
+		},
+	})
+	var starts, terminals int
+	for _, event := range events {
+		if event.Kind == EventItemStart && event.Item == SpeedProviderIperf3 {
+			starts++
+		}
+		if (event.Kind == EventItemDone || event.Kind == EventItemFail) && event.Item == SpeedProviderIperf3 {
+			terminals++
+		}
+	}
+	if starts != 1 || terminals != 1 {
+		t.Fatalf("iperf3 item events: %d starts, %d terminals (events=%+v), want 1 and 1", starts, terminals, events)
 	}
 }
 

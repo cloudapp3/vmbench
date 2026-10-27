@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "revision": "2026-09.1",
+  "provisional": true,
   "grades": {
     "s": 90,
     "a": 80,

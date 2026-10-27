@@ -6,6 +6,9 @@ other = "vmbench — cross-platform CPU and network benchmark toolkit"
 [cli.usage.header]
 other = "Usage:"
 
+[cli.usage.cmdNoArgs]
+other = "no arguments: interactive TUI (checkbox checklist, then run)"
+
 [cli.usage.cmdBench]
 other = "run benchmarks; --preset/--only/--skip select sections"
 
@@ -47,6 +50,14 @@ other = "show version"
 
 [cli.usage.cmdUninstall]
 other = "remove vmbench, its history, and owned data"
+
+[cli.usage.examples]
+other = """Examples:
+  vmbench                            interactive TUI (same as no arguments)
+  vmbench --preset quick             hardware + network info + speed + IP quality
+  vmbench --only ping,speed          just these sections
+  vmbench --json-out report.json     hardware run, JSON report to file
+  vmbench score report.json          deterministic assessment of a saved report"""
 
 [cli.usage.detailHint]
 other = "Run 'vmbench --help' for benchmark flags, or 'vmbench mcp serve --help' for MCP server flags."
@@ -112,19 +123,25 @@ other = "Catalog selection:"
 other = "iterations per workload (1-9)"
 
 [cli.flag.filter]
-other = "run workloads matching regex"
+other = "run hardware workloads matching regex (sections ignore this; use --only/--preset for sections)"
 
 [cli.flag.lang]
-other = "interface language (en, zh-CN)"
+other = "interface language (auto, en, zh-CN)"
 
 [cli.flag.diskPath]
 other = "disk benchmark temp directory"
 
 [cli.flag.timeout]
-other = "per-section timeout (default 5m; hardware applies it per workload)"
+other = "per-section timeout, Go duration format like 90s / 5m / 1h (default 5m; hardware applies it per workload)"
 
-[cli.flag.json]
+[cli.flag.jsonOut]
 other = "write JSON report to file"
+
+[cli.flag.jsonLegacy]
+other = "deprecated alias for --json-out (subcommands use --json as a boolean)"
+
+[cli.flag.jsonList]
+other = "output workload definitions as JSON"
 
 [cli.flag.html]
 other = "write HTML report to file"
@@ -146,6 +163,18 @@ other = "upload endpoint for the custom provider (https only)"
 
 [cli.flag.shareDryRun]
 other = "print the payload and the redaction inventory without uploading"
+
+[cli.flag.scoreJson]
+other = "print the assessment as JSON"
+
+[cli.flag.scoreOut]
+other = "write the assessment JSON to a file"
+
+[cli.flag.scoreBaseline]
+other = "use a baseline JSON file instead of the embedded set"
+
+[cli.flag.scoreBaselineRev]
+other = "fail unless the baseline revision matches"
 
 [cli.flag.savePayload]
 other = "save the redacted payload copy to a file (0600)"
@@ -187,10 +216,10 @@ other = "speed providers (comma-separated: cloudflare,speedtest_net,speedtest_cn
 other = "iperf3 server(s) for speed section (comma-separated)"
 
 [cli.flag.only]
-other = "run only selected sections (comma-separated: hardware,network_info,route,ping,speed,ip,reachability,mail,media)"
+other = "run only selected sections (comma-separated: hardware,network_info,route,ping,speed,ip_quality,reachability,mail,media)"
 
 [cli.flag.skip]
-other = "skip selected sections (comma-separated: hardware,network_info,route,ping,speed,ip,reachability,mail,media)"
+other = "skip selected sections (comma-separated: hardware,network_info,route,ping,speed,ip_quality,reachability,mail,media)"
 
 [cli.flag.ipVersion]
 other = "network IP version: v4, v6, or dual"
@@ -285,6 +314,22 @@ other = "error: --iterations must be between 1 and 9"
 [cli.error.timeoutNegative]
 other = "error: --timeout must not be negative"
 
+[cli.error.badDuration]
+other = 'invalid duration "{{.Value}}" (use the 90s / 5m / 1h format)'
+
+[cli.error.presetOnlyConflict]
+other = "error: --preset and --only are mutually exclusive; --only would silently replace the preset's section set (use --skip to narrow a preset)"
+
+[cli.error.jsonBothFlags]
+other = "error: --json and --json-out cannot be combined; pass the output path once"
+
+[cli.error.tuiNoTTY]
+other = "no interactive terminal available; run `vmbench --preset quick` for a CLI checkup or `vmbench --json-out report.json` for a hardware run"
+
+
+[cli.notice.langSet]
+other = "interface language set to {{.Lang}} (persisted)"
+
 [cli.error.badFilterRegex]
 other = "error: invalid --filter regex: {{.Err}}"
 
@@ -361,7 +406,7 @@ other = "error: exactly one report path or '-' (stdin) is required"
 other = "error reading {{.Path}}: {{.Err}}"
 
 [cli.error.unknownNodesCommand]
-other = "unknown nodes command: {{.Command}}"
+other = 'unknown nodes command: {{.Command}} (available: list, verify, update, health)'
 
 [cli.error.nodesNoPositional]
 other = "error: nodes list does not accept positional arguments"
@@ -426,6 +471,9 @@ other = "share: {{.Provider}} failed: {{.Err}}"
 [cli.share.allFailed]
 other = "error: every share provider failed; no link was created"
 
+[cli.share.providerHint]
+other = "hint: retry with another chain via --provider, e.g. --provider 0x0,paste_rs"
+
 [cli.share.dryRunHint]
 other = "hint: run with --dry-run to review the payload, or --save-payload to keep a copy and distribute it manually"
 
@@ -434,6 +482,18 @@ other = "history: saved {{.ID}}"
 
 [cli.notice.redactDisabled]
 other = "notice: --redact none keeps real public IPs in reports; do not share the output unreviewed"
+
+[cli.notice.jsonDeprecated]
+other = "notice: --json PATH is deprecated for benchmark output; use --json-out (this still works)"
+
+[cli.notice.interrupted]
+other = "interrupted: partial results were kept (report/history written where requested); exit 130"
+
+[cli.notice.scoreHint]
+other = "hint: vmbench score {{.Path}} derives the deterministic assessment (dimension indices, scenario fit, coverage)"
+
+[cli.notice.compareUnavailable]
+other = "note: report comparison is not enabled in this build; run `vmbench score` on each report to compare assessments"
 
 [cli.notice.missingHardwareTools]
 other = "notice: missing hardware tools: {{.Tools}}; affected workloads will be recorded as structured errors"
@@ -830,6 +890,15 @@ other = "error: uninstall takes no arguments"
 
 [cli.score.baseline]
 other = "Baseline"
+
+[cli.score.baselineProvisional]
+other = "provisional baselines, not yet calibrated"
+
+[cli.score.source]
+other = "Source"
+
+[cli.score.confidenceLegend]
+other = "confidence = metric coverage × iteration factor (1.0 at ≥3 iterations, 0.85 at 2, 0.7 at fewer)"
 
 [cli.score.composite]
 other = "Composite"

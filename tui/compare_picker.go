@@ -53,10 +53,19 @@ func newPickerState(pathA, pathB string) pickerState {
 	return pickerState{a: -1, b: -1, pathA: a, pathB: b}
 }
 
+// pickerNeedsLoad reports whether the picker should (re)fetch records: no
+// successful load yet, or the previous one failed so re-entry retries.
+func pickerNeedsLoad(s pickerState) bool {
+	return !s.loading && (s.records == nil || s.err != nil)
+}
+
 type historyListMsg struct {
 	records []history.Record
+	total   int // store record count before the pickerLimit truncation
 	err     error
 }
+
+type historySavedMsg struct{ err error }
 
 type checkupCompareMsg struct {
 	text string
@@ -80,10 +89,31 @@ func loadHistoryCmd() tea.Cmd {
 		if err != nil {
 			return historyListMsg{err: err}
 		}
+		total := len(records)
 		if len(records) > pickerLimit {
 			records = records[:pickerLimit]
 		}
-		return historyListMsg{records: records}
+		return historyListMsg{records: records, total: total}
+	}
+}
+
+// saveHistoryCmd stores a finished (or partially finished) report in the
+// history store with an empty tag, mirroring the CLI's saveHistoryReport
+// wire format: the marshalled report body goes in verbatim.
+func saveHistoryCmd(value any) tea.Cmd {
+	return func() tea.Msg {
+		data, err := json.Marshal(value)
+		if err != nil {
+			return historySavedMsg{err: fmt.Errorf("encode report: %w", err)}
+		}
+		store, err := history.Open("")
+		if err != nil {
+			return historySavedMsg{err: err}
+		}
+		if _, err := store.Add(data, ""); err != nil {
+			return historySavedMsg{err: err}
+		}
+		return historySavedMsg{}
 	}
 }
 
@@ -171,6 +201,14 @@ func updateComparePicker(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(s.records) > 0 {
 				return m, viewRecordCmd(s.records[s.cursor])
 			}
+		case "r":
+			// (Re)load records; retry after a failed load too.
+			if !s.loading {
+				s.loading = true
+				s.err = nil
+				m.picker = s
+				return m, loadHistoryCmd()
+			}
 		case "m":
 			s.mode = pickerManual
 			s.inputFocus = 'a'
@@ -180,7 +218,7 @@ func updateComparePicker(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			if s.mode == pickerManual {
 				return pickerCycleInput(m)
 			}
-		case "esc":
+		case "esc", "q":
 			if s.mode == pickerManual {
 				s.mode = pickerList
 				s.inputFocus = 0
@@ -189,8 +227,6 @@ func updateComparePicker(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.page = pageDashboard
 			}
-		case "q":
-			return m, tea.Quit
 		}
 		m.picker = s
 		return followFocus(m), nil
@@ -286,11 +322,7 @@ func viewComparePicker(m Model) string {
 		body := s.pathA.View() + "\n" + s.pathB.View() + "\n\n" +
 			lipgloss.NewStyle().Foreground(t.Subtle).Render(i18n.T("tui.compare.manualHint"))
 		card := comp.Card{Title: i18n.T("tui.compare.manual"), Body: body, Accent: t.Accent, Width: width - 4}.Render()
-		parts := []string{title, desc, "", card}
-		if m.toast.Active() {
-			parts = append(parts, "", m.toast.Render(width-4))
-		}
-		return strings.Join(parts, "\n")
+		return strings.Join([]string{title, desc, "", card}, "\n")
 	}
 
 	if s.loading {
@@ -301,6 +333,7 @@ func viewComparePicker(m Model) string {
 	if s.err != nil {
 		return strings.Join([]string{title, desc, "",
 			lipgloss.NewStyle().Foreground(t.Danger).Render("  " + i18n.Tf("tui.compare.historyError", map[string]any{"Err": s.err.Error()})),
+			lipgloss.NewStyle().Foreground(t.Subtle).Render("  " + i18n.T("tui.hint.retryHint")),
 		}, "\n")
 	}
 	if len(s.records) == 0 {
@@ -309,13 +342,7 @@ func viewComparePicker(m Model) string {
 		}, "\n")
 	}
 
-	cols := []comp.TableColumn{
-		{Title: "", Width: 3},
-		{Title: i18n.T("tui.compare.col.time"), Width: comp.ColWidth(i18n.T("tui.compare.col.time"), 14)},
-		{Title: i18n.T("tui.compare.col.kind"), Width: comp.ColWidth(i18n.T("tui.compare.col.kind"), 8)},
-		{Title: i18n.T("tui.compare.col.tag"), Width: comp.ColWidth(i18n.T("tui.compare.col.tag"), 14)},
-		{Title: i18n.T("tui.compare.col.id"), Width: comp.ColWidth(i18n.T("tui.compare.col.id"), 22)},
-	}
+	cols, idWidth, withTag := pickerTableColumns(width)
 	rows := make([]comp.TableRow, 0, len(s.records))
 	for i, rec := range s.records {
 		marker := "·"
@@ -324,14 +351,17 @@ func viewComparePicker(m Model) string {
 		} else if i == s.b {
 			marker = "B"
 		}
+		cells := []string{
+			marker,
+			rec.ReportTime.Format("01-02 15:04"),
+			string(rec.Kind),
+		}
+		if withTag {
+			cells = append(cells, truncStr(firstStr(rec.Tag, "—"), 14))
+		}
+		cells = append(cells, truncStr(rec.ID, idWidth))
 		rows = append(rows, comp.TableRow{
-			Cells: []string{
-				marker,
-				rec.ReportTime.Format("01-02 15:04"),
-				string(rec.Kind),
-				truncStr(firstStr(rec.Tag, "—"), 14),
-				truncStr(rec.ID, 22),
-			},
+			Cells:     cells,
 			Highlight: i == s.cursor,
 		})
 	}
@@ -349,10 +379,36 @@ func viewComparePicker(m Model) string {
 		status = i18n.T("tui.compare.pickerHint")
 	}
 	parts = append(parts, "", lipgloss.NewStyle().Foreground(t.Secondary).Render(truncStr(status, width-4)))
-	if m.toast.Active() {
-		parts = append(parts, "", m.toast.Render(width-4))
-	}
 	return strings.Join(parts, "\n")
+}
+
+// pickerTableColumns builds the picker's columns, adding the A/B marker
+// column to the shared history shape. Narrow terminals drop tag and shrink
+// the ID column so time and ID survive.
+func pickerTableColumns(width int) (cols []comp.TableColumn, idWidth int, withTag bool) {
+	const markerW, timeW, kindW, tagW = 3, 14, 8, 14
+	budget := width - 4
+	idWidth = 22
+	withTag = budget >= markerW+timeW+kindW+tagW+idWidth+4
+	if !withTag {
+		idWidth = budget - markerW - timeW - kindW - 3
+		if idWidth < 10 {
+			idWidth = 10
+		}
+		if idWidth > 30 {
+			idWidth = 30
+		}
+	}
+	cols = []comp.TableColumn{
+		{Title: "", Width: markerW},
+		{Title: i18n.T("tui.compare.col.time"), Width: comp.ColWidth(i18n.T("tui.compare.col.time"), timeW)},
+		{Title: i18n.T("tui.compare.col.kind"), Width: comp.ColWidth(i18n.T("tui.compare.col.kind"), kindW)},
+	}
+	if withTag {
+		cols = append(cols, comp.TableColumn{Title: i18n.T("tui.compare.col.tag"), Width: comp.ColWidth(i18n.T("tui.compare.col.tag"), tagW)})
+	}
+	cols = append(cols, comp.TableColumn{Title: i18n.T("tui.compare.col.id"), Width: comp.ColWidth(i18n.T("tui.compare.col.id"), idWidth)})
+	return cols, idWidth, withTag
 }
 
 // pickerFocusedLine mirrors viewComparePicker's layout: title, desc, blank,

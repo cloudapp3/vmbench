@@ -112,8 +112,10 @@ func viewScrollPos(m Model) (string, scrollPos) {
 
 	offset := m.scroll.offset
 	if m.confirm {
-		// The cancel modal overlays the tail of the content; keep it visible.
-		offset = 0
+		// The cancel confirmation rides at the tail of the content (modal
+		// in the full views, inline prompt in the compact ones); show the
+		// tail so it stays inside the viewport on tall pages.
+		offset = maxScrollOffset(content, vh)
 	}
 	if max := maxScrollOffset(content, vh); offset > max {
 		offset = max

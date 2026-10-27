@@ -26,19 +26,17 @@ func updateCompare(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "esc":
+		case "esc", "q":
 			m.page = pageComparePicker
 			return m, nil
 		case "r":
 			// Back to the picker to change the selection.
 			m.page = pageComparePicker
-			if m.picker.records == nil && !m.picker.loading && m.picker.err == nil {
+			if pickerNeedsLoad(m.picker) {
 				m.picker.loading = true
 				return m, loadHistoryCmd()
 			}
 			return m, nil
-		case "q":
-			return m, tea.Quit
 		}
 	}
 	return m, nil

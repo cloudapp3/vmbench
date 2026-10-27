@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"regexp"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/cloudapp3/vmbench"
@@ -19,6 +22,7 @@ import (
 	"github.com/cloudapp3/vmbench/nodecatalog"
 	"github.com/cloudapp3/vmbench/redact"
 	gbreport "github.com/cloudapp3/vmbench/report"
+	"github.com/cloudapp3/vmbench/tui"
 )
 
 // benchmarkFlags carries every root-level benchmark flag. The flag set is the
@@ -31,6 +35,7 @@ type benchmarkFlags struct {
 	diskPath        string
 	timeout         time.Duration
 	jsonOut         string
+	jsonLegacyFlag  string
 	htmlOut         string
 	markdownOut     string
 	preset          string
@@ -67,13 +72,14 @@ func newBenchmarkFlags() *benchmarkFlags {
 // root invocation and the root help text.
 func newBenchmarkFlagSet(bf *benchmarkFlags) *flag.FlagSet {
 	fs := flag.NewFlagSet("vmbench", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
 	fs.IntVar(&bf.iterations, "iterations", 3, i18n.T("cli.flag.iterations"))
 	fs.StringVar(&bf.filter, "filter", "", i18n.T("cli.flag.filter"))
 	fs.StringVar(&bf.diskPath, "disk-path", "", i18n.T("cli.flag.diskPath"))
-	fs.DurationVar(&bf.timeout, "timeout", 0, i18n.T("cli.flag.timeout"))
-	fs.StringVar(&bf.jsonOut, "json", "", i18n.T("cli.flag.json"))
+	fs.Var(durationValue{&bf.timeout}, "timeout", i18n.T("cli.flag.timeout"))
+	fs.StringVar(&bf.jsonOut, "json-out", "", i18n.T("cli.flag.jsonOut"))
+	fs.StringVar(&bf.jsonLegacyFlag, "json", "", i18n.T("cli.flag.jsonLegacy"))
 	fs.StringVar(&bf.htmlOut, "html", "", i18n.T("cli.flag.html"))
 	fs.StringVar(&bf.markdownOut, "markdown", "", i18n.T("cli.flag.markdown"))
 	fs.StringVar(&bf.preset, "preset", "", i18n.T("cli.flag.preset"))
@@ -95,9 +101,47 @@ func newBenchmarkFlagSet(bf *benchmarkFlags) *flag.FlagSet {
 	fs.StringVar(&bf.catalogRevision, "node-revision", "", i18n.T("cli.flag.nodeRevision"))
 	fs.StringVar(&bf.catalogCache, "node-cache", "", i18n.T("cli.flag.nodeCache"))
 	fs.Usage = func() {
-		printBenchUsage(fs)
+		printBenchUsage(fs.Output(), fs)
 	}
 	return fs
+}
+
+// durationValue parses the --timeout flag with a friendlier error than the
+// stock duration flag's bare "parse error", spelling out the expected format.
+type durationValue struct{ d *time.Duration }
+
+func (v durationValue) String() string {
+	if v.d == nil {
+		return "0s"
+	}
+	return v.d.String()
+}
+
+func (v durationValue) Set(s string) error {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return errors.New(i18n.Tf("cli.error.badDuration", map[string]any{"Value": s}))
+	}
+	if d < 0 {
+		return errors.New(i18n.T("cli.error.timeoutNegative"))
+	}
+	*v.d = d
+	return nil
+}
+
+// resolveJSONOutput applies the --json-out flag plus the deprecated --json
+// PATH spelling (kept working with a notice; subcommands use boolean --json).
+func (bf *benchmarkFlags) resolveJSONOutput() int {
+	if bf.jsonLegacyFlag == "" {
+		return 0
+	}
+	if bf.jsonOut != "" {
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error.jsonBothFlags"))
+		return 2
+	}
+	fmt.Fprintln(os.Stderr, i18n.T("cli.notice.jsonDeprecated"))
+	bf.jsonOut = bf.jsonLegacyFlag
+	return 0
 }
 
 // runBenchmark executes the root benchmark surface. Hardware-only selections
@@ -108,12 +152,18 @@ func runBenchmark(args []string) int {
 	fs := newBenchmarkFlagSet(bf)
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
-	// A lone --lang only switches the interface language: open the TUI
-	// instead of silently starting a benchmark.
+	// A lone --lang only switches the interface language: with a terminal it
+	// opens the TUI (persisting the choice on exit, as always); without one
+	// it persists the preference directly instead of failing to render.
 	langOnly := true
 	fs.Visit(func(f *flag.Flag) {
 		if f.Name != "lang" {
@@ -121,9 +171,26 @@ func runBenchmark(args []string) int {
 		}
 	})
 	if langOnly {
+		if !stdinIsInteractiveTTY() {
+			cfg := tui.LoadConfig()
+			if langFlagSeen == "auto" {
+				cfg.Lang = "" // omitempty: back to auto
+			} else {
+				cfg.Lang = langFlagSeen
+			}
+			if err := tui.SaveConfig(cfg); err != nil {
+				printErr(err)
+				return 1
+			}
+			fmt.Fprintln(os.Stderr, i18n.Tf("cli.notice.langSet", map[string]any{"Lang": i18n.Lang()}))
+			return 0
+		}
 		return runTUI(nil)
 	}
 
+	if code := bf.resolveJSONOutput(); code != 0 {
+		return code
+	}
 	filterRE, code := bf.validate(fs)
 	if code != 0 {
 		return code
@@ -231,6 +298,12 @@ func (bf *benchmarkFlags) resolveSections() (checkup.SectionSelector, []string, 
 	sections := checkup.SectionSelector{Hardware: true}
 	routePresets := parseHosts(bf.routePreset)
 	ipVersion := bf.ipVersion
+	if strings.TrimSpace(bf.preset) != "" && strings.TrimSpace(bf.only) != "" {
+		// --only silently replaced the whole preset selection before; make
+		// the conflict explicit instead.
+		fmt.Fprintln(os.Stderr, i18n.T("cli.error.presetOnlyConflict"))
+		return checkup.SectionSelector{}, nil, "", 2
+	}
 	if strings.TrimSpace(bf.preset) != "" {
 		spec, ok := checkup.LookupPreset(bf.preset)
 		if !ok {
@@ -286,11 +359,22 @@ func (bf *benchmarkFlags) runHardwareOnly(filterRE *regexp.Regexp) int {
 	}
 	printHardwareToolPreflight(os.Stderr, runOptions.HardwareTools, filterRE)
 	defer maybeSetupTempSwap(bf, runOptions.HardwareTools, filterRE)()
-	report := vmbench.RunCore(context.Background(), runOptions)
+	// SIGINT/SIGTERM cancel the run context instead of killing the process:
+	// the partial report is still written, history still saved, and deferred
+	// temp-file cleanup (fio/dd workloads, temp swap) still runs.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	report := vmbench.RunCore(ctx, runOptions)
+	interrupted := ctx.Err() != nil
 	if !bf.saveHistoryIfRequested(report) {
 		return 1
 	}
-	return bf.writeRunReport(report)
+	code := bf.writeRunReport(report)
+	if interrupted {
+		fmt.Fprintln(os.Stderr, i18n.T("cli.notice.interrupted"))
+		return 130
+	}
+	return code
 }
 
 // runCheckupSections is the former `vmbench checkup` execution path.
@@ -323,11 +407,21 @@ func (bf *benchmarkFlags) runCheckupSections(sections checkup.SectionSelector, r
 		printHardwareToolPreflight(os.Stderr, checkupOptions.HardwareTools, filterRE)
 		defer maybeSetupTempSwap(bf, checkupOptions.HardwareTools, filterRE)()
 	}
-	report := checkup.Run(context.Background(), checkupOptions)
+	// Same interrupt contract as the hardware path: cancel, keep the partial
+	// report, run deferred cleanup, exit 130.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	report := checkup.Run(ctx, checkupOptions)
+	interrupted := ctx.Err() != nil
 	if !bf.saveHistoryIfRequested(report) {
 		return 1
 	}
-	return bf.writeCheckupReport(report)
+	code := bf.writeCheckupReport(report)
+	if interrupted {
+		fmt.Fprintln(os.Stderr, i18n.T("cli.notice.interrupted"))
+		return 130
+	}
+	return code
 }
 
 func (bf *benchmarkFlags) saveHistoryIfRequested(report any) bool {
@@ -371,10 +465,22 @@ func (bf *benchmarkFlags) writeRunReport(report vmbench.Report) int {
 	if err := gbreport.WriteConsole(os.Stdout, report); err != nil {
 		return 1
 	}
+	bf.printScoreHint()
+	// Exit 3: the report is complete and usable, but some workloads failed;
+	// exit 1 stays reserved for "no usable report" (write errors).
 	if gbreport.HasFailures(report) {
-		return 1
+		return 3
 	}
 	return 0
+}
+
+// printScoreHint points at the deterministic assessment command after a run
+// wrote a JSON report, so the derived layer is discoverable without reading
+// the docs.
+func (bf *benchmarkFlags) printScoreHint() {
+	if bf.jsonOut != "" {
+		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.notice.scoreHint", map[string]any{"Path": bf.jsonOut}))
+	}
 }
 
 func (bf *benchmarkFlags) writeCheckupReport(report checkup.CheckupReport) int {
@@ -408,8 +514,10 @@ func (bf *benchmarkFlags) writeCheckupReport(report checkup.CheckupReport) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
+	bf.printScoreHint()
+	// Exit 3 mirrors the run path: usable report, some sections failed.
 	if report.HasFailures() {
-		return 1
+		return 3
 	}
 	return 0
 }

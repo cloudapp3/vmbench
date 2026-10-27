@@ -1,10 +1,13 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -25,7 +28,7 @@ func updateResults(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "esc":
+		case "esc", "q":
 			if m.reportFrom != pageDashboard {
 				from := m.reportFrom
 				m.reportFrom = pageDashboard
@@ -71,8 +74,6 @@ func updateResults(m Model, msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.page = pageResultDetail
 				return m, nil
 			}
-		case "q":
-			return m, tea.Quit
 		}
 	}
 	return m, nil
@@ -132,18 +133,37 @@ func resultsFocusedLine(m Model) (int, bool) {
 
 const resultsBodyStartLine = 5
 
+// reportFileName builds the timestamped save name so repeated saves never
+// silently overwrite each other.
+func reportFileName(now time.Time) string {
+	return fmt.Sprintf("vmbench-report-%s.json", now.Format("20060102-150405"))
+}
+
+// saveReportFile writes the report to an absolute path, refusing to
+// overwrite an existing file; the returned message carries the full path for
+// the toast.
+func saveReportFile(name string, report *vmbench.Report) saveDoneMsg {
+	path, err := filepath.Abs(name)
+	if err != nil {
+		path = name
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return saveDoneMsg{path: path, err: fmt.Errorf("%s", i18n.Tf("tui.toast.saveExists", map[string]any{"Path": path}))}
+		}
+		return saveDoneMsg{path: path, err: err}
+	}
+	defer f.Close()
+	if err := gbreport.WriteJSON(f, *report); err != nil {
+		return saveDoneMsg{path: path, err: err}
+	}
+	return saveDoneMsg{path: path}
+}
+
 func saveReportCmd(report *vmbench.Report) tea.Cmd {
 	return func() tea.Msg {
-		path := "vmbench-report.json"
-		f, err := os.Create(path)
-		if err != nil {
-			return saveDoneMsg{path: path, err: err}
-		}
-		defer f.Close()
-		if err := gbreport.WriteJSON(f, *report); err != nil {
-			return saveDoneMsg{path: path, err: err}
-		}
-		return saveDoneMsg{path: path}
+		return saveReportFile(reportFileName(time.Now()), report)
 	}
 }
 
@@ -187,10 +207,6 @@ func viewResults(m Model) string {
 	if len(doc.Extensions.Workloads) > 0 {
 		extHeader := lipgloss.NewStyle().Bold(true).Foreground(t.Secondary).Render(i18n.T("tui.results.extensions"))
 		parts = append(parts, "", extHeader, viewWorkloadRows(doc.Extensions.Workloads, -1, width))
-	}
-
-	if m.toast.Active() {
-		parts = append(parts, "", m.toast.Render(width))
 	}
 
 	return strings.Join(parts, "\n")
@@ -373,6 +389,19 @@ func viewResultsGrouped(m Model) string {
 	cats := resultCategories(m.report.Results.Workloads)
 	line := 0
 
+	// Narrow terminals drop the latency column (like the flat table) and let
+	// the name column absorb the slack so the OK/FAIL status stays visible.
+	nameW, timeW, thrW, latW := 22, 10, 18, 10
+	if m.width < 100 {
+		latW = 0
+		if w := m.width - 2 - (10 + 18 + 8 + 3 + 4); w < nameW {
+			nameW = w
+		}
+		if nameW < 12 {
+			nameW = 12
+		}
+	}
+
 	for _, cat := range cats {
 		icon := "▸"
 		if m.expanded[cat] {
@@ -390,12 +419,14 @@ func viewResultsGrouped(m Model) string {
 				if w.Category != cat {
 					continue
 				}
-				name := lipgloss.NewStyle().Width(22).Foreground(t.Fg).Render(truncStr(w.Name, 22))
-				time := lipgloss.NewStyle().Width(10).Align(lipgloss.Right).Foreground(t.Fg).Render(tuiTime(w.Result))
-				thr := lipgloss.NewStyle().Width(18).Align(lipgloss.Right).Foreground(t.Fg).Render(tuiThroughput(w.Result))
-				lat := lipgloss.NewStyle().Width(10).Align(lipgloss.Right).Foreground(t.Fg).Render(tuiLatency(w.Result))
-				status := tuiStatusText(w.Result)
-				b.WriteString("    " + name + " " + time + " " + thr + " " + lat + " " + status + "\n")
+				row := "    " +
+					lipgloss.NewStyle().Width(nameW).Foreground(t.Fg).Render(truncStr(w.Name, nameW)) + " " +
+					lipgloss.NewStyle().Width(timeW).Align(lipgloss.Right).Foreground(t.Fg).Render(tuiTime(w.Result)) + " " +
+					lipgloss.NewStyle().Width(thrW).Align(lipgloss.Right).Foreground(t.Fg).Render(tuiThroughput(w.Result))
+				if latW > 0 {
+					row += " " + lipgloss.NewStyle().Width(latW).Align(lipgloss.Right).Foreground(t.Fg).Render(tuiLatency(w.Result))
+				}
+				b.WriteString(row + " " + tuiStatusText(w.Result) + "\n")
 			}
 		}
 		line++

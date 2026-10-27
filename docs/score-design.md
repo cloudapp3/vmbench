@@ -72,7 +72,7 @@ vmbench 此前的产品立场是"不输出总分/等级"（README、capabilities
 
 - 加载：严格 Decode（`DisallowUnknownFields`、单 JSON 文档、1 MiB 上限）+ `Validate()`（metric id 唯一；维度/ profile 权重和为 1；引用存在；log 类 floor>0 且 <ceiling；band 类 exc<good<fair<cut）。
 - 来源：内嵌（默认）或 `--baseline PATH`；`--baseline-rev REV` 指定 revision 时严格相等校验，不匹配硬错误（fail-closed）。基线 `revision` 与来源写入输出的 `baseline` 字段。
-- 锚点数值是知情占位，随 revision 迭代校准，不改代码。
+- 锚点数值是知情占位，随 revision 迭代校准，不改代码。占位基线在 JSON 里显式标记 `"provisional": true`，该标记透传到输出的 `baseline.provisional`，console 在基线行追加「基线为占位值，尚未校准」提示；校准完成后移除标记即可。
 
 ## 5. 归一化模型
 
@@ -144,8 +144,8 @@ type Assessment struct {
     SchemaVersion int                   `json:"schema_version"`      // 1
     Kind          string                `json:"report_kind"`         // "assessment"
     Generator     string                `json:"generator"`
-    Source        SourceRef             `json:"source"`              // 输入 kind/id/时间
-    Baseline      BaselineRef           `json:"baseline"`            // revision + 来源
+    Source        SourceRef             `json:"source"`              // 输入 kind + 回链（version/timestamp/sha256-8）
+    Baseline      BaselineRef           `json:"baseline"`            // revision + 来源 + provisional
     Composite     *Composite            `json:"composite,omitempty"` // nil = 证据不足
     Dimensions    []DimensionAssessment `json:"dimensions"`
     Profiles      []ProfileAssessment   `json:"profiles"`
@@ -158,7 +158,7 @@ type Assessment struct {
 // Coverage{metric_pct, present[], missing[], dimensions_present[], dimensions_missing[], confidence}
 ```
 
-**不含任何时间戳**（Generator 版本除外）：确定性底线 ⇒ 同输入同基线字节级相同输出。全部可选字段 `omitempty`。
+**不含任何本地时钟值**：确定性底线 ⇒ 同输入同基线字节级相同输出。`source.timestamp` / `source.version` / `source.sha256`（前 8 位十六进制）是从输入报告本身读出的回链，不是评估时刻；无该字段的报告保持空缺。全部可选字段 `omitempty`。
 
 ## 11. CLI：`vmbench score`
 

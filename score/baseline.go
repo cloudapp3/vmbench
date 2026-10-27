@@ -77,10 +77,13 @@ type ProfileBaseline struct {
 	Vetoes  []VetoRule         `json:"vetoes,omitempty"`
 }
 
-// BaselineSet is a versioned scoring baseline collection.
+// BaselineSet is a versioned scoring baseline collection. Provisional marks
+// sets whose anchors are placeholder values awaiting calibration; assessments
+// built on them disclose it instead of posing as calibrated verdicts.
 type BaselineSet struct {
 	SchemaVersion int                          `json:"schema_version"`
 	Revision      string                       `json:"revision"`
+	Provisional   bool                         `json:"provisional,omitempty"`
 	Grades        GradeCutoffs                 `json:"grades"`
 	Metrics       map[string]MetricBaseline    `json:"metrics"`
 	Dimensions    map[string]DimensionBaseline `json:"dimensions"`

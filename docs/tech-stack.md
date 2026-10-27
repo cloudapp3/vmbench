@@ -119,7 +119,7 @@ Runner 行为：
 - workload 始终串行、隔离执行，不并发不同 benchmark，也不修改进程级 `GOMAXPROCS`、GC 或线程绑定状态。线程数和队列深度由 sysbench/fio/OpenSSL/WinSAT 各自参数定义。
 - 硬件 workload 使用请求的 1-9 次迭代并聚合中位数；`bench/netio` workload 通过 `IterationLimiter` 限制为一次真实探测（体检场景），并在结果中记录实际 `iterations: 1`。
 - `vmbench` 根命令统一承载硬件基准与综合测评：不带 `--preset`/`--only`/`--skip` 只注册外部工具硬件 workload（run 报告），选择网络 section 后走 `checkup.Run`（体检报告）；网络诊断（route/speed/IP 质量等）都在同一命令面上。
-- CLI 对非法 filter/iteration/tool 直接返回参数错误；没有 workload 命中或任一 workload 失败时，run 路径返回退出码 1。
+- CLI 对非法 filter/iteration/tool 直接返回参数错误（退出码 2）；没有可用报告产出返回 1；报告已写出但存在失败 workload / section 返回 3；Ctrl+C / SIGTERM 优雅取消后返回 130（部分报告保留）。
 - `OnWorkloadStart` 在每个 workload 的首个 sample 进入前同步触发，`OnWorkloadDone` 在该 workload 返回后立即触发；`RunCore` 据此逐项发射 `checkup_start` 与 `checkup_done` / `checkup_fail`，不等待整批结束。同名 workload 也会逐项发射，不按名称去重。
 
 ## Hardware 外部工具模型
@@ -204,7 +204,7 @@ vmbench --preset quick|website|proxy|mail
 vmbench --only ping,mail
 vmbench --skip media
 vmbench --ip-version v4|v6|dual
-vmbench --quiet --json checkup.json
+vmbench --quiet --json-out checkup.json
 ```
 
 CLI 默认通过 `checkup.Options.OnEvent` 把 `section.start`、完成/失败状态和 `checkup.done` 实时写到 stderr，因此 JSON/HTML 输出路径和 stdout console 内容不受进度文本污染；`--quiet` 只关闭这条进度流。

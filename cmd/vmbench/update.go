@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"runtime"
@@ -21,26 +22,31 @@ var currentVersion = vmbench.Version
 
 func runUpdate(args []string) int {
 	fs := flag.NewFlagSet("update", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
 	var checkOnly, asJSON bool
 	var version, apiBase, dest string
 	var timeout time.Duration
 	fs.BoolVar(&checkOnly, "check", false, i18n.T("cli.update.flag.check"))
 	fs.StringVar(&version, "version", "", i18n.T("cli.update.flag.version"))
-	fs.DurationVar(&timeout, "timeout", 300*time.Second, i18n.T("cli.update.flag.timeout"))
+	fs.DurationVar(&timeout, "timeout", 300*time.Second, "overall timeout for the whole update, check and download included (default 5m)")
 	fs.BoolVar(&asJSON, "json", false, i18n.T("cli.flag.jsonOutput"))
 	fs.StringVar(&apiBase, "api-url", selfupdate.DefaultAPIBase, i18n.T("cli.update.flag.apiUrl"))
 	fs.StringVar(&dest, "dest", "", i18n.T("cli.update.flag.dest"))
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: vmbench update [flags]")
-		fmt.Fprintln(os.Stderr, "")
-		fmt.Fprintln(os.Stderr, i18n.T("cli.usage.updateDetail"))
+		fmt.Fprintln(fs.Output(), "Usage: vmbench update [flags]")
+		fmt.Fprintln(fs.Output(), "")
+		fmt.Fprintln(fs.Output(), i18n.T("cli.usage.updateDetail"))
 	}
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 	if fs.NArg() != 0 || timeout <= 0 {

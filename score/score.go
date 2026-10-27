@@ -9,6 +9,8 @@
 package score
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"strings"
@@ -46,15 +48,21 @@ type Assessment struct {
 	Warnings      []string          `json:"warnings,omitempty"`
 }
 
-// SourceRef identifies the evaluated report.
+// SourceRef identifies the evaluated report. Version, Timestamp, and SHA256
+// are backlinks into the source document (not wall-clock values), so the
+// assessment stays byte-identical for identical input.
 type SourceRef struct {
-	Kind string `json:"kind"`
+	Kind      string `json:"kind"`
+	Version   string `json:"version,omitempty"`
+	Timestamp string `json:"timestamp,omitempty"`
+	SHA256    string `json:"sha256,omitempty"`
 }
 
 // BaselineRef identifies the baseline set used for evaluation.
 type BaselineRef struct {
-	Revision string `json:"revision"`
-	Source   string `json:"source"`
+	Revision    string `json:"revision"`
+	Source      string `json:"source"`
+	Provisional bool   `json:"provisional,omitempty"`
 }
 
 // CompositeResult is the weighted composite index. It is nil when the report
@@ -171,15 +179,24 @@ func Evaluate(data []byte, opts Options) (Assessment, error) {
 		return Assessment{}, err
 	}
 
+	// The digest is over the exact input bytes: a stable backlink that lets
+	// anyone re-derive which report file produced this assessment.
+	digest := sha256.Sum256(data)
 	evidence := extractEvidence(*baseline, in)
 	assessment := Assessment{
 		SchemaVersion: AssessmentSchemaVersion,
 		ReportKind:    ReportKindAssessment,
 		Generator:     opts.Generator,
-		Source:        SourceRef{Kind: in.Kind},
+		Source: SourceRef{
+			Kind:      in.Kind,
+			Version:   in.ReportVersion,
+			Timestamp: in.ReportTimestamp,
+			SHA256:    hex.EncodeToString(digest[:])[:8],
+		},
 		Baseline: BaselineRef{
-			Revision: baseline.Revision,
-			Source:   baselineSourceLabel(opts.BaselineSource),
+			Revision:    baseline.Revision,
+			Source:      baselineSourceLabel(opts.BaselineSource),
+			Provisional: baseline.Provisional,
 		},
 		Warnings: evidenceWarnings(evidence),
 	}

@@ -16,11 +16,14 @@ import (
 
 // Provider names accepted by --provider.
 const (
-	ProviderDpaste   = "dpaste"
-	ProviderZerox0   = "0x0"
-	ProviderPasteRS  = "paste_rs"
-	ProviderCustom   = "custom"
-	DefaultProviders = ProviderDpaste
+	ProviderDpaste  = "dpaste"
+	ProviderZerox0  = "0x0"
+	ProviderPasteRS = "paste_rs"
+	ProviderCustom  = "custom"
+	// DefaultProviders is the fallback chain used when --provider is omitted.
+	// dpaste goes first (JSON API, expiry control) but has been observed
+	// answering 403 to datacenter IP ranges, so 0x0 and paste.rs back it up.
+	DefaultProviders = ProviderDpaste + "," + ProviderZerox0 + "," + ProviderPasteRS
 )
 
 // uploadTimeout bounds a single provider attempt. There is no in-provider
@@ -66,7 +69,9 @@ func ParseProviders(value, customEndpoint string) ([]string, error) {
 		names = append(names, name)
 	}
 	if len(names) == 0 {
-		names = []string{DefaultProviders}
+		// DefaultProviders is itself a comma-separated chain; expand it
+		// through the same split-and-validate path as an explicit value.
+		return ParseProviders(DefaultProviders, customEndpoint)
 	}
 	for _, name := range names {
 		if name == ProviderCustom && strings.TrimSpace(customEndpoint) == "" {
@@ -78,7 +83,7 @@ func ParseProviders(value, customEndpoint string) ([]string, error) {
 
 // UploadOptions configures one Upload call.
 type UploadOptions struct {
-	Providers []string     // ordered fallback chain; empty means dpaste
+	Providers []string     // ordered fallback chain; empty means DefaultProviders
 	Endpoint  string       // upload URL for the "custom" provider
 	UserAgent string       // sent to every provider
 	Client    *http.Client // injectable for tests; default has uploadTimeout
@@ -94,15 +99,19 @@ type Attempt struct {
 }
 
 // Upload sends the payload through the provider chain and returns the first
-// successful paste URL. Fallback only happens on network errors and 5xx
-// responses: any other failure (4xx, unparseable or oversized response,
-// non-https endpoint) is terminal so a misbehaving provider cannot turn one
-// requested upload into several. The payload is uploaded successfully at
-// most once.
+// successful paste URL. Fallback happens on network errors, 5xx responses,
+// and 403/429 rejections (dpaste blocks some datacenter ranges with 403;
+// 429 is rate limiting): a paste URL was definitely not created in those
+// cases, so the next provider may try. Any other failure (4xx, unparseable
+// or oversized response, non-https endpoint) is terminal so a misbehaving
+// provider cannot turn one requested upload into several. The payload is
+// uploaded successfully at most once.
 func Upload(ctx context.Context, payload []byte, opts UploadOptions) (string, []Attempt, error) {
 	names := opts.Providers
 	if len(names) == 0 {
-		names = []string{DefaultProviders}
+		// DefaultProviders is a validated compile-time chain; plain Split
+		// avoids re-validating what the constant already guarantees.
+		names = strings.Split(DefaultProviders, ",")
 	}
 	client := opts.Client
 	if client == nil {
@@ -141,7 +150,9 @@ func Upload(ctx context.Context, payload []byte, opts UploadOptions) (string, []
 func fallbackable(err error) bool {
 	var httpErr *httpError
 	if errors.As(err, &httpErr) {
-		return httpErr.Status >= 500
+		// 403 (range blocks) and 429 (rate limit) are provider-side
+		// rejections: nothing was pasted, the next provider may try.
+		return httpErr.Status >= 500 || httpErr.Status == 403 || httpErr.Status == 429
 	}
 	// Network errors (dial, timeout, TLS) are *url.Error; everything else
 	// (bad status handling aside) is treated as terminal.

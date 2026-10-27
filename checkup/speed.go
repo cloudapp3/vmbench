@@ -24,6 +24,7 @@ func runSpeedSection(ctx context.Context, opts Options, report *CheckupReport) {
 	failed := 0
 
 	for _, provider := range opts.SpeedProviders {
+		emitItem(opts.OnEvent, SectionSpeed, provider, "running", "")
 		group := buildSpeedGroup(ctx, provider, opts)
 		if group.ID == "" {
 			continue
@@ -35,6 +36,7 @@ func runSpeedSection(ctx context.Context, opts Options, report *CheckupReport) {
 		if group.Summary != nil {
 			mergeSpeedSummary(aggregate, group.Summary.Provider, group.Summary.ProviderLabel, group.Summary.Node, group.Summary.Region, group.Summary.DownloadMbps, group.Summary.UploadMbps, group.Summary.LatencyMs)
 		}
+		emitItem(opts.OnEvent, SectionSpeed, provider, speedGroupItemStatus(group), speedGroupItemMessage(group))
 	}
 
 	aggregate.Available = available
@@ -95,6 +97,39 @@ func buildSpeedGroup(ctx context.Context, provider string, opts Options) SpeedPr
 	}
 }
 
+// speedGroupItemStatus maps a finished provider group onto item event status
+// tokens (ok / partial / error) matching section state vocabulary.
+func speedGroupItemStatus(group SpeedProviderGroup) string {
+	if group.Available == 0 {
+		return "error"
+	}
+	return statusFromCounts(group.Available, group.Failed)
+}
+
+// speedGroupItemMessage summarizes one provider group for progress output,
+// e.g. "DL 940.2 Mbps" or "2 ok/1 failed".
+func speedGroupItemMessage(group SpeedProviderGroup) string {
+	var parts []string
+	if group.Summary != nil && group.Summary.DownloadMbps > 0 {
+		parts = append(parts, fmt.Sprintf("DL %.1f Mbps", group.Summary.DownloadMbps))
+	}
+	if group.Summary != nil && group.Summary.UploadMbps > 0 {
+		parts = append(parts, fmt.Sprintf("UL %.1f Mbps", group.Summary.UploadMbps))
+	}
+	parts = append(parts, fmt.Sprintf("%d ok/%d failed", group.Available, group.Failed))
+	return strings.Join(parts, " · ")
+}
+
+// carrierNodeTrail names the nodes a carrier download will try, in order,
+// for progress output (e.g. "gz-telecom → sh-telecom").
+func carrierNodeTrail(nodes []netio.SpeedNode) string {
+	ids := make([]string, 0, len(nodes))
+	for _, n := range nodes {
+		ids = append(ids, n.ID)
+	}
+	return strings.Join(ids, " → ")
+}
+
 var ispCarrierLabels = map[string]string{
 	"telecom": "China Telecom",
 	"unicom":  "China Unicom",
@@ -130,6 +165,7 @@ func buildChinaISPGroup(ctx context.Context, opts Options) SpeedProviderGroup {
 			builder.addError("china-isp-"+carrier, "download", "", fmt.Errorf("no %s node in the selected node catalog", carrier))
 			continue
 		}
+		emitItem(opts.OnEvent, SectionSpeed, SpeedProviderChinaISP+"/"+carrier, "running", carrierNodeTrail(carrierNodes))
 		// Try same-carrier nodes in catalog order until one succeeds so a
 		// single unreachable city does not fail the whole carrier.
 		var (
@@ -151,9 +187,11 @@ func buildChinaISPGroup(ctx context.Context, opts Options) SpeedProviderGroup {
 		}
 		if probe == nil || lastErr != nil {
 			builder.addError("china-isp-"+carrier, "download", "", fmt.Errorf("all %s nodes failed: %s", carrier, strings.Join(tried, "; ")))
+			emitItem(opts.OnEvent, SectionSpeed, SpeedProviderChinaISP+"/"+carrier, "error", "all nodes failed")
 			continue
 		}
 		dlMbps := mebibytesPerSecondToMegabitsPerSecond(probe.ThroughputMiBPerSec())
+		emitItem(opts.OnEvent, SectionSpeed, SpeedProviderChinaISP+"/"+carrier, "ok", fmt.Sprintf("%s · DL %.1f Mbps", node.Name, dlMbps))
 		builder.addOK(SpeedProviderResult{
 			ID:            "china-isp-" + carrier,
 			Provider:      SpeedProviderChinaISP,

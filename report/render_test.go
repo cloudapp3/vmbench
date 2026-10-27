@@ -56,6 +56,53 @@ func TestWriteConsoleOmitsEvidenceLinesWhenAbsent(t *testing.T) {
 	}
 }
 
+// TestFormatTimeAdaptiveUnits pins the ≥10s switch from milliseconds to
+// seconds so long workloads stop printing as five-digit millisecond values.
+func TestFormatTimeAdaptiveUnits(t *testing.T) {
+	cases := []struct {
+		medianMS float64
+		want     string
+	}{
+		{123.4, "123.4ms"},
+		{9999.9, "9999.9ms"},
+		{10000, "10.00 s"},
+		{65432.1, "65.43 s"},
+	}
+	for _, tc := range cases {
+		got := formatTime(&ResultEntry{MedianMS: tc.medianMS})
+		if got != tc.want {
+			t.Fatalf("formatTime(%vms) = %q, want %q", tc.medianMS, got, tc.want)
+		}
+	}
+}
+
+// TestWriteConsoleFailureSummary pins the N/M failure line: present when a
+// workload errored, absent when everything succeeded.
+func TestWriteConsoleFailureSummary(t *testing.T) {
+	doc := evidenceDocument()
+	doc.Results.Workloads = []WorkloadEntry{
+		{Name: "ok-workload", Category: "CPU", Result: &ResultEntry{MedianMS: 10, Detail: "fine"}},
+		{Name: "bad-workload", Category: "CPU", Result: &ResultEntry{Error: "tool missing"}},
+	}
+	var out bytes.Buffer
+	if err := WriteConsole(&out, doc); err != nil {
+		t.Fatal(err)
+	}
+	console := out.String()
+	if !strings.Contains(console, "1/2 workloads failed") {
+		t.Fatalf("console missing failure summary:\n%s", console)
+	}
+
+	doc.Results.Workloads[1] = WorkloadEntry{Name: "bad-workload", Category: "CPU", Result: &ResultEntry{MedianMS: 5}}
+	out.Reset()
+	if err := WriteConsole(&out, doc); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "workloads failed") {
+		t.Fatalf("console must not print a failure summary for a clean run:\n%s", out.String())
+	}
+}
+
 func TestWriteHTMLIncludesSysExtraLine(t *testing.T) {
 	var out bytes.Buffer
 	if err := WriteHTML(&out, evidenceDocument()); err != nil {

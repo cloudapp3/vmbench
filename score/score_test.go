@@ -230,6 +230,34 @@ func fullRunWorkloads() map[string]map[string]any {
 
 var fullRunTools = []string{"sysbench", "openssl", "fio", "dd", "stream", "mbw"}
 
+// TestEvaluateSourceBacklink pins the assessment→report backlink fields: the
+// digest and report metadata come from the input bytes, never the clock.
+func TestEvaluateSourceBacklink(t *testing.T) {
+	data := runDocument("Ubuntu 24.04", 3, []string{"fio"}, map[string]map[string]any{
+		"Disk 4K Random Read Q32 (fio)": throughputRow("IOPS", 90000),
+	})
+	assessment := mustEvaluate(t, data, Options{})
+	if assessment.Source.Kind != "run" {
+		t.Fatalf("source kind = %q, want run", assessment.Source.Kind)
+	}
+	if assessment.Source.Version != "test" {
+		t.Fatalf("source version = %q, want the report's version field", assessment.Source.Version)
+	}
+	if assessment.Source.Timestamp != "" {
+		t.Fatalf("source timestamp = %q, want empty when the report has none", assessment.Source.Timestamp)
+	}
+	if len(assessment.Source.SHA256) != 8 {
+		t.Fatalf("source sha256 = %q, want 8 hex chars", assessment.Source.SHA256)
+	}
+	// Determinism: identical bytes in, identical digest out.
+	if again := mustEvaluate(t, data, Options{}); again.Source.SHA256 != assessment.Source.SHA256 {
+		t.Fatalf("source sha256 not deterministic: %q vs %q", again.Source.SHA256, assessment.Source.SHA256)
+	}
+	if !assessment.Baseline.Provisional {
+		t.Fatal("embedded baseline should disclose provisional status")
+	}
+}
+
 func TestEvaluateFullRunReportIsCompleteAndDeterministic(t *testing.T) {
 	data := runDocument("Ubuntu 24.04 LTS", 3, fullRunTools, fullRunWorkloads())
 	assessment := mustEvaluate(t, data, Options{})
@@ -468,6 +496,11 @@ func TestEvaluateLegacySuiteMatchesCheckup(t *testing.T) {
 	}
 	checkupAssessment := mustEvaluate(t, base("checkup"), Options{})
 	suiteAssessment := mustEvaluate(t, base("suite"), Options{})
+	// The source digest is input-specific by design (the two documents are
+	// not the same bytes); normalize it out so the comparison pins the
+	// scoring behavior, which is what equivalence means here.
+	checkupAssessment.Source.SHA256 = ""
+	suiteAssessment.Source.SHA256 = ""
 
 	checkupBytes, err := json.Marshal(checkupAssessment)
 	if err != nil {

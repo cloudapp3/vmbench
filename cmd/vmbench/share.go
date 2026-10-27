@@ -22,7 +22,7 @@ import (
 // subcommand — the benchmark, TUI, and MCP paths do not call into share.
 func runShare(args []string) int {
 	fs := flag.NewFlagSet("share", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	fs.SetOutput(io.Discard)
 	registerLangFlag(fs)
 	format := fs.String("format", "text", i18n.T("cli.flag.shareFormat"))
 	redactMode := fs.String("redact", string(redact.Default), i18n.T("cli.flag.redact"))
@@ -32,13 +32,18 @@ func runShare(args []string) int {
 	dryRun := fs.Bool("dry-run", false, i18n.T("cli.flag.shareDryRun"))
 	savePayload := fs.String("save-payload", "", i18n.T("cli.flag.savePayload"))
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: vmbench share <report.json|-> [flags]\n\n"+i18n.T("cli.usage.shareDetail"))
+		fmt.Fprintln(fs.Output(), "Usage: vmbench share <report.json|-> [flags]\n\n"+i18n.T("cli.usage.shareDetail"))
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
+			fs.SetOutput(os.Stdout)
+			fs.Usage()
 			return 0
 		}
+		fs.SetOutput(os.Stderr)
+		fmt.Fprintln(os.Stderr, err)
+		fs.Usage()
 		return 2
 	}
 	if fs.NArg() != 1 {
@@ -123,6 +128,10 @@ func runShare(args []string) int {
 		}
 	}
 
+	// The inventory lands on stderr *before* the upload so the user sees
+	// exactly what is about to leave the machine, not only afterwards.
+	fmt.Fprintln(os.Stderr, prepared.Inventory.Summary())
+
 	url, attempts, err := share.Upload(context.Background(), prepared.Payload, share.UploadOptions{
 		Providers: providerChain,
 		Endpoint:  *endpoint,
@@ -137,6 +146,7 @@ func runShare(args []string) int {
 			}))
 		}
 		fmt.Fprintf(os.Stderr, "%s\n", i18n.T("cli.share.allFailed"))
+		fmt.Fprintf(os.Stderr, "%s\n", i18n.Tf("cli.share.providerHint", map[string]any{"Chain": share.DefaultProviders}))
 		fmt.Fprintf(os.Stderr, "%s\n", i18n.T("cli.share.dryRunHint"))
 		return 1
 	}
@@ -151,7 +161,6 @@ func runShare(args []string) int {
 		"Size":     fmt.Sprintf("%.1f KiB", float64(len(prepared.Payload))/1024),
 		"Provider": providerChainName(providerChain, attempts),
 	}))
-	fmt.Fprintln(os.Stderr, prepared.Inventory.Summary())
 	fmt.Println(url)
 	return 0
 }
