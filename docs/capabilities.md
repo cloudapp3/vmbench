@@ -974,7 +974,7 @@ CLI、TUI、MCP 复用同一体检（checkup）normalization/validation 契约�
     "name": "Ubuntu 22.04 LTS",
     "kernel": "5.15.0-91-generic",
     "hostname": "vps-01",
-    "go_version": "go1.26.6"
+    "go_version": "go1.26.10"
   },
   "disks": [
     {

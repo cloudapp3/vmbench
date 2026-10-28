@@ -47,6 +47,7 @@
 
 ### 安装与文档
 
+- **Go 工具链基线升级到 `1.26.10`**（安全补丁批次，清掉 govulncheck 门禁新披露的 13 个可达标准库漏洞 GO-2026-6599…6809；唯一保留项仍是已 allowlist 的 GO-2026-4479）。`golang.org/x/term` 随本次直接引用从 indirect 提升为直接依赖。
 - **install.sh**：curl 下载显示进度条；GitHub API 限流时提示可设 `GITHUB_TOKEN`/`GH_TOKEN`。
 - **文档**：README（中）与 docs/README.en.md（英）同步退出码、`--json-out`、share 默认链、TUI 按键、score 披露；docs/capabilities.md、docs/product.md、docs/tech-stack.md、docs/tui-design.md、docs/score-design.md 对应更新。
 

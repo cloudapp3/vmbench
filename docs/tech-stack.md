@@ -6,7 +6,7 @@
 
 | 项目 | 说明 |
 |---|---|
-| 语言 | Go 1.26.6 |
+| 语言 | Go 1.26.10 |
 | CLI | 标准库 `flag` |
 | TUI | Bubble Tea / Lip Gloss |
 | 界面国际化 | nicksnyder/go-i18n v2 + 内嵌 TOML 目录（`i18n/messages/<locale>/`，渲染层翻译，数据层 token 恒为英文） |
