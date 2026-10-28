@@ -16,6 +16,7 @@ require (
 	github.com/oneclickvirt/basics v0.0.34
 	github.com/oneclickvirt/gostun v0.0.10
 	github.com/shirou/gopsutil/v4 v4.25.6
+	golang.org/x/term v0.45.0
 	golang.org/x/text v0.41.0
 )
 
@@ -70,5 +71,4 @@ require (
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
 )
